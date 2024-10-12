@@ -1,0 +1,127 @@
+# ==============================================================================
+# Razobill Git Ignore Rules
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Scientific Manuscripts & Local Research Drafts
+# (Published under Zenodo DOI: 10.5281/zenodo.23287286)
+# ------------------------------------------------------------------------------
+Latitude-and-Doubt.*
+*.preprint.*
+
+# ------------------------------------------------------------------------------
+# 2. C / C++ Build Artifacts & CMake Directories
+# ------------------------------------------------------------------------------
+build/
+build-*/
+cmake-build-*/
+out/
+bin/
+lib/bin/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+*.ninja*
+.ninja_*
+
+# Compiled objects, static archives, and dynamic shared libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.exp
+*.ilk
+*.pdb
+
+# DuckDB extension binaries
+*.duckdb_extension
+
+# CPack package files
+_CPack_Packages/
+*.deb
+*.rpm
+*.tar.gz
+*.tar.xz
+*.zip
+
+# ------------------------------------------------------------------------------
+# 3. Python Packaging, Virtual Environments, & Bytecode
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+*.whl
+*.tar.gz
+
+# Python package build staging directories
+lib/python/srcCore/
+lib/python/includeCore/
+lib/python/thirdpartyCore/
+lib/python/build/
+lib/python/dist/
+lib/python/*.egg-info/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Pytest, coverage, and mypy caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------------------------------------------
+# 4. IDEs, Editors, & Tooling
+# ------------------------------------------------------------------------------
+.vs/
+.vscode/
+*.vscode
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# ------------------------------------------------------------------------------
+# 5. Operating System Artifacts
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------------------
+# 6. Profiling, Tracing, & Benchmark Dumps
+# ------------------------------------------------------------------------------
+*.prof
+*.profdata
+*.gcda
+*.gcno
+callgrind.out.*
+perf.data
+perf.data.old
+gmon.out
+*.log

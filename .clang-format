@@ -1,0 +1,38 @@
+---
+# Clang-Format configuration for librazobill C++20
+BasedOnStyle: LLVM
+Standard: c++20
+Language: Cpp
+
+# Indentation & Alignment
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+AccessModifierOffset: -4
+
+# Braces & Control Flow
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+
+# Pointers & References
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInSquareBrackets: false
+
+# Includes
+SortIncludes: false
+
+# Templates & Namespaces
+FixNamespaceComments: true
+CompactNamespaces: false
+...

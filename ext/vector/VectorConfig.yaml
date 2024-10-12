@@ -1,0 +1,42 @@
+# Vector Production Pipeline: Razobill Edge Compaction
+sources:
+  kubernetes_logs:
+    type: file
+    include:
+      - /var/log/containers/*.log
+    read_from: beginning
+
+transforms:
+  razobill_decompose:
+    type: remap
+    inputs:
+      - kubernetes_logs
+    source: |
+      # Calls native librazobill C ABI transform
+      .razobill = parse_razobill!(.message)
+      
+      # Retain formKey as the primary message skeleton
+      .message = .razobill.form
+      .ints = .razobill.ints
+      .strs = .razobill.strs
+      .hash = .razobill.hash
+
+sinks:
+  aws_s3_parquet:
+    type: aws_s3
+    inputs:
+      - razobill_decompose
+    bucket: telemetry
+    key_prefix: "year=%Y/month=%m/day=%d/"
+    encoding:
+      codec: parquet
+    compression: zstd
+
+  clickhouse_cluster:
+    type: clickhouse
+    inputs:
+      - razobill_decompose
+    endpoint: "http://clickhouse:8123"
+    database: "telemetry"
+    table: "logs_compact"
+    skip_unknown_fields: true

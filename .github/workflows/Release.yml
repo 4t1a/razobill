@@ -1,0 +1,90 @@
+name: Release Engineering & Binary Artifacts
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      versionBump:
+        description: 'SemVer release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  validate-and-lint:
+    name: Lint Commits & Verify ABI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify Conventional Commits
+        uses: wagoid/commitlint-github-action@v6
+
+      - name: Validate SemVer Invariant
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "Building librazobill version: ${VERSION}"
+          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+
+  build-matrix:
+    name: Build & Test (${{ matrix.os }})
+    needs: validate-and-lint
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up C++20 Compiler
+        uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Libraries & Extensions
+        run: cmake --build build --config Release
+
+      - name: Run Test Suites
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Run Python Verification Suite
+        run: python lib/python/tests/TestPyRazobill.py
+
+  publish-release:
+    name: Sign & Publish GitHub Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Tag Version
+        id: get_version
+        run: echo "VERSION=$(cat VERSION | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+
+      - name: Generate SLSA Attestations & Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: librazobill v${{ steps.get_version.outputs.VERSION }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          files: |
+            build/librazobill.duckdb_extension
+            build/Core.*.pyd
+            docs/governance/SbomSpdx.json

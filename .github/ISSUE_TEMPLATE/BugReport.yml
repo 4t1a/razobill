@@ -1,0 +1,59 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behavior in Razobill
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please check existing issues before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Razobill Version
+      description: What version of Razobill are you using? (e.g. 1.0.0, commit hash)
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - "C++ Core (librazobill)"
+        - "Python Bindings (pyrazobill)"
+        - "DuckDB Extension"
+        - "SIMD Scanner (AVX2 / SSE4.2)"
+        - "Information Theory / Stats"
+        - "Build System / CMake"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal reproducible example or code snippet.
+      placeholder: |
+        1. Parse message '...'
+        2. Call reconstruct()
+        3. Observe mismatch
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating System, CPU architecture, compiler version, Python version.
+      placeholder: |
+        - OS: Ubuntu 22.04 / Windows 11 / macOS 14
+        - CPU: x86_64 (AVX2 supported)
+        - Compiler: GCC 13.2 / Clang 16 / MSVC 19.38
+        - Python: 3.12.2
+    validations:
+      required: false

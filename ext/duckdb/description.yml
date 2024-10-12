@@ -1,0 +1,12 @@
+extension:
+  name: razobill
+  description: High-performance lossless log parsing, analytical database compaction, and information-theoretic semantic accounting.
+  version: 1.0.0
+  language: C++
+  build: cmake
+  license: Apache-2.0
+  maintainers:
+    - Forke
+  repo:
+    github: razobill/razobill
+  ref: v1.0.0

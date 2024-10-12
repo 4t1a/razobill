@@ -1,0 +1,109 @@
+// Unit tests for low-level memory planes: MemoryArena, StringPool, FormCatalog, and ThreadPool.
+// Verifies 64-byte alignment, monotonic pointer progression, and cache-conscious behavior.
+#include <string>
+#include <unordered_set>
+
+#include "doctest.h"
+#include "librazobill/FormCatalog.hpp"
+#include "librazobill/MemoryArena.hpp"
+#include "librazobill/StringPool.hpp"
+#include "librazobill/ThreadPool.hpp"
+
+using namespace razobill::core;
+
+TEST_CASE("MemoryArena monotonic allocation and cache-line alignment") {
+    // Assert strictly that all returned pointers are multiples of 64 bytes.
+    // If this fails, AVX2 vector loads will suffer cache-line crossing penalties!
+    MemoryArena arena(4096);
+    void* p1 = arena.allocate(100, 64);
+    REQUIRE(p1 != nullptr);
+    CHECK((reinterpret_cast<std::size_t>(p1) % 64) == 0);
+
+    void* p2 = arena.allocate(200, 64);
+    REQUIRE(p2 != nullptr);
+    CHECK((reinterpret_cast<std::size_t>(p2) % 64) == 0);
+    CHECK(p2 > p1);
+
+    arena.reset();
+    void* p3 = arena.allocate(100, 64);
+    REQUIRE(p3 != nullptr);
+    CHECK((reinterpret_cast<std::size_t>(p3) % 64) == 0);
+}
+
+TEST_CASE("MemoryArena multi-block chunk expansion and reset reuse") {
+    // Initial arena with 1024-byte default block size
+    MemoryArena arena(1024);
+    CHECK(arena.allocatedBytes() == 0);
+
+    // First allocation lazily creates block 0 with capacity >= 1024
+    void* p1 = arena.allocate(800, 64);
+    REQUIRE(p1 != nullptr);
+    CHECK(arena.capacity() >= 1024);
+
+    // Second allocation exceeds block 0 and forces block 1 creation
+    void* p2 = arena.allocate(800, 64);
+    REQUIRE(p2 != nullptr);
+    CHECK(p2 != p1);
+    const std::size_t capAfterGrowth = arena.capacity();
+    CHECK(capAfterGrowth >= 2048);
+    CHECK(arena.allocatedBytes() >= 1600);
+
+    // Reset rewinds to block 0 without freeing allocated block buffers
+    arena.reset();
+    CHECK(arena.allocatedBytes() == 0);
+    CHECK(arena.capacity() == capAfterGrowth);
+
+    // Reallocate through block 0 and block 1 to certify reuse
+    void* p3 = arena.allocate(800, 64);
+    REQUIRE(p3 != nullptr);
+    void* p4 = arena.allocate(800, 64);
+    REQUIRE(p4 != nullptr);
+    CHECK(arena.capacity() == capAfterGrowth);
+}
+
+TEST_CASE("StringPool interning and garbage collection") {
+    StringPool pool;
+    auto id0 = pool.intern("apple");
+    auto id1 = pool.intern("banana");
+    auto id2 = pool.intern("cherry");
+    auto id0Again = pool.intern("apple");
+
+    CHECK(id0 == id0Again);
+    CHECK(id0 != id1);
+    CHECK(pool.size() == 3);
+    CHECK(pool.lookup(id0) == "apple");
+    CHECK(pool.lookup(id1) == "banana");
+
+    // Retain only "banana" and "cherry"
+    std::unordered_set<std::uint32_t> active{id1, id2};
+    auto stats = pool.gc(active);
+    CHECK(stats.totalBefore == 3);
+    CHECK(stats.activeAfter == 2);
+    CHECK(stats.purgedCount == 1);
+    CHECK(pool.size() == 2);
+}
+
+TEST_CASE("FormCatalog thread-safe registration") {
+    FormCatalog catalog;
+    auto h1 = catalog.registerForm("test_key_1\x13I", "test_key_1 <*>", 1, 0);
+    auto h2 = catalog.registerForm("test_key_2\x13S", "test_key_2 <*>", 0, 1);
+    CHECK(catalog.contains(h1));
+    CHECK(catalog.contains(h2));
+    CHECK(catalog.size() == 2);
+}
+
+TEST_CASE("ThreadPool chunked parallelFor") {
+    ThreadPool pool(4);
+    constexpr std::size_t N = 10000;
+    std::vector<int> data(N, 0);
+
+    pool.parallelFor(N, 1000, [&](std::size_t start, std::size_t end) {
+        for (std::size_t i = start; i < end; ++i) {
+            data[i] = 1;
+        }
+    });
+
+    for (std::size_t i = 0; i < N; ++i) {
+        REQUIRE(data[i] == 1);
+    }
+}

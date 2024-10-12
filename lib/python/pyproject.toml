@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=65.0.0", "pybind11>=3.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyrazobill"
+version = "1.0.0"
+description = "High-performance log parsing, exact lossless compaction, and information-theoretic semantic accounting library"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "M. M. Atta and Razobill Contributors" }
+]
+keywords = [
+    "log-parsing",
+    "information-theory",
+    "compression",
+    "duckdb",
+    "lossless",
+    "drain",
+    "high-performance",
+    "cpp20"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Logging",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/razobill/razobill"
+Documentation = "https://github.com/razobill/razobill/blob/main/docs/Index.md"
+Repository = "https://github.com/razobill/razobill.git"
+Issues = "https://github.com/razobill/razobill/issues"
+Changelog = "https://github.com/razobill/razobill/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "psutil>=5.9.0",
+    "duckdb>=1.2.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyrazobill*"]
+
+[tool.setuptools.package-data]
+pyrazobill = ["py.typed", "*.pyi", "*.pyd", "*.so", "*.dll"]

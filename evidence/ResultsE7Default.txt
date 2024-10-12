@@ -1,0 +1,7 @@
+rows=134,815 raw msg bytes=11,680,951 forms=2260 distinct strings=20,680 ki=4 ks=4  xz-9e(msg only)=720,684
+R0 raw                                         native= 6,291,456 (1.00x)  parquet-zstd19=  865,795 (1.00x)  parquet-V2=  901,530 (1.04x)  encodings=[('FSST', 21), ('Constant', 8), ('Dictionary', 6)]
+R1 raw + form_id (additive)                    native= 6,029,312 (0.96x)  parquet-zstd19=  906,958 (1.05x)  parquet-V2=  942,693 (1.09x)  encodings=[('FSST', 21), ('Constant', 10), ('Dictionary', 6), ('BitPacking', 2)]
+CU-i compact, strings inline, time order       native= 3,932,160 (0.62x)  parquet-zstd19=1,228,025 (1.42x)  parquet-V2=1,095,218 (1.26x)  encodings=[('Constant', 18), ('Uncompressed', 17), ('Dictionary', 12), ('RLE', 10)]
+CC-i compact, strings inline, clustered        native= 3,670,016 (0.58x)  parquet-zstd19=1,053,341 (1.22x)  parquet-V2=  980,799 (1.13x)  encodings=[('Uncompressed', 18), ('Constant', 17), ('Dictionary', 15), ('RLE', 11)]
+CU-d compact, string dictionary, time order    native= 3,145,728 (0.50x)  parquet-zstd19=1,151,317 (1.33x)  parquet-V2=  971,363 (1.12x)  encodings=[('Constant', 21), ('Uncompressed', 16), ('BitPacking', 15), ('RLE', 13)]
+CC-d compact, string dictionary, clustered     native= 2,883,584 (0.46x)  parquet-zstd19=  980,363 (1.13x)  parquet-V2=  844,240 (0.98x)  encodings=[('Constant', 19), ('Uncompressed', 17), ('BitPacking', 15), ('RLE', 13)]

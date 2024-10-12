@@ -1,0 +1,48 @@
+# ==============================================================================
+# Razobill Git Attributes (Line Endings & Binary Designations)
+# ==============================================================================
+
+# Default behavior: auto-normalize text files to LF in repository
+* text=auto eol=lf
+
+# Explicit text files
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+*.pyi text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+LICENSE text eol=lf
+NOTICE text eol=lf
+VERSION text eol=lf
+
+# Windows scripts must keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files
+*.pdf binary
+*.pyd binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.lib binary
+*.duckdb_extension binary
+*.parquet binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.zip binary
+*.tar.gz binary

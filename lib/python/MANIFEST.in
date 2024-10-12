@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include NOTICE
+include pyproject.toml
+include setup.py
+include PyRazobill.cpp
+include Guide.md
+recursive-include pyrazobill *.py py.typed
+recursive-include srcCore *.cpp
+recursive-include includeCore *.hpp *.h
+recursive-include thirdpartyCore *
+recursive-include tests *.py

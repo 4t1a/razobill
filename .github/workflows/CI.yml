@@ -1,0 +1,69 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-matrix:
+    name: Test (${{ matrix.os }}, ${{ matrix.compiler }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: ubuntu-latest
+            compiler: gcc-13
+          - os: macos-latest
+            compiler: apple-clang
+          - os: windows-latest
+            compiler: msvc
+
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install Python Build Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel pybind11 duckdb pytest
+
+      - name: Set up Ninja
+        uses: scanframe/setup-ninja@v1
+
+      - name: Set up MSVC Compiler
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C++ Binaries & Extensions
+        run: |
+          ninja -C build
+
+      - name: Run Core C++ Unit Tests
+        run: |
+          ./build/UnitTests || ./build/UnitTests.exe
+
+      - name: Run Embedded DuckDB Integration Tests
+        run: |
+          ./build/IntegrationDuckdb || ./build/IntegrationDuckdb.exe
+
+      - name: Run Python Bindings Test Suite
+        run: |
+          python lib/python/tests/TestPyRazobill.py

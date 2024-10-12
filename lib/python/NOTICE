@@ -1,0 +1,44 @@
+librazobill & pyrazobill
+Copyright 2026 M. M. Atta and contributors.
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for details.
+
+================================================================================
+Scientific Provenance & Theoretical Foundations
+================================================================================
+
+This software implements and operationalizes the mathematical theorems, information
+ledgers, and semantic gating models established in:
+
+    "Latitude and Doubt: Exact Information Accounting and Lossless Decomposition"
+    by M. M. Atta (2026).
+
+================================================================================
+Academic & Industrial Citation Notice
+================================================================================
+
+Pursuant to Section 4(d) of the Apache License, Version 2.0, if you use, embed,
+modify, or redistribute this software (or any derivative works thereof) in academic,
+scientific, benchmark, or industrial publications, you must retain this notice and
+cite the foundational work:
+
+BibTeX:
+@software{atta2026razobill,
+  author       = {Atta, M. M.},
+  title        = {librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.<RECORD_ID>},
+  url          = {https://doi.org/10.5281/zenodo.<RECORD_ID>}
+}
+
+APA:
+Atta, M. M. (2026). librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine. Zenodo. https://doi.org/10.5281/zenodo.<RECORD_ID>
+
+================================================================================
+Included Third-Party Works
+================================================================================
+
+- DuckDB C Extension API: DuckDB contributors (MIT License)
+- Doctest: Viktor Kirilov (MIT License)

@@ -1,0 +1,11 @@
+  dataset  levels  templates  I_XY  leak_identity  leak_kwclass  leak_one_bucket  leak_kw_share  kw_classes  expanded_rows_wrong_level
+  Android       5        202 1.739            0.0         1.574            1.739          0.905           3                      0.644
+   Apache       2          6 0.878            0.0         0.171            0.878          0.195           2                      0.740
+      BGL       5        178 0.852            0.0         0.793            0.852          0.932           3                      0.559
+     HDFS       2         20 0.242            0.0         0.126            0.242          0.522           3                      0.014
+   Hadoop       4        117 1.309            0.0         0.856            1.309          0.654           3                      0.427
+OpenStack       2         67 0.115            0.0         0.114            0.115          0.986           3                      0.050
+Zookeeper       3         57 0.972            0.0         0.628            0.972          0.646           3                      0.718
+
+mean leakage share lost by keyword-class meaning (leak/I(X;Y)): 0.691
+mean share of rows added by semantic "=" whose Level differs from searched template: 0.45
