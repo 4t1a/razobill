@@ -6,7 +6,7 @@ extension:
   build: cmake
   license: Apache-2.0
   maintainers:
-    - Forke
+    - 4t1a
   repo:
-    github: razobill/razobill
+    github: 4t1a/razobill
   ref: v1.0.0
