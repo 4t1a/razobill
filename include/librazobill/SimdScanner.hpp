@@ -81,42 +81,12 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
 #endif
 }
 
-// Scans up to 64 bytes at once using AVX-512BW for spaces, tabs, or newlines.
-// Unlocks 64-byte vector throughput on Intel Xeon Scalable and AMD EPYC server chips.
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
-__attribute__((target("avx512bw,avx512f")))
-#endif
-[[nodiscard]] inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) noexcept {
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
-    std::size_t i = 0;
-    const __m512i spaceVec = _mm512_set1_epi8(' ');
-    const __m512i tabVec = _mm512_set1_epi8('\t');
-    const __m512i lfVec = _mm512_set1_epi8('\n');
-    const __m512i crVec = _mm512_set1_epi8('\r');
-
-    while (i + 64 <= length) {
-        __m512i chunk = _mm512_loadu_si512(reinterpret_cast<const void*>(data + i));
-        __mmask64 eqSpace = _mm512_cmpeq_epi8_mask(chunk, spaceVec);
-        __mmask64 eqTab = _mm512_cmpeq_epi8_mask(chunk, tabVec);
-        __mmask64 eqLf = _mm512_cmpeq_epi8_mask(chunk, lfVec);
-        __mmask64 eqCr = _mm512_cmpeq_epi8_mask(chunk, crVec);
-
-        __mmask64 combined = eqSpace | eqTab | eqLf | eqCr;
-        if (combined != 0) {
-            return i + static_cast<std::size_t>(countTrailingZeros64(static_cast<std::uint64_t>(combined)));
-        }
-        i += 64;
-    }
-    while (i < length) {
-        char c = data[i];
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
-        ++i;
-    }
-    return length;
-#else
-    return findWhitespaceAvx2(data, length);
-#endif
-}
+// Forward declarations for multi-tier SIMD scanners
+[[nodiscard]] inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noexcept;
+[[nodiscard]] inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) noexcept;
+[[nodiscard]] inline std::size_t findWhitespaceNeon(const char* data, std::size_t length) noexcept;
+[[nodiscard]] inline std::size_t findWhitespaceDynamic(const char* data, std::size_t length) noexcept;
+[[nodiscard]] inline std::size_t findWhitespace(const char* data, std::size_t length) noexcept;
 
 // Scans up to 32 bytes at once using AVX2 for spaces, tabs, or newlines.
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
@@ -156,6 +126,43 @@ __attribute__((target("avx2")))
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
     }
     return length;
+#endif
+}
+
+// Scans up to 64 bytes at once using AVX-512BW for spaces, tabs, or newlines.
+// Unlocks 64-byte vector throughput on Intel Xeon Scalable and AMD EPYC server chips.
+#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
+__attribute__((target("avx512bw,avx512f")))
+#endif
+[[nodiscard]] inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) noexcept {
+#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
+    std::size_t i = 0;
+    const __m512i spaceVec = _mm512_set1_epi8(' ');
+    const __m512i tabVec = _mm512_set1_epi8('\t');
+    const __m512i lfVec = _mm512_set1_epi8('\n');
+    const __m512i crVec = _mm512_set1_epi8('\r');
+
+    while (i + 64 <= length) {
+        __m512i chunk = _mm512_loadu_si512(reinterpret_cast<const void*>(data + i));
+        __mmask64 eqSpace = _mm512_cmpeq_epi8_mask(chunk, spaceVec);
+        __mmask64 eqTab = _mm512_cmpeq_epi8_mask(chunk, tabVec);
+        __mmask64 eqLf = _mm512_cmpeq_epi8_mask(chunk, lfVec);
+        __mmask64 eqCr = _mm512_cmpeq_epi8_mask(chunk, crVec);
+
+        __mmask64 combined = eqSpace | eqTab | eqLf | eqCr;
+        if (combined != 0) {
+            return i + static_cast<std::size_t>(countTrailingZeros64(static_cast<std::uint64_t>(combined)));
+        }
+        i += 64;
+    }
+    while (i < length) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        ++i;
+    }
+    return length;
+#else
+    return findWhitespaceAvx2(data, length);
 #endif
 }
 

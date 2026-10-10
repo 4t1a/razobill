@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "High-performance log parsing, exact lossless compaction, and information-theoretic semantic accounting library"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 authors = [
     { name = "M. M. Atta and Razobill Contributors" }
 ]
@@ -26,7 +26,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: C++",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -40,11 +39,11 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/razobill/razobill"
-Documentation = "https://github.com/razobill/razobill/blob/main/docs/Index.md"
-Repository = "https://github.com/razobill/razobill.git"
-Issues = "https://github.com/razobill/razobill/issues"
-Changelog = "https://github.com/razobill/razobill/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/4t1a/razobill"
+Documentation = "https://github.com/4t1a/razobill/blob/main/docs/Index.md"
+Repository = "https://github.com/4t1a/razobill.git"
+Issues = "https://github.com/4t1a/razobill/issues"
+Changelog = "https://github.com/4t1a/razobill/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

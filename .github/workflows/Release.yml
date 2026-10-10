@@ -125,3 +125,38 @@ jobs:
           files: |
             release-binaries/*
             docs/governance/SbomSpdx.json
+
+  publish-pypi:
+    name: Build & Publish to PyPI
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Packaging Dependencies
+        run: |
+          python -m pip install --upgrade pip build twine setuptools wheel pybind11
+
+      - name: Build Source Distribution & Wheels
+        working-directory: lib/python
+        run: |
+          python -m build
+
+      - name: Verify Package with Twine
+        working-directory: lib/python
+        run: |
+          twine check dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        working-directory: lib/python
+        run: |
+          twine upload dist/* --skip-existing
+
