@@ -142,10 +142,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip build twine setuptools wheel pybind11
 
-      - name: Build Source Distribution & Wheels
+      - name: Build Source Distribution
         working-directory: lib/python
         run: |
-          python -m build
+          python -m build --sdist
 
       - name: Verify Package with Twine
         working-directory: lib/python
