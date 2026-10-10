@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ---
 
+## [1.0.1] - 2026-10-11
+
+### Added
+- **Resilient Pure-Python Fallback (`pyrazobill._fallback`)**:
+  - Full API parity for `decompose`, `reconstruct`, `formKey`, `templateOf`, `hash64`, `entropy`, and `computeLedger` in pure Python.
+  - Guarantees seamless installation and operation across all environments, even when C++ development headers or MSVC runtimes are absent.
+- **Windows SDK / UCRT Auto-Discovery**:
+  - Automatically identifies Windows 10/11 SDK header directories (`ucrt`, `shared`, `um`) in `setup.py`, resolving missing `<io.h>` compilation errors on Windows with MSVC.
+- **Pre-Compiled Multi-Platform Binary Wheels**:
+  - Automated building of native wheels across Python 3.9, 3.10, 3.11, 3.12, and 3.13 on Windows (`win_amd64`), Linux (`manylinux_2_28_x86_64`), and macOS (`arm64` and `x86_64`).
+
+### Fixed
+- Resolved `fatal error C1083: Cannot open include file: 'io.h'` during Windows `pip install`.
+- Modernized `pyproject.toml` license configuration to direct SPDX string (`license = "Apache-2.0"`), resolving setuptools deprecation notices.
+
+---
+
 ## [1.0.0] - 2026-10-07
 
 ### Added
