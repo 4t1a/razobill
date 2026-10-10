@@ -1,5 +1,6 @@
 // Unit tests for low-level memory planes: MemoryArena, StringPool, FormCatalog, and ThreadPool.
 // Verifies 64-byte alignment, monotonic pointer progression, and cache-conscious behavior.
+#include <ostream>
 #include <string>
 #include <unordered_set>
 

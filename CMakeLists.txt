@@ -19,6 +19,8 @@ endif()
 
 find_package(Threads REQUIRED)
 
+add_compile_definitions(DOCTEST_CONFIG_USE_STD_HEADERS)
+
 if(MSVC)
   add_compile_options(/W4 /wd4996 /arch:AVX2)
 elseif(APPLE)
