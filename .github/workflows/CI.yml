@@ -53,13 +53,9 @@ jobs:
         run: |
           ninja -C build
 
-      - name: Run Core C++ Unit Tests
+      - name: Run C++ Unit & Integration Test Suites
         run: |
-          ./build/UnitTests || ./build/UnitTests.exe
-
-      - name: Run Embedded DuckDB Integration Tests
-        run: |
-          ./build/IntegrationDuckdb || ./build/IntegrationDuckdb.exe
+          ctest --test-dir build --output-on-failure -C Release
 
       - name: Run Python Bindings Test Suite
         run: |

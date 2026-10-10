@@ -27,6 +27,10 @@
 #include <immintrin.h>
 #endif
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 #if defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
 #endif
@@ -103,11 +107,14 @@ __attribute__((target("avx512bw,avx512f")))
         }
         i += 64;
     }
-    return i;
+    while (i < length) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        ++i;
+    }
+    return length;
 #else
-    (void)data;
-    (void)length;
-    return 0;
+    return findWhitespaceAvx2(data, length);
 #endif
 }
 
@@ -116,7 +123,7 @@ __attribute__((target("avx512bw,avx512f")))
 __attribute__((target("avx2")))
 #endif
 [[nodiscard]] inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noexcept {
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
+#if defined(__x86_64__) || defined(_M_X64)
     std::size_t i = 0;
     const __m256i spaceVec = _mm256_set1_epi8(' ');
     const __m256i tabVec = _mm256_set1_epi8('\t');
@@ -137,11 +144,18 @@ __attribute__((target("avx2")))
         }
         i += 32;
     }
-    return i;
+    while (i < length) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        ++i;
+    }
+    return length;
 #else
-    (void)data;
-    (void)length;
-    return 0;
+    for (std::size_t i = 0; i < length; ++i) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+    }
+    return length;
 #endif
 }
 
@@ -180,11 +194,18 @@ __attribute__((target("avx2")))
         }
         i += 16;
     }
-    return i;
+    while (i < length) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        ++i;
+    }
+    return length;
 #else
-    (void)data;
-    (void)length;
-    return 0;
+    for (std::size_t i = 0; i < length; ++i) {
+        char c = data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+    }
+    return length;
 #endif
 }
 
@@ -201,7 +222,11 @@ __attribute__((target("avx2")))
         return findWhitespaceNeon(data, length);
     case SimdArchitecture::Scalar:
     default:
-        return 0;
+        for (std::size_t i = 0; i < length; ++i) {
+            char c = data[i];
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        }
+        return length;
     }
 }
 
