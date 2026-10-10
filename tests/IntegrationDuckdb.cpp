@@ -31,6 +31,23 @@
 using namespace razobill;
 
 namespace {
+bool duckdbAvailable() {
+    static const bool avail = [] {
+        const auto opt = support::duckdbOptions();
+        std::error_code ec;
+        return std::filesystem::exists(opt.driverPath, ec);
+    }();
+    return avail;
+}
+
+bool corpusAvailable() {
+    static const bool avail = [] {
+        std::error_code ec;
+        return std::filesystem::exists("/tmp/corpus.parquet", ec);
+    }();
+    return avail;
+}
+
 constexpr const char* kRules[][2] = {{"HDFS_RECEIVING", R"(^Receiving block <\*> src: )"},
                                      {"SSH_PASSWORD_FAIL", "^Failed password for"},
                                      {"LINUX_AUTH_FAIL", "^authentication failure"}};
@@ -43,6 +60,10 @@ void loadRaw(Backend& b, const char* name = "raw") {
 } // namespace
 
 TEST_CASE("compact mode: lossless, appendable, original columns restored") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     RazobillEngine rz(*b, {.table = "logs", .purpose = "level"});
@@ -57,6 +78,10 @@ TEST_CASE("compact mode: lossless, appendable, original columns restored") {
 }
 
 TEST_CASE("compact mode: adversarial rows survive") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
     // Robustness test:
     // Testing boundary conditions and multi-byte encoding resilience:
     // - Multibyte UTF-8 characters: '日本語 ログ 42 ünïcödé3'
@@ -78,6 +103,10 @@ TEST_CASE("compact mode: adversarial rows survive") {
 }
 
 TEST_CASE("every stored form equals the C++ core's form (cross-implementation conformance)") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     RazobillEngine rz(*b, {.table = "logs", .purpose = "level"});
@@ -104,6 +133,10 @@ TEST_CASE("every stored form equals the C++ core's form (cross-implementation co
 }
 
 TEST_CASE("meaning layer: gate, doubt, versions, ledger identities") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     RazobillEngine rz(*b, {.table = "logs", .purpose = "level"});
@@ -165,6 +198,10 @@ TEST_CASE("meaning layer: gate, doubt, versions, ledger identities") {
 }
 
 TEST_CASE("hardening: hostile identifiers and patterns never reach SQL unquoted") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     CHECK_THROWS_AS(RazobillEngine(*b, {.table = "logs; DROP TABLE raw; --"}), std::invalid_argument);
@@ -186,6 +223,10 @@ TEST_CASE("hardening: hostile identifiers and patterns never reach SQL unquoted"
 }
 
 TEST_CASE("one instance shared by many threads: calls serialize, results stay consistent") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     RazobillEngine rz(*b, {.table = "logs", .purpose = "level"});
@@ -211,6 +252,10 @@ TEST_CASE("one instance shared by many threads: calls serialize, results stay co
 }
 
 TEST_CASE("additive mode on DuckDB") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     RazobillEngine rz(*b, {.table = "raw", .purpose = "level"});
@@ -229,6 +274,10 @@ TEST_CASE("additive mode on DuckDB") {
 }
 
 TEST_CASE("DuckDB: a new instance resumes over existing compact storage (restart)") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     loadRaw(*b);
     std::optional<stats::Ledger> before;
@@ -251,6 +300,10 @@ TEST_CASE("DuckDB: a new instance resumes over existing compact storage (restart
 }
 
 TEST_CASE("dictionary garbage collection and compaction: purges dead strings and preserves lossless rebuild") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
     auto b = open();
     b->exec("CREATE TABLE ephem(id INTEGER, msg VARCHAR)");
     b->exec("INSERT INTO ephem VALUES (1, 'worker 1 session-alpha-1 active'), (2, 'worker 2 session-beta-1 idle'), (3, "
@@ -278,6 +331,10 @@ TEST_CASE("dictionary garbage collection and compaction: purges dead strings and
 }
 
 TEST_CASE("native functions equal the SQL regex specification (real logs + 60,000 random and adversarial messages)") {
+    if (!duckdbAvailable() || !corpusAvailable()) {
+        MESSAGE("Skipping DuckDB corpus test: DuckDB driver or /tmp/corpus.parquet not present");
+        return;
+    }
     auto b = open();
     b->exec("SET threads = 4");
     loadRaw(*b);
@@ -384,6 +441,10 @@ TEST_CASE("native functions equal the SQL regex specification (real logs + 60,00
 }
 
 TEST_CASE("semantic form extraction in DuckDB: collapses text variables and round-trips exactly") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
     auto b = open();
     b->exec("CREATE TABLE ssh_sample(msg VARCHAR)");
     b->exec("INSERT INTO ssh_sample VALUES "
@@ -410,6 +471,10 @@ TEST_CASE("semantic form extraction in DuckDB: collapses text variables and roun
 }
 
 TEST_CASE("composite struct decomposition and entropy in DuckDB SQL") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
     auto b = open();
     b->exec("CREATE TABLE decomp_test(msg VARCHAR)");
     b->exec("INSERT INTO decomp_test VALUES "

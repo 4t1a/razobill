@@ -7,6 +7,7 @@
 // Handles path normalization (Windows '\\' -> '/') so SQL `LOAD` statements work seamlessly.
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 
 #include "librazobill/Backend.hpp"
@@ -29,13 +30,28 @@ inline razobill::AdbcOptions duckdbOptions() {
     razobill::AdbcOptions o;
     o.flavor = razobill::Flavor::DuckDB;
 #if defined(_WIN32)
-    const char* defLib = "C:/Users/Forke/AppData/Roaming/Python/Python313/site-packages/_duckdb.cp313-win_amd64.pyd";
+    const char* defLib = "duckdb.dll";
+    const char* forkeLib = "C:/Users/Forke/AppData/Roaming/Python/Python313/site-packages/_duckdb.cp313-win_amd64.pyd";
     const char* defExt = "build/librazobill.duckdb_extension";
+    const char* chosenLib = defLib;
+    if (std::getenv("RZB_DUCKDB_LIB")) {
+        chosenLib = std::getenv("RZB_DUCKDB_LIB");
+    } else {
+        std::error_code ec;
+        if (std::filesystem::exists(forkeLib, ec)) {
+            chosenLib = forkeLib;
+        }
+    }
+#elif defined(__APPLE__)
+    const char* defLib = "libduckdb.dylib";
+    const char* defExt = "build/librazobill.duckdb_extension";
+    const char* chosenLib = env("RZB_DUCKDB_LIB", defLib);
 #else
     const char* defLib = "/usr/local/lib/libduckdb.so";
     const char* defExt = "build/librazobill.duckdb_extension";
+    const char* chosenLib = env("RZB_DUCKDB_LIB", defLib);
 #endif
-    o.driverPath = o.driver_path = normalizePath(env("RZB_DUCKDB_LIB", defLib));
+    o.driverPath = o.driver_path = normalizePath(chosenLib);
     o.entrypoint = "duckdb_adbc_init";
     o.databaseOptions = o.database_options = {{"path", ":memory:"}, {"allow_unsigned_extensions", "true"}};
     o.initSql = o.init_sql = {std::string("LOAD '") + normalizePath(env("RZB_EXT", defExt)) + "'"};
