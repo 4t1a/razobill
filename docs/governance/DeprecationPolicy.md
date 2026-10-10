@@ -24,7 +24,7 @@ This document establishes the deprecation, sunset, and removal lifecycle for all
   ```http
   Deprecation: @1767225600
   Sunset: Fri, 01 Jan 2027 00:00:00 GMT
-  Link: <https://github.com/librazobill/razobill/docs/migration-v2.md>; rel="deprecation"
+  Link: <https://github.com/4t1a/razobill/docs/migration-v2.md>; rel="deprecation"
   ```
 - Debug builds output diagnostic warnings into the test console.
 
