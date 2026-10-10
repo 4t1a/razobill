@@ -7,7 +7,7 @@ dist:
 processors:
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.111.0
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.111.0
-  - gomod: github.com/razobill/razobill/ext/otel v1.0.0
+  - gomod: github.com/4t1a/razobill/ext/otel v1.0.0
     path: ./ext/otel
 
 receivers:

@@ -12,10 +12,13 @@
   </p>
   <p align="center">
     <a href="https://doi.org/10.5281/zenodo.23287286"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23287286.svg" alt="DOI: 10.5281/zenodo.23287286"></a>
+    <a href="https://github.com/4t1a/razobill/actions/workflows/CI.yml"><img src="https://github.com/4t1a/razobill/actions/workflows/CI.yml/badge.svg" alt="Continuous Integration"></a>
+    <a href="https://github.com/4t1a/razobill/actions/workflows/Release.yml"><img src="https://github.com/4t1a/razobill/actions/workflows/Release.yml/badge.svg" alt="Release Engineering"></a>
+    <a href="https://pypi.org/project/pyrazobill/"><img src="https://img.shields.io/pypi/v/pyrazobill.svg" alt="PyPI Package"></a>
+    <a href="https://github.com/duckdb/community-extensions/pull/3023"><img src="https://img.shields.io/badge/DuckDB%20Community-PR%20%233023-yellow.svg" alt="DuckDB Community Extension PR #3023"></a>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
     <a href="https://en.wikipedia.org/wiki/C%2B%2B20"><img src="https://img.shields.io/badge/C%2B%2B-20-blue.svg" alt="Language: C++20"></a>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+"></a>
-    <a href="https://duckdb.org/"><img src="https://img.shields.io/badge/DuckDB-Community_Extension-yellow.svg" alt="DuckDB Extension"></a>
     <a href="https://semver.org/"><img src="https://img.shields.io/badge/SemVer-2.0.0-green.svg" alt="SemVer 2.0.0"></a>
     <img src="https://img.shields.io/badge/Lossless-100%25_Exact-brightgreen.svg" alt="Lossless Guarantee">
     <img src="https://img.shields.io/badge/Unit_Tests-37%2F37_Passed-brightgreen.svg" alt="37/37 Unit Tests">
@@ -94,6 +97,82 @@ Once serialized into a string, this message travels down logging pipelines into 
   │ • String pools: dictionary encoded        │   │ • 0 bit mismatches across 69.6M    │
   │ • Form keys: RLE 64-bit hashes            │   │   audited events                   │
   └───────────────────────────────────────────┘   └────────────────────────────────────┘
+```
+
+---
+
+## Quick Start (60 Seconds)
+
+### Python (`pyrazobill`)
+Install directly from [PyPI](https://pypi.org/project/pyrazobill/):
+```bash
+pip install pyrazobill
+```
+
+Lossless decomposition and exact reconstruction:
+```python
+import pyrazobill as rz
+
+raw = "2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
+
+# 1. High-speed single-pass decomposition (releasing GIL for multi-threading)
+form, ints, strs = rz.decompose(raw)
+print("Form: ", form)
+# -> "{}-{}-{} {}:{}:{} [{}] Connection to {}.{}.{}.{}:{} timed out after {} retries"
+print("Ints: ", ints)
+# -> [2026, 10, 7, 14, 2, 11, 10, 0, 0, 1, 5432, 3]
+print("Strs: ", strs)
+# -> ['WARN']
+
+# 2. Exact 100% byte-for-byte lossless reconstruction
+recovered = rz.reconstruct(form, ints, strs)
+assert recovered == raw
+
+# 3. Exact Shannon information ledger & confidence interval (Atta 2026)
+ledger = rz.computeLedger([raw] * 1000)
+print(f"Expression: {ledger.expression:.4f} bits, Content: {ledger.content:.4f} bits, Doubt: {ledger.doubt:.4f} bits")
+```
+
+### DuckDB Extension (`razobill`)
+Vectorized in-database execution over columnar tables:
+```sql
+-- Install & load official community extension
+INSTALL razobill FROM community;
+LOAD razobill;
+
+-- Single-pass composite struct decomposition: STRUCT(form VARCHAR, ints BIGINT[], strs VARCHAR[])
+SELECT rbDecompose('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries') AS d;
+
+-- Columnar S3 Parquet export with 93.8% storage compaction
+COPY (
+    SELECT (rbDecompose(log_line)).* FROM raw_telemetry
+) TO 's3://production-lakehouse/compact_logs.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
+
+-- Exact bit-for-bit lossless log reconstruction in SQL
+SELECT rbReconstruct(d.form, d.ints, d.strs) AS original_log
+FROM (SELECT rbDecompose(log_line) AS d FROM raw_telemetry);
+```
+
+### C++20 Core Engine (`librazobill`)
+Zero-allocation monotonic arena bump parsing:
+```cpp
+#include <librazobill/Razobill.hpp>
+#include <iostream>
+
+using namespace razobill::core;
+
+int main() {
+    MemoryArena arena(1024 * 1024);
+    SlotRecord slots(&arena);
+
+    std::string_view msg = "2026-10-07 14:02:11 [WARN] Worker 42 timeout";
+    if (parse(msg, slots, ScanMode::Exact) == razobill::Status::Ok) {
+        std::string form;
+        slots.formKey(form);
+        std::cout << "Form: " << form << std::endl;
+    }
+    return 0;
+}
 ```
 
 ---
