@@ -58,7 +58,7 @@ if(NOT MSVC)
   target_compile_options(RazobillDuckdb PRIVATE -fvisibility=hidden -Wno-missing-field-initializers)
 endif()
 target_link_libraries(RazobillDuckdb PRIVATE librazobill)
-set_target_properties(RazobillDuckdb PROPERTIES PREFIX "" OUTPUT_NAME razobill)
+set_target_properties(RazobillDuckdb PROPERTIES PREFIX "" OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill_duckdb)
 
 find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 if(WIN32)

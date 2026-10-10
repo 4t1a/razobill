@@ -48,9 +48,9 @@ inline constexpr unsigned char kDelim = 1, kDigit = 2, kReserved = 4, kAlpha = 8
 // Evaluated during compilation by constexpr; resides in read-only .rodata.
 constexpr std::array<unsigned char, 256> makeClasses() {
     std::array<unsigned char, 256> t{};
-    for (unsigned char c :
+    for (char c :
          {'\t', '\n', '\f', '\r', ' ', '=', ',', ';', ':', '(', ')', '[', ']', '{', '}', '"', '\'', '<', '>', '|', '/'})
-        t[c] = kDelim;
+        t[static_cast<unsigned char>(c)] = kDelim;
     for (unsigned c = '0'; c <= '9'; ++c)
         t[c] = kDigit;
     for (unsigned c = 'a'; c <= 'z'; ++c)
