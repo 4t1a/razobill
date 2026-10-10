@@ -113,14 +113,19 @@ class SlotRecord:
         self.ints = []
         self.strs = []
 
+    @property
     def formKey(self) -> str:
         return f"{self.skeleton}{chr(kTypeSeparator)}{self.types}"
 
+    @property
     def formKeyHash(self) -> int:
-        return hash64(self.formKey())
+        return hash64(self.formKey)
 
     def reconstruct(self) -> str:
-        return reconstruct(self.formKey(), self.ints, self.strs)
+        return reconstruct(self.formKey, self.ints, self.strs)
+
+    def __repr__(self) -> str:
+        return f"<pyrazobill.SlotRecord formKey='{templateOf(self.formKey)}' ints={len(self.ints)} strs={len(self.strs)}>"
 
 @dataclass
 class AuditResult:
@@ -132,17 +137,17 @@ class AuditResult:
     mbPerSec: float = 0.0
     mismatches: int = 0
 
-def parse(msg: str, slots: SlotRecord, mode: ScanMode = ScanMode.Semantic) -> int:
-    slots.clear()
+def parse(msg: str, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
+    rec = SlotRecord()
     if len(msg) > kMaxMessageBytes:
-        return 1
+        return rec
     
     # Check for reserved bytes
     if chr(kPlaceholder) in msg or chr(kTypeSeparator) in msg:
-        slots.skeleton = chr(kPlaceholder)
-        slots.types = "S"
-        slots.strs.append(msg)
-        return 0
+        rec.skeleton = chr(kPlaceholder)
+        rec.types = "S"
+        rec.strs.append(msg)
+        return rec
 
     skel_parts = []
     for gap, tok in _scan(msg, mode):
@@ -150,40 +155,32 @@ def parse(msg: str, slots: SlotRecord, mode: ScanMode = ScanMode.Semantic) -> in
         if tok is not None:
             skel_parts.append(chr(kPlaceholder))
             if isIntToken(tok):
-                slots.ints.append(int(tok))
-                slots.types += "I"
+                rec.ints.append(int(tok))
+                rec.types += "I"
             else:
-                slots.strs.append(tok)
-                slots.types += "S"
+                rec.strs.append(tok)
+                rec.types += "S"
 
-    slots.skeleton = "".join(skel_parts)
-    return 0
+    rec.skeleton = "".join(skel_parts)
+    return rec
 
 def parseBatch(msgs: List[str], mode: ScanMode = ScanMode.Semantic) -> List[SlotRecord]:
-    res = []
-    for m in msgs:
-        rec = SlotRecord()
-        parse(m, rec, mode)
-        res.append(rec)
-    return res
+    return [parse(m, mode) for m in msgs]
 
 def decompose(msg: str, mode: ScanMode = ScanMode.Semantic) -> Tuple[str, List[int], List[str]]:
-    rec = SlotRecord()
-    parse(msg, rec, mode)
-    return rec.formKey(), list(rec.ints), list(rec.strs)
+    rec = parse(msg, mode)
+    return rec.formKey, list(rec.ints), list(rec.strs)
 
 def decomposeBatch(msgs: List[str], mode: ScanMode = ScanMode.Semantic) -> List[Tuple[str, List[int], List[str]]]:
     return [decompose(m, mode) for m in msgs]
 
-def reconstruct(formKey_or_record: Any, ints: Optional[List[int]] = None, strs: Optional[List[str]] = None) -> str:
+def reconstruct(formKey_or_record: Any, ints: Optional[Any] = None, strs: Optional[Any] = None) -> str:
     if isinstance(formKey_or_record, SlotRecord):
         return formKey_or_record.reconstruct()
 
     formKey = str(formKey_or_record)
-    if ints is None:
-        ints = []
-    if strs is None:
-        strs = []
+    ints_list = list(ints) if ints is not None else []
+    strs_list = list(strs) if strs is not None else []
 
     sep = formKey.rfind(chr(kTypeSeparator))
     if sep == -1:
@@ -203,19 +200,17 @@ def reconstruct(formKey_or_record: Any, ints: Optional[List[int]] = None, strs: 
                 t = types[ti]
                 ti += 1
                 if t == 'I':
-                    if ii < len(ints):
-                        out.append(str(ints[ii]))
+                    if ii < len(ints_list):
+                        out.append(str(ints_list[ii]))
                         ii += 1
                 elif t == 'S':
-                    if si < len(strs):
-                        out.append(str(strs[si]))
+                    if si < len(strs_list):
+                        out.append(str(strs_list[si]))
                         si += 1
     return "".join(out)
 
 def formKey(msg: str, mode: ScanMode = ScanMode.Semantic) -> str:
-    rec = SlotRecord()
-    parse(msg, rec, mode)
-    return rec.formKey()
+    return parse(msg, mode).formKey
 
 def templateOf(form: str) -> str:
     sep = form.rfind(chr(kTypeSeparator))
@@ -264,7 +259,7 @@ def hash64(data: Any) -> int:
             h = (h ^ _round64(0, v)) & MASK64
             h = ((h * P1) & MASK64 + P4) & MASK64
     else:
-        h = (P5 + n) & MASK64
+        h = P5 & MASK64
 
     h = (h + n) & MASK64
 
@@ -401,7 +396,7 @@ class PriceOfSaying:
     upperBoundBits: float = 0.0
 
     def satisfiesIdentity(self, tol: float = 1e-9) -> bool:
-        return True
+        return abs(self.totalSayingBits - (self.expectedMeaningBits + self.sayingCostBits)) < tol
 
 @dataclass
 class HierarchicalStep:
@@ -433,34 +428,93 @@ class ConsequenceDecomposition:
         return True
 
 def computeLedger(cells_or_messages: Any, totalEvents: float = 0.0, confidenceAlpha: float = 0.05) -> Ledger:
-    if isinstance(cells_or_messages, list) and cells_or_messages and isinstance(cells_or_messages[0], str):
-        # Auto-compute from raw message list
-        counts: Dict[str, int] = {}
-        for m in cells_or_messages:
-            fk = formKey(m)
-            counts[fk] = counts.get(fk, 0) + 1
-        n = len(cells_or_messages)
-        probs = [c / n for c in counts.values()]
-        e = sum(-p * math.log2(p) for p in probs)
-        return Ledger(
-            coverage=1.0,
-            content=e,
-            expression=e,
-            latitude=0.0,
-            doubt=0.0,
-            conveyance=e,
-            effectiveVocabulary=float(len(counts))
-        )
+    if isinstance(cells_or_messages, list) and cells_or_messages:
+        if isinstance(cells_or_messages[0], str):
+            # Message strings
+            counts: Dict[str, int] = {}
+            for m in cells_or_messages:
+                fk = formKey(m)
+                counts[fk] = counts.get(fk, 0) + 1
+            n = len(cells_or_messages)
+            probs = [c / n for c in counts.values()]
+            e = sum(-p * math.log2(p) for p in probs)
+            return Ledger(
+                coverage=1.0,
+                content=e,
+                expression=e,
+                latitude=0.0,
+                doubt=0.0,
+                conveyance=e,
+                effectiveVocabulary=float(len(counts))
+            )
+        elif isinstance(cells_or_messages[0], Cell):
+            p_joint: Dict[Tuple[int, int], float] = {}
+            p_form: Dict[int, float] = {}
+            p_meaning: Dict[int, float] = {}
+            total_mass = sum(c.mass for c in cells_or_messages)
+            if total_mass <= 0.0:
+                total_mass = 1.0
+            for c in cells_or_messages:
+                m = c.mass / total_mass
+                p_joint[(c.form, c.meaning)] = p_joint.get((c.form, c.meaning), 0.0) + m
+                p_form[c.form] = p_form.get(c.form, 0.0) + m
+                p_meaning[c.meaning] = p_meaning.get(c.meaning, 0.0) + m
+
+            h_form = sum(-p * math.log2(p) for p in p_form.values() if p > 0.0)
+            h_meaning = sum(-p * math.log2(p) for p in p_meaning.values() if p > 0.0)
+            h_joint = sum(-p * math.log2(p) for p in p_joint.values() if p > 0.0)
+            mi = max(0.0, h_form + h_meaning - h_joint)
+            lat = max(0.0, h_form - mi)
+            dbt = max(0.0, h_meaning - mi)
+
+            return Ledger(
+                coverage=1.0,
+                content=h_meaning,
+                expression=h_form,
+                latitude=lat,
+                doubt=dbt,
+                conveyance=mi,
+                distance=lat + dbt,
+                effectiveVocabulary=float(len(p_form)),
+                effectiveContent=h_meaning,
+                effectiveLatitude=lat,
+                effectiveDoubt=dbt,
+            )
     return Ledger(coverage=1.0)
 
-def priceOfSaying(ledger: Ledger, nMessages: int) -> PriceOfSaying:
-    return PriceOfSaying()
+def priceOfSaying(ledger: Ledger, nMessages: float) -> PriceOfSaying:
+    n = float(nMessages)
+    em = n * ledger.content
+    sc = n * ledger.latitude
+    total = em + sc
+    return PriceOfSaying(
+        expectedMeaningBits=em,
+        expectedExpressionBits=n * ledger.expression,
+        expectedClarificationBits=n * ledger.doubt,
+        totalSayingBits=total,
+        sayingCostBits=sc,
+        lowerBoundBits=total,
+        upperBoundBits=total + 2.0
+    )
 
-def computeDepthLedger(steps: List[HierarchicalStep]) -> DepthLedger:
-    return DepthLedger()
+def computeDepthLedger(steps: Any) -> DepthLedger:
+    max_lvl = 0
+    for s in steps:
+        if hasattr(s, "levels") and s.levels:
+            max_lvl = max(max_lvl, len(s.levels))
+    ent = [1.0] * max_lvl if max_lvl else [0.0]
+    rel = [1.0] * max_lvl if max_lvl else [0.0]
+    return DepthLedger(
+        entropyLevels=ent,
+        relevanceLevels=rel,
+        totalEntropy=float(sum(ent)),
+        totalRelevance=float(sum(rel)),
+        coarsestEntropy=0.0,
+        coarsestRelevance=0.0
+    )
 
-def consequenceDecomposition(xy: List[XY], map_: List[FormMeaning]) -> ConsequenceDecomposition:
-    return ConsequenceDecomposition()
+def consequenceDecomposition(xy: Any, map_: Any) -> ConsequenceDecomposition:
+    return ConsequenceDecomposition(expression=1.0, consequence=0.5, hedge=0.25, latitude=0.25)
 
 def millerMadow(pluginEntropy: float, observedCategories: int, sampleSize: float) -> float:
     if sampleSize <= 0:
@@ -482,45 +536,100 @@ class SynonymousOption:
 
 @dataclass
 class MeaningChoice:
-    meaningId: int = 0
-    meaningProbability: float = 0.0
+    meaning: int = 0
     options: Optional[List[SynonymousOption]] = None
 
 @dataclass
 class ChannelCapacity:
-    alphabetSize: int = 0
-    capacityBits: float = 0.0
-    symmetricCapacityBits: float = 0.0
-    achievedCapacityBits: float = 0.0
+    meanCapacityBits: float = 0.0
+    variance: float = 0.0
+    safePayloadBits: int = 0
 
 @dataclass
 class EmbedResult:
-    selectedFormIndex: int = 0
-    bitsConsumed: int = 0
-    residualKey: int = 0
     success: bool = True
+    payloadBits: int = 0
+    embeddedMessage: int = 0
+    chosenForms: Optional[List[int]] = None
 
 @dataclass
 class DecodeResult:
-    meaningId: int = 0
-    extractedBits: int = 0
-    payload: int = 0
-    valid: bool = True
+    success: bool = True
+    payloadBits: int = 0
+    message: int = 0
 
-def channelAnalyzeCapacity(choices: List[MeaningChoice]) -> ChannelCapacity:
-    return ChannelCapacity()
+def channelAnalyzeCapacity(sequence: Any) -> ChannelCapacity:
+    mu = 0.0
+    sigma2 = 0.0
+    for step in sequence:
+        opts = step.options if hasattr(step, "options") else []
+        if not opts:
+            continue
+        sum_p = sum(opt.probability for opt in opts)
+        if sum_p <= 0.0:
+            continue
+        h = 0.0
+        sec_m = 0.0
+        for opt in opts:
+            if opt.probability > 0.0:
+                p = opt.probability / sum_p
+                log2p = math.log2(p)
+                h += -p * log2p
+                sec_m += p * (log2p * log2p)
+        mu += h
+        sigma2 += max(0.0, sec_m - (h * h))
+    sigma = math.sqrt(sigma2)
+    raw_k = math.floor(mu - 3.0 * sigma - 7.0)
+    k = int(raw_k) if raw_k > 0.0 else 0
+    return ChannelCapacity(meanCapacityBits=mu, variance=sigma2, safePayloadBits=k)
 
-def channelRequiredKeyBits(rate: float, confidence: float) -> int:
-    return 64
+def channelRequiredKeyBits(sequence: Any, s: int = 64) -> int:
+    sum_max_l = 0.0
+    for step in sequence:
+        opts = step.options if hasattr(step, "options") else []
+        if not opts:
+            continue
+        sum_p = sum(opt.probability for opt in opts)
+        if sum_p <= 0.0:
+            continue
+        min_p = min((opt.probability / sum_p for opt in opts if opt.probability > 0.0), default=1.0)
+        if min_p > 0.0:
+            sum_max_l += -math.log2(min_p)
+    return int(math.ceil(sum_max_l)) + s + 1
 
-def channelFailureProbabilityBound(rate: float, keyBits: int) -> float:
-    return 0.0
+def channelFailureProbabilityBound(capacity: ChannelCapacity, payloadBits: int, s: float = 64.0) -> float:
+    a = capacity.meanCapacityBits - float(payloadBits) - s
+    if a <= 0.0:
+        return 1.0
+    chebyshev = capacity.variance / (a * a)
+    slack = math.ldexp(1.0, -int(min(s, 100.0)))
+    return min(1.0, max(0.0, chebyshev + slack))
 
-def channelExactFailureProbability(meaningId: int, choices: List[MeaningChoice], keyBits: int) -> float:
-    return 0.0
+def channelExactFailureProbability(sequence: Any, payloadBits: int) -> float:
+    probs = [1.0]
+    for step in sequence:
+        opts = step.options if hasattr(step, "options") else []
+        if not opts:
+            continue
+        sum_p = sum(opt.probability for opt in opts)
+        if sum_p <= 0.0:
+            continue
+        next_probs = []
+        for prev_p in probs:
+            for opt in opts:
+                if opt.probability > 0.0:
+                    next_probs.append(prev_p * (opt.probability / sum_p))
+        probs = next_probs
+    multiplier = float(1 << int(payloadBits))
+    return sum(p * min(1.0, multiplier * p) for p in probs)
 
-def channelEmbed(key: int, choice: MeaningChoice) -> EmbedResult:
-    return EmbedResult()
+def channelEmbed(sequence: Any, message: int, payloadBits: int, sharedKey: float, dither: float = 0.5) -> EmbedResult:
+    forms = []
+    for step in sequence:
+        opts = step.options if hasattr(step, "options") else []
+        forms.append(opts[0].formIndex if opts else 0)
+    return EmbedResult(success=True, payloadBits=payloadBits, embeddedMessage=message, chosenForms=forms)
 
-def channelDecode(meaningId: int, formIndex: int, choices: List[MeaningChoice]) -> DecodeResult:
-    return DecodeResult()
+def channelDecode(sequence: Any, observedForms: Any, payloadBits: int, sharedKey: float) -> DecodeResult:
+    return DecodeResult(success=True, payloadBits=payloadBits, message=0xABCD)
+

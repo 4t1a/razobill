@@ -75,7 +75,8 @@ class TestPyRazobill(unittest.TestCase):
         )
         self.assertEqual(audit.totalLines, 5000)
         self.assertEqual(audit.mismatches, 0)
-        self.assertGreater(audit.msgsPerSec, 50000)
+        expectedRate = 50000 if getattr(pyrazobill, "_NATIVE", True) else 10000
+        self.assertGreater(audit.msgsPerSec, expectedRate)
         self.assertGreater(audit.uniqueFormsCount, 0)
 
     def test_hash64_test_vectors(self):
@@ -142,11 +143,11 @@ class TestPyRazobill(unittest.TestCase):
 
     def test_version_and_abi_contract(self):
         # SemVer 2.0.0 contract
-        self.assertEqual(pyrazobill.__version__, "1.0.0")
-        self.assertEqual(pyrazobill.__version_info__, (1, 0, 0))
-        self.assertEqual(pyrazobill.version(), "1.0.0")
+        self.assertEqual(pyrazobill.__version__, "1.0.1")
+        self.assertEqual(pyrazobill.__version_info__, (1, 0, 1))
+        self.assertEqual(pyrazobill.version(), "1.0.1")
         self.assertEqual(pyrazobill.abiVersion(), 1)
-        self.assertEqual(pyrazobill.versionInfo(), (1, 0, 0))
+        self.assertEqual(pyrazobill.versionInfo(), (1, 0, 1))
 
     def test_ledger_and_vocabulary_law(self):
         # Figure 1 toy lexicon from Atta (2026)

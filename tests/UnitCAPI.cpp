@@ -70,10 +70,10 @@ TEST_CASE("Universal C ABI: RzDecompose") {
 
 TEST_CASE("Universal C ABI: Hash and Version") {
     CHECK(RzHash64("", 0) == 0xEF46DB3751D8E999ULL);
-    CHECK(std::string(RzVersion()) == "1.0.0");
+    CHECK(std::string(RzVersion()) == "1.0.1");
     CHECK(RzVersionMajor() == 1);
     CHECK(RzVersionMinor() == 0);
-    CHECK(RzVersionPatch() == 0);
+    CHECK(RzVersionPatch() == 1);
     CHECK(RzAbiVersion() == 1);
 }
 
