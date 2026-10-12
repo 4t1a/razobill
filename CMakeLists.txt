@@ -21,12 +21,25 @@ find_package(Threads REQUIRED)
 
 add_compile_definitions(DOCTEST_CONFIG_USE_STD_HEADERS)
 
+option(RAZOBILL_BUILD_EXT_ONLY "Build only the DuckDB loadable extension" OFF)
+if(DEFINED EXTENSION_NAME)
+  set(RAZOBILL_BUILD_EXT_ONLY ON)
+endif()
+
+option(ENABLE_NATIVE_OPTIMIZATION "Enable CPU native instruction optimizations (-march=native)" OFF)
+
 if(MSVC)
-  add_compile_options(/W4 /wd4996 /arch:AVX2)
+  add_compile_options(/W4 /wd4996)
+  if(ENABLE_NATIVE_OPTIMIZATION)
+    add_compile_options(/arch:AVX2)
+  endif()
 elseif(APPLE)
   add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wnon-virtual-dtor -Woverloaded-virtual)
 else()
-  add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wnon-virtual-dtor -Woverloaded-virtual -march=native)
+  add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wnon-virtual-dtor -Woverloaded-virtual)
+  if(ENABLE_NATIVE_OPTIMIZATION)
+    add_compile_options(-march=native)
+  endif()
 endif()
 
 # Core library: librazobill (STATIC by default, or SHARED if BUILD_SHARED_LIBS=ON)
@@ -40,7 +53,7 @@ add_library(librazobill
   src/RazobillC.cpp
 )
 add_library(librazobill::librazobill ALIAS librazobill)
-set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill)
+set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill_core ARCHIVE_OUTPUT_NAME razobill_core)
 
 target_include_directories(librazobill
   PUBLIC
@@ -55,103 +68,118 @@ target_link_libraries(librazobill PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 # DuckDB Native Loadable Extension (C API)
 add_library(RazobillDuckdb SHARED ext/duckdb/DuckdbExtension.cpp)
 target_include_directories(RazobillDuckdb PRIVATE include thirdparty/duckdbcapi)
-target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=razobill)
+if(DEFINED EXTENSION_NAME)
+  target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=${EXTENSION_NAME})
+else()
+  target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=razobill)
+endif()
 if(NOT MSVC)
   target_compile_options(RazobillDuckdb PRIVATE -fvisibility=hidden -Wno-missing-field-initializers)
 endif()
 target_link_libraries(RazobillDuckdb PRIVATE librazobill)
-set_target_properties(RazobillDuckdb PROPERTIES PREFIX "" OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill_duckdb)
-
-find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 if(WIN32)
-  set(DUCKDB_PLATFORM "windows_amd64")
-elseif(APPLE)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|ARM|aarch64|arm64")
-    set(DUCKDB_PLATFORM "osx_arm64")
-  else()
-    set(DUCKDB_PLATFORM "osx_amd64")
-  endif()
+  set_target_properties(RazobillDuckdb PROPERTIES PREFIX "" OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill_duckdb)
 else()
-  set(DUCKDB_PLATFORM "linux_amd64")
+  set_target_properties(RazobillDuckdb PROPERTIES OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill_duckdb)
 endif()
 
-# Sign the DuckDB extension with ABI metadata (both razobill and librazobill names)
-add_custom_command(TARGET RazobillDuckdb POST_BUILD
-  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/AppendExtensionMetadata.py -l $<TARGET_FILE:RazobillDuckdb> -n razobill
-          -o ${CMAKE_BINARY_DIR}/razobill.duckdb_extension -p ${DUCKDB_PLATFORM} -dv v1.2.0 -ev v${LIBRAZOBILL_PROJECT_VERSION} --abi-type C_STRUCT
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/razobill.duckdb_extension ${CMAKE_BINARY_DIR}/librazobill.duckdb_extension
-  COMMENT "Signing DuckDB loadable extension metadata for community distribution" VERBATIM)
+if(NOT RAZOBILL_BUILD_EXT_ONLY)
+  find_package(Python3 COMPONENTS Interpreter Development.Module QUIET)
+  if(Python3_FOUND)
+    if(WIN32)
+      set(DUCKDB_PLATFORM "windows_amd64")
+    elseif(APPLE)
+      if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|ARM|aarch64|arm64")
+        set(DUCKDB_PLATFORM "osx_arm64")
+      else()
+        set(DUCKDB_PLATFORM "osx_amd64")
+      endif()
+    else()
+      set(DUCKDB_PLATFORM "linux_amd64")
+    endif()
 
-# Python Bindings: pyrazobill via pybind11
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} -m pybind11 --cmakedir
-  OUTPUT_VARIABLE pybind11_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-find_package(pybind11 CONFIG REQUIRED)
+    # Sign the DuckDB extension with ABI metadata (both razobill and librazobill names)
+    add_custom_command(TARGET RazobillDuckdb POST_BUILD
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/AppendExtensionMetadata.py -l $<TARGET_FILE:RazobillDuckdb> -n razobill
+              -o ${CMAKE_BINARY_DIR}/razobill.duckdb_extension -p ${DUCKDB_PLATFORM} -dv v1.2.0 -ev v${LIBRAZOBILL_PROJECT_VERSION} --abi-type C_STRUCT
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/razobill.duckdb_extension ${CMAKE_BINARY_DIR}/librazobill.duckdb_extension
+      COMMENT "Signing DuckDB loadable extension metadata for community distribution" VERBATIM)
 
-pybind11_add_module(Core lib/python/PyRazobill.cpp)
-target_include_directories(Core PRIVATE include)
-target_link_libraries(Core PRIVATE librazobill)
-if(NOT MSVC)
-  target_compile_options(Core PRIVATE -Wno-missing-field-initializers)
+    # Python Bindings: pyrazobill via pybind11
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} -m pybind11 --cmakedir
+      OUTPUT_VARIABLE pybind11_DIR
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+    find_package(pybind11 CONFIG QUIET)
+
+    if(pybind11_FOUND)
+      pybind11_add_module(Core lib/python/PyRazobill.cpp)
+      target_include_directories(Core PRIVATE include)
+      target_link_libraries(Core PRIVATE librazobill)
+      if(NOT MSVC)
+        target_compile_options(Core PRIVATE -Wno-missing-field-initializers)
+      endif()
+      if(WIN32 AND MINGW)
+        target_link_options(Core PRIVATE -static-libgcc -static-libstdc++ -Wl,-Bstatic -l:libwinpthread.a -Wl,-Bdynamic)
+      endif()
+
+      # Copy compiled Core extension to lib/python/pyrazobill package directory
+      add_custom_command(TARGET Core POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:Core> ${CMAKE_SOURCE_DIR}/lib/python/pyrazobill/
+        COMMENT "Copying Core extension into python distribution" VERBATIM)
+    endif()
+  endif()
+
+  # Testing Suites
+  enable_testing()
+
+  add_executable(UnitTests
+    tests/UnitCore.cpp
+    tests/UnitStats.cpp
+    tests/UnitArena.cpp
+    tests/UnitCAPI.cpp
+    tests/UnitChannel.cpp
+  )
+  target_include_directories(UnitTests PRIVATE thirdparty include)
+  if(NOT MSVC)
+    target_compile_options(UnitTests PRIVATE -Wno-missing-field-initializers)
+  endif()
+  target_link_libraries(UnitTests PRIVATE librazobill)
+  add_test(NAME unit COMMAND UnitTests)
+
+  add_executable(IntegrationDuckdb tests/IntegrationDuckdb.cpp)
+  target_include_directories(IntegrationDuckdb PRIVATE thirdparty include tests)
+  if(NOT MSVC)
+    target_compile_options(IntegrationDuckdb PRIVATE -Wno-missing-field-initializers)
+  endif()
+  target_link_libraries(IntegrationDuckdb PRIVATE librazobill)
+  add_test(NAME integration_duckdb COMMAND IntegrationDuckdb)
+  set_tests_properties(integration_duckdb PROPERTIES ENVIRONMENT "RZB_EXT=${CMAKE_BINARY_DIR}/librazobill.duckdb_extension")
+
+  add_executable(IntegrationChdb tests/IntegrationChdb.cpp)
+  target_include_directories(IntegrationChdb PRIVATE thirdparty include tests)
+  if(NOT MSVC)
+    target_compile_options(IntegrationChdb PRIVATE -Wno-missing-field-initializers)
+  endif()
+  target_link_libraries(IntegrationChdb PRIVATE librazobill)
+  add_test(NAME integration_chdb COMMAND IntegrationChdb)
+
+  add_executable(BenchCore bench/BenchCore.cpp)
+  target_include_directories(BenchCore PRIVATE include)
+  if(NOT MSVC)
+    target_compile_options(BenchCore PRIVATE -Wno-missing-field-initializers)
+  endif()
+  target_link_libraries(BenchCore PRIVATE librazobill)
+
+  add_executable(BenchStorage bench/BenchStorage.cpp)
+  target_include_directories(BenchStorage PRIVATE thirdparty include tests)
+  if(NOT MSVC)
+    target_compile_options(BenchStorage PRIVATE -Wno-missing-field-initializers)
+  endif()
+  target_link_libraries(BenchStorage PRIVATE librazobill)
 endif()
-if(WIN32 AND MINGW)
-  target_link_options(Core PRIVATE -static-libgcc -static-libstdc++ -Wl,-Bstatic -l:libwinpthread.a -Wl,-Bdynamic)
-endif()
-
-# Copy compiled Core extension to lib/python/pyrazobill package directory
-add_custom_command(TARGET Core POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:Core> ${CMAKE_SOURCE_DIR}/lib/python/pyrazobill/
-  COMMENT "Copying Core extension into python distribution" VERBATIM)
-
-# Testing Suites
-enable_testing()
-
-add_executable(UnitTests
-  tests/UnitCore.cpp
-  tests/UnitStats.cpp
-  tests/UnitArena.cpp
-  tests/UnitCAPI.cpp
-  tests/UnitChannel.cpp
-)
-target_include_directories(UnitTests PRIVATE thirdparty include)
-if(NOT MSVC)
-  target_compile_options(UnitTests PRIVATE -Wno-missing-field-initializers)
-endif()
-target_link_libraries(UnitTests PRIVATE librazobill)
-add_test(NAME unit COMMAND UnitTests)
-
-add_executable(IntegrationDuckdb tests/IntegrationDuckdb.cpp)
-target_include_directories(IntegrationDuckdb PRIVATE thirdparty include tests)
-if(NOT MSVC)
-  target_compile_options(IntegrationDuckdb PRIVATE -Wno-missing-field-initializers)
-endif()
-target_link_libraries(IntegrationDuckdb PRIVATE librazobill)
-add_test(NAME integration_duckdb COMMAND IntegrationDuckdb)
-set_tests_properties(integration_duckdb PROPERTIES ENVIRONMENT "RZB_EXT=${CMAKE_BINARY_DIR}/librazobill.duckdb_extension")
-
-add_executable(IntegrationChdb tests/IntegrationChdb.cpp)
-target_include_directories(IntegrationChdb PRIVATE thirdparty include tests)
-if(NOT MSVC)
-  target_compile_options(IntegrationChdb PRIVATE -Wno-missing-field-initializers)
-endif()
-target_link_libraries(IntegrationChdb PRIVATE librazobill)
-add_test(NAME integration_chdb COMMAND IntegrationChdb)
-
-add_executable(BenchCore bench/BenchCore.cpp)
-target_include_directories(BenchCore PRIVATE include)
-if(NOT MSVC)
-  target_compile_options(BenchCore PRIVATE -Wno-missing-field-initializers)
-endif()
-target_link_libraries(BenchCore PRIVATE librazobill)
-
-add_executable(BenchStorage bench/BenchStorage.cpp)
-target_include_directories(BenchStorage PRIVATE thirdparty include tests)
-if(NOT MSVC)
-  target_compile_options(BenchStorage PRIVATE -Wno-missing-field-initializers)
-endif()
-target_link_libraries(BenchStorage PRIVATE librazobill)
 
 # ==============================================================================
 # Public Installation & Packaging (CMake Export, pkg-config, CPack)
