@@ -1,6 +1,6 @@
 # Root Makefile for DuckDB Community Extensions CI
 # Drives build through duckdb/extension-ci-tools for the stable C_STRUCT ABI.
-.PHONY: clean clean_all set_duckdb_version set_duckdb_tag configure_ci
+.PHONY: clean clean_all
 
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
@@ -27,15 +27,11 @@ endif
 -include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 -include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-# Fallback targets in case extension-ci-tools is not present during basic calls
-set_duckdb_version:
-	@echo "DuckDB version setup complete."
-
-set_duckdb_tag:
-	@echo "DuckDB tag setup complete."
-
-configure_ci:
-	@echo "configure_ci complete."
+# Multi-config fallback copy step for Windows MSVC if needed
+ifeq ($(OS),Windows_NT)
+EXTRA_COPY_STEP_RELEASE?=@if exist cmake_build\release\Release\$(EXTENSION_LIB_FILENAME) copy /Y cmake_build\release\Release\$(EXTENSION_LIB_FILENAME) cmake_build\release\$(EXTENSION_LIB_FILENAME) >nul 2>&1 || true
+EXTRA_COPY_STEP_DEBUG?=@if exist cmake_build\debug\Debug\$(EXTENSION_LIB_FILENAME) copy /Y cmake_build\debug\Debug\$(EXTENSION_LIB_FILENAME) cmake_build\debug\$(EXTENSION_LIB_FILENAME) >nul 2>&1 || true
+endif
 
 configure: venv platform extension_version
 
