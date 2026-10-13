@@ -18,9 +18,6 @@ updates:
       actions-dependencies:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
     open-pull-requests-limit: 10
 
   # 2. Python Package Ecosystem
