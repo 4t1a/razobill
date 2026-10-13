@@ -22,8 +22,8 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+"></a>
     <a href="https://semver.org/"><img src="https://img.shields.io/badge/SemVer-2.0.0-green.svg" alt="SemVer 2.0.0"></a>
     <img src="https://img.shields.io/badge/Lossless-100%25_Exact-brightgreen.svg" alt="Lossless Guarantee">
-    <img src="https://img.shields.io/badge/Unit_Tests-42%2F42_Passed-brightgreen.svg" alt="42/42 Unit Tests">
-    <img src="https://img.shields.io/badge/Assertions-977%2C936_Passed-brightgreen.svg" alt="977,936 Assertions">
+    <img src="https://img.shields.io/badge/Unit_Tests-43%2F43_Passed-brightgreen.svg" alt="43/43 Unit Tests">
+    <img src="https://img.shields.io/badge/Assertions-1%2C082%2C866_Passed-brightgreen.svg" alt="1,082,866 Assertions">
     <img src="https://img.shields.io/badge/DuckDB_Tests-13%2F13_Passed-brightgreen.svg" alt="13/13 DuckDB Tests">
     <img src="https://img.shields.io/badge/Python_Tests-24%2F24_Passed-brightgreen.svg" alt="24/24 Python Tests">
   </p>

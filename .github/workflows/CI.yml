@@ -26,6 +26,9 @@ jobs:
             compiler: apple-clang
           - os: windows-latest
             compiler: msvc
+          - os: ubuntu-24.04-arm
+            compiler: gcc-13
+            python-version: "3.12"
 
     steps:
       - name: Checkout Source Tree
@@ -64,3 +67,38 @@ jobs:
       - name: Run Python Property-Based Test Suite (Hypothesis)
         run: |
           python lib/python/tests/TestProperties.py
+
+  avx512-emulation:
+    name: AVX-512 Vectorization Emulation (Intel SDE)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-13 curl xz-utils
+          python -m pip install --upgrade pip pybind11 duckdb pytest
+
+      - name: Download & Extract Intel SDE
+        run: |
+          SDE_URL="https://downloadmirror.intel.com/832777/sde-external-9.44.0-2024-08-20-lin.tar.xz"
+          curl -sSL "$SDE_URL" -o sde.tar.xz || curl -sSL "https://downloadmirror.intel.com/813576/sde-external-9.38.0-2024-04-18-lin.tar.xz" -o sde.tar.xz
+          mkdir -p "$HOME/sde" && tar -xf sde.tar.xz -C "$HOME/sde" --strip-components=1
+          echo "$HOME/sde" >> $GITHUB_PATH
+
+      - name: Build with Explicit AVX-512 Flags
+        run: |
+          cmake -B build-avx512 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-mavx512bw -mavx512f"
+          ninja -C build-avx512 UnitTests
+
+      - name: Execute Test Suite under Intel SDE (Sapphire Rapids Target)
+        run: |
+          sde64 -spr -- ./build-avx512/UnitTests
+

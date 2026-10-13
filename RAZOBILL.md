@@ -403,8 +403,8 @@ Turnkey Rust Cargo crate (`razobill-vector` in `ext/vector/Cargo.toml`):
 The comprehensive test suite confirms all invariants across every platform target:
 
 1. **`build/UnitTests.exe` (C++20 Doctest Core Engine)**:
-   - **42/42 test cases passed**.
-   - **977,936 assertions passed, 0 failures**.
+   - **43/43 test cases passed**.
+   - **1,082,866 assertions passed, 0 failures**.
    - Validates AVX-512, AVX2, and ARM NEON SIMD scanners, dynamic CPUID dispatcher, memory arena bump allocator with block freelist, string pool GC with thread-safe accessors, FormCatalog full-key comparison and hash collision safety, ThreadPool zero-chunk safety, C ABI universal exception barriers and safe pointer zeroing, Latitude Channel capacity & embedding, Miller-Madow bias corrections, Proposition 10 certified confidence intervals, and round-trip lossless reconstruction over adversarial inputs.
 2. **`build/IntegrationDuckdb.exe` (DuckDB Loadable Extension)**:
    - **13/13 test cases passed**.

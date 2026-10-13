@@ -224,3 +224,49 @@ TEST_CASE("hardware vector SIMD scanner and dynamic CPUID dispatcher") {
     CHECK(findWhitespace(test64.data(), test64.size()) == 60);
     CHECK(findWhitespace(test128.data(), test128.size()) == 35);
 }
+
+TEST_CASE("differential scalar vs SIMD delimiter scanner verification") {
+    using namespace razobill::core::simd;
+    auto scalarFind = [](const char* data, std::size_t len) -> std::size_t {
+        for (std::size_t i = 0; i < len; ++i) {
+            char c = data[i];
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return i;
+        }
+        return len;
+    };
+
+    std::mt19937_64 rng(0x12345678);
+    const char delims[] = {' ', '\t', '\n', '\r'};
+
+    for (std::size_t len = 0; len <= 160; ++len) {
+        std::string s(len, 'a');
+        CHECK(findWhitespaceDynamic(s.data(), s.size()) == scalarFind(s.data(), s.size()));
+        CHECK(findWhitespace(s.data(), s.size()) == scalarFind(s.data(), s.size()));
+
+        // Probe single delimiter across every byte offset (tests vector chunk edges: 15, 16, 31, 32, 63, 64)
+        for (std::size_t pos = 0; pos < len; ++pos) {
+            char orig = s[pos];
+            for (char d : delims) {
+                s[pos] = d;
+                CHECK(findWhitespaceDynamic(s.data(), s.size()) == scalarFind(s.data(), s.size()));
+                CHECK(findWhitespace(s.data(), s.size()) == scalarFind(s.data(), s.size()));
+            }
+            s[pos] = orig;
+        }
+
+        // Probe random combinations
+        for (int trial = 0; trial < 5; ++trial) {
+            std::string randStr(len, 'x');
+            for (std::size_t i = 0; i < len; ++i) {
+                if (rng() % 7 == 0) {
+                    randStr[i] = delims[rng() % 4];
+                } else {
+                    randStr[i] = static_cast<char>('A' + (rng() % 26));
+                }
+            }
+            CHECK(findWhitespaceDynamic(randStr.data(), randStr.size()) == scalarFind(randStr.data(), randStr.size()));
+            CHECK(findWhitespace(randStr.data(), randStr.size()) == scalarFind(randStr.data(), randStr.size()));
+        }
+    }
+}
+
