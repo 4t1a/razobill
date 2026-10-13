@@ -475,10 +475,10 @@ def computeLedger(cells_or_messages: Any, totalEvents: float = 0.0, confidenceAl
                 doubt=dbt,
                 conveyance=mi,
                 distance=lat + dbt,
-                effectiveVocabulary=float(len(p_form)),
-                effectiveContent=h_meaning,
-                effectiveLatitude=lat,
-                effectiveDoubt=dbt,
+                effectiveVocabulary=2.0 ** h_form,
+                effectiveContent=2.0 ** h_meaning,
+                effectiveLatitude=2.0 ** lat,
+                effectiveDoubt=2.0 ** dbt,
             )
     return Ledger(coverage=1.0)
 

@@ -102,14 +102,17 @@ class TestHypothesisProperties(unittest.TestCase):
         3. Effective Latitude <= Latitude + 1e-9
         """
         cells = [pyrazobill.Cell(form=f, meaning=m, mass=w) for f, m, w in raw_cells]
-        ledger = pyrazobill.computeLedger(cells)
+        total_events = sum(w for _, _, w in raw_cells)
+        ledger = pyrazobill.computeLedger(cells, total_events)
 
         self.assertGreaterEqual(ledger.latitude, -1e-9)
         self.assertGreaterEqual(ledger.doubt, -1e-9)
         self.assertGreaterEqual(ledger.content, -1e-9)
         self.assertGreaterEqual(ledger.conveyance, -1e-9)
         self.assertLessEqual(ledger.conveyance, ledger.content + 1e-6)
-        self.assertLessEqual(ledger.effectiveLatitude, ledger.latitude + 1e-6)
+        self.assertGreaterEqual(ledger.effectiveLatitude, 1.0 - 1e-6)
+        self.assertGreaterEqual(ledger.effectiveDoubt, 1.0 - 1e-6)
+        self.assertAlmostEqual(ledger.distance, ledger.latitude + ledger.doubt, places=5)
 
 
 if __name__ == "__main__":
