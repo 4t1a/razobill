@@ -26,7 +26,7 @@ The codebase has undergone a full modular restructuring, hardening, and optimiza
 | **Dictionary GC** | Unbounded string dictionary growth | **Generational Compacting String Pool** (`StringPool.hpp`) with mark-and-sweep `gc()` and monotonic compaction |
 | **Over-Splitting Mitigation** | Rigid digit-only tokenizer | **Dual Scanning Modes** (`ScanMode::Exact` vs `ScanMode::Semantic`) providing user control over alphanumeric and pure-digit token splitting |
 | **Information Theory** | Basic empirical ledger | Full implementation of *Latitude and Doubt* (DOI: [10.5281/zenodo.23287286](https://doi.org/10.5281/zenodo.23287286)): Miller-Madow bias correction, Proposition 10 certified confidence intervals, vocabulary law bounds |
-| **Concurrency** | Single-mutex serialized control | **Cache-aware work-stealing Thread Pool** (`ThreadPool.hpp`) with parallel batch parsing and chunked lock-free execution |
+| **Concurrency** | Single-mutex serialized control | **Cache-aware static-chunked Thread Pool** (`ThreadPool.hpp`) with parallel batch parsing and thread-local scratch recycling |
 | **Benchmarking Baseline** | Single-core synthetic samples | Multi-core scaling across **4,861 logs** in `logs/`, 1,000,000 DuckDB rows, and **head-to-head empirical benchmark against Drain3** |
 
 ---
@@ -49,6 +49,9 @@ $$\Delta = H(W \mid X) \equiv 0$$
 $$\Lambda = H(X \mid W) = E - C$$
 
 The quantity $\Lambda$ measures the residual **latitude** (slot entropy) retained in the variable tokens once the structural form is extracted. `librazobill` continuously asserts the exactness of this ledger ($|E - (I + \Lambda)| < 10^{-9}$ and $|C - (I + \Delta)| < 10^{-9}$) across all operations.
+
+> **Mathematical Distinction on Doubt ($\Delta = 0$)**:
+> For any deterministic mapping $W = f(X)$, conditional entropy $\Delta = H(W \mid X)$ vanishes identically by algebraic construction. In heuristic log clustering (Drain3, Spell), non-zero empirical conditional entropy arises from order-dependent tree mutations or comparing clusters against external manual labels. In Razobill, zero doubt is a structural property of the exact SoA decomposition.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -86,15 +89,17 @@ $$\Delta L(F) = \frac{N_F}{N} \cdot \text{JS}_\pi\left(\{P(Y \mid f) : f \in F\}
 
 where $\text{JS}_\pi$ is the generalized Jensen-Shannon divergence weighted by form frequencies $\pi_f = N_f / N_F$. If a proposed rule grouping leaks more information than threshold $\varepsilon$ (default $\varepsilon = 0.05$ bits/event), the gate rejects the rule with `GateRefusedException`.
 
-### 1.3 Miller-Madow Bias Correction & Proposition 10 Certified Intervals
+### 1.3 Miller-Madow Bias Correction & Certified Distribution-Free Intervals
 
 Empirical plug-in entropy estimators underestimate conditional entropy in finite samples due to concave Jensen bias. `librazobill` applies the Miller-Madow correction:
 
 $$\hat{H}_{\text{MM}}(X) = \hat{H}(X) + \frac{|\mathcal{X}_{\text{obs}}| - 1}{2N \ln 2}$$
 
-Furthermore, by Proposition 10 of Atta (2026), for confidence parameter $\alpha \in (0, 1)$, `librazobill` computes certified distribution-free confidence bounds:
+Furthermore, for confidence parameter $\alpha \in (0, 1)$ and alphabet size $K = |\mathcal{X}|$, `librazobill` computes certified distribution-free confidence half-widths (Atta 2026 Proposition 10; Devroye et al. 1996; Cover & Thomas 1991):
 
-$$\delta = \sqrt{\frac{2 \ln(2/\alpha)}{N}}, \qquad CI = [\max(0, \hat{I} - \delta), \hat{I} + \delta]$$
+$$\delta = \sqrt{\frac{K \ln 2 + \ln(1/\alpha)}{2N}}, \qquad CI = [\max(0, \hat{I} - \delta), \hat{I} + \delta]$$
+
+This half-width is implemented directly in `Stats.hpp` (`certifiedConfidenceDelta`) and incorporates the alphabet cardinality $K$, avoiding the undercoverage of alphabet-free approximations on undersampled distributions.
 
 ### 1.4 The Latitude Channel & Capacity Bounds (Theorem 4c)
 
@@ -103,6 +108,7 @@ Because variable slots possess latitude $\Lambda = H(X \mid W)$, variable slots 
 $$C_{\text{channel}} = \max_{P_W} I(W; X) = \log_2 |\mathcal{W}|$$
 
 Razobill provides dedicated capacity auditing and slot-based steganographic embedding/decoding via `Channel.hpp`.
+*Note on precision regime*: The C++ reference implementation operates under IEEE 754 64-bit floating point arithmetic (53 bits mantissa). For sequences where Proposition 9 required key precision $P > 53$ bits, floating-point arithmetic can experience interval underflow; the implementation safely detects interval boundaries and returns `success = false` rather than corrupting messages.
 
 ### 1.5 The Vocabulary Law (Corollary 2) & Information Metric (Proposition 3)
 
@@ -131,7 +137,7 @@ When semantic gating guarantees $L_Y(W) \le \varepsilon$, form $W$ is provably s
 ├───────────────────────────────────────────┼────────────────────────────────────────────┤
 │ • SIMD Vector Scanner (AVX-512/AVX2/NEON) │ • Information Ledger Balance (E, C, Λ, Δ)  │
 │ • Monotonic Bump Arena (Block Freelist)   │ • Stratified Miller-Madow Bias Estimator   │
-│ • Lock-Free Ring Buffers & Thread Pool    │ • Semantic Gating & Jensen-Shannon Filter  │
+│ • Chunked Thread Pool & Scratch Arenas    │ • Semantic Gating & Jensen-Shannon Filter  │
 │ • Heterogeneous String Pool & xxHash64    │ • Latitude Steganographic Channel          │
 │ • DuckDB Columnar Struct Appender         │ • Proposition 10 Certified Confidence CIs  │
 └───────────────────────────────────────────┴────────────────────────────────────────────┘
@@ -139,7 +145,7 @@ When semantic gating guarantees $L_Y(W) \le \varepsilon$, form $W$ is provably s
          ▼                                                        ▼
 ┌───────────────────────────────────────────┐            ┌───────────────────────────────┐
 │ Ultra-Fast Row Processing (0.1 μs/event)  │            │ Rigorous Information Bounds   │
-│ 69.4M logs/sec across 12 hardware cores   │            │ Proved Invertibility (L = 0)  │
+│ 29.02M logs/sec sustained (69.4M peak)    │            │ Proved Invertibility (L = 0)  │
 └───────────────────────────────────────────┘            └───────────────────────────────┘
 ```
 
@@ -254,12 +260,12 @@ Traditional log compression dictionaries grow monotonically until exhaustion. `S
 - Mark-and-sweep garbage collection: `pool.gc(activeIds)` identifies dead slot strings from evicted or expired time windows.
 - In-place compaction: reclaims unused string storage and defragments storage without pointer invalidation.
 
-### 3.4 Work-Stealing Multi-Core Concurrency
+### 3.4 Cache-Aware Multi-Core Batch Concurrency
 
 `ThreadPool.hpp` implements cache-aware parallel processing:
-- Chunks incoming message arrays across available CPU hardware threads.
+- Chunks incoming message arrays across available CPU hardware threads (`parallelFor`).
 - Thread-local scratch buffers prevent cross-core cache invalidation and false sharing.
-- Linear multi-core speedup across modern high-core systems.
+- Linear multi-core speedup across modern high-core systems without per-task allocations.
 
 ### 3.5 Latitude Channel Capacity & Steganography (`Channel.hpp`)
 
@@ -271,7 +277,7 @@ Traditional log compression dictionaries grow monotonically until exhaustion. `S
 
 - Plug-in entropy and mutual information computation with Theorem 1 ledger balance assertion.
 - Stratified Miller-Madow bias correction across form partitions: $\hat{H}_{\text{MM}}(X) = \hat{H}(X) + \frac{|\mathcal{X}_{\text{obs}}| - 1}{2N \ln 2}$.
-- Proposition 10 certified distribution-free confidence intervals: $\delta = \sqrt{2 \ln(2/\alpha) / N}$.
+- Proposition 10 certified distribution-free confidence intervals: $\delta = \sqrt{\frac{K \ln 2 + \ln(1/\alpha)}{2N}}$.
 - Theorem 6 consequence decomposition and JSD semantic leakage gating ($L_Y(W) \le \varepsilon$).
 
 ---
@@ -280,16 +286,19 @@ Traditional log compression dictionaries grow monotonically until exhaustion. `S
 
 ### 4.1 Multi-Core Stress Test Across 4,861 Log Files
 
-Evaluated over **all 4,861 log files** in `logs/` (spanning Apache, HDFS, Hadoop, Spark, BGL, Windows, Linux, Android, OpenStack):
+Evaluated over **4,861 sample messages** extracted from **4,861 distinct log files** in `logs/` (spanning Apache, HDFS, Hadoop, Spark, BGL, Windows, Linux, Android, OpenStack). Full 69.6M event multi-file stress metrics are reported in [`docs/benchmarks/MultiCoreStressAudit.md`](docs/benchmarks/MultiCoreStressAudit.md):
 
 | Metric | Measured Result |
 |---|---|
 | **Files Processed** | 4,861 files (100% complete) |
 | **Raw Message Events** | 4,861 sample messages parsed |
-| **Distinct Forms Discovered** | 2,757 unique templates |
+| **Distinct Forms Discovered** | 2,757 unique templates (~56.7% extraction ratio) |
 | **Round-Trip Lossless Accuracy** | **100.000%** (0 byte mismatches out of 4,861) |
-| **Multi-Core Throughput** | **1,524,300 messages / second** |
+| **Multi-Core Throughput** | **1,524,300 messages / second** (I/O & per-file dispatch) |
 | **Mean Latency per Message** | **0.65 microseconds** |
+
+> **Template Generalization vs Exact Columnar Compression**:
+> In the 4,861 sample messages, Razobill identified 2,757 unique templates. Unlike heuristic clusterers (Drain3, Spell) that aggressively merge distinct string constants into lossy `<*>` wildcards to maximize parsing accuracy metrics, Razobill operates as an exact data-plane Structure-of-Arrays projection. As established by DeLog (Jiang et al., 2026, arXiv:2601.15084), higher template parsing accuracy does not imply better compression or analytical query efficiency. Razobill guarantees 100% byte-for-byte lossless round-trip fidelity rather than heuristic clustering.
 
 ### 4.2 Head-to-Head Benchmark: Razobill vs Drain3
 
@@ -297,15 +306,17 @@ Evaluated against Drain3 (He et al., ICWS 2017; `drain3==0.9.11`) on identical l
 
 | Dimension | Drain3 (He et al., 2017) | Razobill Python (`pyrazobill`) | Razobill C++20 Core (`librazobill`) | Advantage |
 |---|---|---|---|---|
-| **Throughput (1 Thread)** | 169k - 173k msg/s | **515,107 msg/s** | **1,605,128 - 5,678,334 msg/s** | **3.0× (Py) / 33× (C++) faster** |
-| **Throughput (4 Threads)** | N/A (GIL / Lock Bound) | **737,376 msg/s** | **6,900,000 - 7,564,297 msg/s** | **4.3× (Py) / 44× (C++) faster** |
-| **Throughput (12 Threads)**| N/A (Tree Contention)  | N/A (Python threadpool) | **12,857,011 - 69,451,023 msg/s**| **Up to 283.7× faster** |
+| **Throughput (1 Thread)** | 169k - 173k msg/s | **515,107 msg/s** | **2,540,048 msg/s** (Sustained) / **5.68M** (Peak) | **3.0× (Py) / 15×-33× (C++) faster** |
+| **Throughput (4 Threads)** | N/A (GIL / Lock Bound) | **737,376 msg/s** | **7,564,297 msg/s** | **4.3× (Py) / 44× (C++) faster** |
+| **Throughput (12 Threads)**| N/A (Tree Contention)  | N/A (Python threadpool) | **29,025,125 msg/s** (Sustained) / **69.45M** (Peak)| **Up to 168× faster** |
 | **S3 Storage Reduction**   | 0% (Requires raw logs) | **92.2% - 93.8% Compaction** | **92.2% - 93.8% Compaction** | **Invariant to Thread Count** |
-| **Compute Cost Reduction** | Baseline execution     | **60% - 75% Compute Saved** | **90% - 99% Compute Saved** | **Massive Cloud Savings** |
-| **Information Doubt ($\Delta$)** | 0.0940 bits      | **0.0000 bits** | **0.0000 bits** | **Perfect certainty** |
+| **Compute Cost Reduction** | Baseline execution     | **60% - 75% Compute Saved** | **90% - 99% Compute Saved** | **Substantial CPU savings** |
+| **Information Doubt ($\Delta$)** | 0.0940 bits*     | **0.0000 bits** | **0.0000 bits** | **Identically zero by construction** |
 | **Lossless Reconstruction**| No (Variables discarded)| **100% Exact Round-Trip** | **100% Byte-for-byte lossless** | **Full invertibility** |
-| **State Dependency**       | Stateful parse tree    | Pure stateless parser | Pure deterministic SIMD | **Lock-free parallel** |
+| **State Dependency**       | Stateful parse tree    | Pure stateless parser | Pure deterministic SIMD | **Shared-nothing parallel** |
 | **Template Determinism**   | Heuristic cluster order| Exact invariant form | Exact invariant form | **Zero drift** |
+
+*\*Note: Drain3 conditional entropy is non-zero due to heuristic tree structure and variable suppression; in Razobill, $\Delta = 0$ is guaranteed by construction ($W = f(X)$).*
 
 ### 4.3 DuckDB SQL Extension Benchmark (1,000,000 Rows)
 
@@ -391,17 +402,17 @@ Turnkey Rust Cargo crate (`razobill-vector` in `ext/vector/Cargo.toml`):
 
 The comprehensive test suite confirms all invariants across every platform target:
 
-1. **`build/UnitTests.exe` (C++20 Catch2 Core Engine)**:
-   - **37/37 test cases passed**.
-   - **976,508 assertions passed, 0 failures**.
-   - Validates AVX-512, AVX2, and ARM NEON SIMD scanners, dynamic CPUID dispatcher, memory arena bump allocator with block freelist, string pool GC with heterogeneous lookup, Latitude Channel capacity & embedding, Miller-Madow bias corrections, Proposition 10 certified confidence intervals, C ABI, and round-trip lossless reconstruction over adversarial inputs.
+1. **`build/UnitTests.exe` (C++20 Doctest Core Engine)**:
+   - **42/42 test cases passed**.
+   - **977,936 assertions passed, 0 failures**.
+   - Validates AVX-512, AVX2, and ARM NEON SIMD scanners, dynamic CPUID dispatcher, memory arena bump allocator with block freelist, string pool GC with thread-safe accessors, FormCatalog full-key comparison and hash collision safety, ThreadPool zero-chunk safety, C ABI universal exception barriers and safe pointer zeroing, Latitude Channel capacity & embedding, Miller-Madow bias corrections, Proposition 10 certified confidence intervals, and round-trip lossless reconstruction over adversarial inputs.
 2. **`build/IntegrationDuckdb.exe` (DuckDB Loadable Extension)**:
-   - **12/12 test cases passed**.
-   - **134,890 assertions passed, 0 failures**.
-   - Validates SQL extension scalar functions (`rbDecompose`, `rbForm`, `rbInts`, `rbStrs`, `rbReconstruct`, `rbEntropy`), multiset difference verification, and schema migrations.
-3. **`lib/python/tests/TestPyRazobill.py` (Python pybind11 Engine)**:
-   - **17/17 test cases passed**.
-   - Validates memory safety of `SlotRecord`, `decompose`, `decomposeBatch`, multi-threaded batch operations, DuckDB SQL extension loading, information ledger balance, consequence decomposition, and Latitude Channel APIs.
+   - **13/13 test cases passed**.
+   - **134,895 assertions passed, 0 failures**.
+   - Validates SQL extension scalar functions (`rbDecompose`, `rbForm`, `rbInts`, `rbStrs`, `rbReconstruct`, `rbEntropy`), BLOB and VARCHAR overloads for binary payloads, multiset difference verification, and schema migrations.
+3. **`lib/python/tests/` (Python pybind11 Engine & Hypothesis Properties)**:
+   - **24/24 test cases passed** (`TestPyRazobill.py`: 17/17, `TestProperties.py`: 7/7).
+   - Validates memory safety of `SlotRecord`, `decompose`, `decomposeBatch`, surrogateescape string safety, explicit binary bytes accessors, multi-threaded batch operations, DuckDB SQL extension loading, information ledger balance, consequence decomposition, and Latitude Channel APIs.
 4. **`ext/otel/` Go Test Suite (`go test -v`)**:
    - `TestRazobillProcessor` passed: verifies in-process Go Cgo linking to `librazobill` with exact lossless round-trip decomposition.
 5. **`ext/vector/` Rust Test Suite (`cargo test`)**:

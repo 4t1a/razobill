@@ -1,10 +1,18 @@
 // Latitude Steganographic & Provenance Channel
-// Exact implementation of Theorem 8 (Capacity) and Proposition 9 (Finite-Precision Implementation)
+// Implementation of Theorem 8 (Capacity) and Proposition 9 (Finite-Precision Implementation)
 // from "Latitude and Doubt" (M. M. Atta, 2026).
 //
 // In an unambiguous semantic source (Delta = 0), Latitude Lambda = H(X | W) is an operational channel:
 // exactly the number of bits per symbol that can be written into the form without changing the
 // meaning or the statistics of the text.
+//
+// OPERATIONAL REGIME & IMPLEMENTATION CAVEAT:
+// Grounded in Atta (2026) §4, this module implements an idealized shared-key prototype operating
+// under IEEE 754 64-bit floating point arithmetic (`double`, 53 bits of mantissa).
+// Proposition 9 proves that exact distortion-free decoding across long sequences requires a grid
+// precision P = ceil(sum_i max_x (-log2 Q(x | w_i))) + s + 1 bits. For long sequences where P > 53 bits,
+// interval arithmetic under IEEE 754 `double` experiences precision underflow. The implementation safely
+// detects interval boundary crossings and returns success = false rather than returning a corrupted message.
 #pragma once
 
 #include <cstddef>

@@ -29,12 +29,12 @@ BibTeX:
   title        = {librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine},
   year         = {2026},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.<RECORD_ID>},
-  url          = {https://doi.org/10.5281/zenodo.<RECORD_ID>}
+  doi          = {10.5281/zenodo.23287286},
+  url          = {https://doi.org/10.5281/zenodo.23287286}
 }
 
 APA:
-Atta, M. M. (2026). librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine. Zenodo. https://doi.org/10.5281/zenodo.<RECORD_ID>
+Atta, M. M. (2026). librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine. Zenodo. https://doi.org/10.5281/zenodo.23287286
 
 ================================================================================
 Included Third-Party Works
@@ -42,3 +42,5 @@ Included Third-Party Works
 
 - DuckDB C Extension API: DuckDB contributors (MIT License)
 - Doctest: Viktor Kirilov (MIT License)
+- xxHash: Yann Collet (BSD 2-Clause License)
+- pybind11: Wenzel Jakob and contributors (BSD 3-Clause License)

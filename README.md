@@ -22,10 +22,10 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+"></a>
     <a href="https://semver.org/"><img src="https://img.shields.io/badge/SemVer-2.0.0-green.svg" alt="SemVer 2.0.0"></a>
     <img src="https://img.shields.io/badge/Lossless-100%25_Exact-brightgreen.svg" alt="Lossless Guarantee">
-    <img src="https://img.shields.io/badge/Unit_Tests-37%2F37_Passed-brightgreen.svg" alt="37/37 Unit Tests">
-    <img src="https://img.shields.io/badge/Assertions-976%2C508_Passed-brightgreen.svg" alt="976,508 Assertions">
-    <img src="https://img.shields.io/badge/DuckDB_Tests-12%2F12_Passed-brightgreen.svg" alt="12/12 DuckDB Tests">
-    <img src="https://img.shields.io/badge/Python_Tests-17%2F17_Passed-brightgreen.svg" alt="17/17 Python Tests">
+    <img src="https://img.shields.io/badge/Unit_Tests-42%2F42_Passed-brightgreen.svg" alt="42/42 Unit Tests">
+    <img src="https://img.shields.io/badge/Assertions-977%2C936_Passed-brightgreen.svg" alt="977,936 Assertions">
+    <img src="https://img.shields.io/badge/DuckDB_Tests-13%2F13_Passed-brightgreen.svg" alt="13/13 DuckDB Tests">
+    <img src="https://img.shields.io/badge/Python_Tests-24%2F24_Passed-brightgreen.svg" alt="24/24 Python Tests">
   </p>
 </p>
 
@@ -262,15 +262,15 @@ Razobill translates this mathematical foundation into production-grade systems r
 ```
 
 ### Pillar I: The Mathematical Information Ledger
-Traditional logging tools count lines. Razobill balances an **exact information-theoretic ledger**. For every log stream, Razobill computes the exact Shannon entropy of Expression ($E$), Content ($C$), Latitude ($\Lambda$), and Doubt ($ distribution-free intervals (Proposition 10), and the Latitude Channel module (`Channel.hpp`, `channelAnalyzeCapacity`), you can mathematically prove whether your telemetry taxonomy is losing information, collapsing critical states, or leaking diagnostic signals.
+Traditional logging tools count lines. Razobill balances an **exact information-theoretic ledger**. For every log stream, Razobill computes the exact Shannon entropy of Expression ($E$), Content ($C$), Latitude ($\Lambda$), and Doubt ($\Delta$). With certified distribution-free intervals (Proposition 10; Devroye et al. 1996), and the Latitude Channel module (`Channel.hpp`, `channelAnalyzeCapacity`), you can mathematically prove whether your telemetry taxonomy is losing information, collapsing critical states, or leaking diagnostic signals.
 
 ### Pillar II: Zero-Overhead C++20 Systems Engine
 Where heuristic miners parse at 50,000 to 200,000 logs/second and bottleneck your CPU, Razobill's C++20 core engine (`librazobill`):
 * Utilizes **AVX-512, AVX2, SSE4.2, and ARM NEON SIMD vectorization** with **dynamic CPUID multiversion dispatch** to classify and segment delimiter boundaries 16 to 64 bytes at a time across x86-64, Apple Silicon, and AWS Graviton.
 * Allocates memory strictly through a **64-byte aligned monotonic bump arena with chunk block-reuse freelist (`MemoryArena`)**, eliminating `malloc`, `new`, and string allocations in hot per-row loops.
 * Uses **heterogeneous string hashing and lookup in `StringPool`**, avoiding temporary `std::string` allocations during lookup.
-* Delivers throughput up to **69.4 Million logs/second** across 12 hardware cores (**5.6× to 283.7× faster than Drain3**).
-* Achieves median latency of **$0.1\,\mu\text{s} - 0.8\,\mu\text{s}$** and $p_{99}$ tail latency under **$5.7\,\mu\text{s}$** (up to **151× lower tail latency**).
+* Delivers sustained multi-core throughput of **29.0 Million logs/second** across 12 hardware cores (with peak burst up to 69.4M on short synthetic strings).
+* Achieves median latency of **$0.1\,\mu\text{s} - 0.8\,\mu\text{s}$** and $p_{99}$ tail latency under **$5.7\,\mu\text{s}$** (up to **151× lower tail latency** than Drain3).
 
 ### Pillar III: Native Analytical Database Integration & Cloud Object Storage
 Razobill does not store logs in opaque proprietary formats. It integrates directly into the modern analytical database stack:
@@ -279,7 +279,7 @@ Razobill does not store logs in opaque proprietary formats. It integrates direct
   * `rbForm(msg)`, `rbInts(msg)`, `rbStrs(msg)`, `rbReconstruct(form, ints, strs)`.
   * `rbDecomposeSemantic(msg)`: Alphanumeric-aware token preservation.
   * `rbEntropy(msg)`: Inline Shannon bit-entropy calculation.
-* **Columnar Compaction**: Decomposes bloated raw text into dictionary-encoded forms, typed 64-bit integer vectors, and string pools. Achieves **45%+ physical disk compaction** compared to raw text while allowing analytical queries (e.g. `AVG(ints[1])`) to execute directly over compressed columnar data at memory-bus speeds.
+* **Columnar Compaction**: Decomposes bloated raw text into dictionary-encoded forms, typed 64-bit integer vectors, and string pools. Achieves **45%+ physical disk compaction** in native DuckDB tables compared to raw text while allowing analytical queries (e.g. `AVG(ints[1])`) to execute directly over compressed columnar data at memory-bus speeds.
 * **Direct AWS S3 & Cloud Object Storage Streaming**: Stream decomposed columns directly to Parquet on AWS S3, Cloudflare R2, or MinIO with zero intermediate disk writes:
   ```sql
   INSTALL httpfs; LOAD httpfs;
@@ -295,7 +295,7 @@ Razobill does not store logs in opaque proprietary formats. It integrates direct
       )
   ) TO 's3://your-bucket-name/logs.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
   ```
-  This cuts S3 storage costs by **93.8%** and slashes AWS Athena query scan costs by up to **88%** — saving **$1,346.59 / month ($16,159 / year)** at common 1 TB/month developer scale, and **$40,262.94 / month ($483,155 / year)** at 30 TB/month enterprise scale.
+  This reduces S3 Parquet storage bytes by up to **93.8%** compared to uncompressed raw ASCII, and cuts Athena columnar query scan volume by up to **88%** by scanning only referenced variable columns. (Illustrative pricing impact: at 1 TB/month with standard AWS S3 storage at $0.023/GB and Athena query scans at $5/TB, reducing stored bytes to ~62 GB reduces storage from ~$23.50/mo to ~$1.43/mo, with scan savings scaling with query frequency).
 
 ---
 
@@ -321,11 +321,10 @@ Razobill was evaluated against the entire Loghub standard benchmark suite and ma
 
 <p align="center">
   <img src="https://img.shields.io/badge/Production_Logs_Audited-4%2C861_files-blue" alt="4,861 Files">
-  <img src="https://img.shields.io/badge/Total_Events_Processed-69%2C619%2C748-blue" alt="69.6M Events">
+  <img src="https://img.shields.io/badge/Total_Events_Processed-69%2C612%2C488-blue" alt="69.6M Events">
   <img src="https://img.shields.io/badge/Bit--Level_Mismatches-0_(100.000%25)-brightgreen" alt="0 Mismatches">
-  <img src="https://img.shields.io/badge/Speedup_vs_Drain3-Up_to_283.7x-brightgreen" alt="283.7x Speedup">
+  <img src="https://img.shields.io/badge/Sustained_12T_Throughput-29.02M_msg%2Fs-brightgreen" alt="29.02M msg/s">
   <img src="https://img.shields.io/badge/AWS_S3_Storage_Reduction-93.8%25-brightgreen" alt="93.8% S3 Reduction">
-  <img src="https://img.shields.io/badge/LocalStack_Pro_Validated-100k_events-blue" alt="LocalStack Validated">
 </p>
 
 ```text
@@ -338,9 +337,9 @@ Razobill was evaluated against the entire Loghub standard benchmark suite and ma
 │ Drain3 (Python)   │ 4 Cores      │ █▌ 171k (GIL / Lock Bound)                          │
 │ pyrazobill (Py)   │ 1 Core       │ █████ 515k (3.0× vs Drain3)                         │
 │ pyrazobill (Py)   │ 4 Cores      │ ███████ 737k (4.3× vs Drain3)                       │
-│ librazobill (C++) │ 1 Core       │ ████████████████████████████ 5.68M (33.2× vs Drain3)│
-│ librazobill (C++) │ 12 Cores     │ ████████████████████████████████████████████ 69.4M  │
-│                   │              │ (283.7× vs Drain3)                                  │
+│ librazobill (C++) │ 1 Core       │ ████████████████████████ 2.54M-4.27M (Avg) / 5.68M  │
+│ librazobill (C++) │ 12 Cores     │ ████████████████████████████████████ 29.02M Sustained│
+│                   │              │ (Peak burst: 69.45M on short synthetic strings)     │
 └───────────────────┴──────────────┴─────────────────────────────────────────────────────┘
 ```
 
@@ -350,16 +349,16 @@ Razobill was evaluated against the entire Loghub standard benchmark suite and ma
 ├─────────────────────────┬──────────────────────┬────────────────────────┬───────────────────────┬──────────────────────┤
 │ Metric / Execution Mode │ Drain3 (He et al.)   │ Razobill Python (1T/4T)│ Razobill C++20 / SIMD │ Razobill Advantage   │
 ├─────────────────────────┼──────────────────────┼────────────────────────┼───────────────────────┼──────────────────────┤
-│ Throughput (1 Thread)   │ 169k - 173k logs/sec │ 515,107 logs/sec       │ 1.5M - 5.68M logs/sec │ 3.0× (Py) / 33× (C++)│
-│ Throughput (4 Threads)  │ N/A (GIL / Lock bound│ 737,376 logs/sec       │ 6.9M - 7.56M logs/sec │ 4.3× (Py) / 44× (C++)│
-│ Throughput (12 Threads) │ N/A (Tree contention)│ N/A (Python threadpool)│ 12.8M - 69.4M logs/sec│ Up to 283.7× Faster  │
+│ Throughput (1 Thread)   │ 169k - 173k logs/sec │ 515,107 logs/sec       │ 2.54M - 4.27M logs/sec│ 3.0× (Py) / 15-25× C++│
+│ Throughput (4 Threads)  │ N/A (GIL / Lock bound│ 737,376 logs/sec       │ 7.56M logs/sec        │ 4.3× (Py) / 44× (C++)│
+│ Throughput (12 Threads) │ N/A (Tree contention)│ N/A (Python threadpool)│ 29.02M logs/sec (sust)│ ~168× faster (12T)   │
 │ Median Latency (p50)    │ 1.4 μs - 2.4 μs      │ 0.8 μs - 1.2 μs        │ 0.1 μs - 0.8 μs       │ Up to 18× Lower      │
 │ Tail Latency (p99)      │ 11.2 μs - 529.0 μs   │ 1.8 μs - 3.9 μs        │ 0.7 μs - 5.7 μs       │ Up to 151× Lower     │
 │ S3 Storage Compaction   │ 0% (Must store raw)  │ 92.2% - 93.8% (Columnar│ 92.2% - 93.8% (ZSTD)  │ Invariant to Threads │
 │ In-S3 Query Scan (QPS)  │ N/A (Full raw scans) │ 83.5 QPS (1 Client)    │ 171.8 QPS (4 Clients) │ Instant S3 Pushdown  │
 │ Invertibility Guarantee │ 0% (Destructive <*>) │ 100.000% Exact Lossless│ 100.000% Exact Round  │ Zero bit-level loss  │
-│ Cloud Cost (1 TB/mo)    │ $0 / month saved     │ Save $1,346.59 / month │ Save $1,346.59 / month│ 93.8% Storage + Scan │
-│ Compute Cost Reduction  │ Baseline execution   │ 60% - 75% compute saved│ 90% - 99% compute saved Slashing CPU billing   │
+│ S3 Bytes Stored (1 TB)  │ 1,000 GB (Raw text)  │ ~62 GB (ZSTD Parquet)  │ ~62 GB (ZSTD Parquet) │ 93.8% Fewer Bytes    │
+│ Information Doubt (Δ)   │ 0.0940 bits (heurs.) │ 0.0000 bits (exact)    │ 0.0000 bits (exact)   │ Δ=0 by construction  │
 └─────────────────────────┴──────────────────────┴────────────────────────┴───────────────────────┴──────────────────────┘
 ```
 
