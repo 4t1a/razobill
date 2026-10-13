@@ -113,6 +113,10 @@ public:
 
     template <typename F> void parallelFor(std::size_t total, std::size_t chunkSize, F&& fn) {
         if (total == 0) return;
+        if (chunkSize == 0) {
+            const std::size_t count = workers_.empty() ? 1 : workers_.size();
+            chunkSize = std::max<std::size_t>(1, (total + count - 1) / count);
+        }
         if (workers_.empty() || total <= chunkSize) {
             fn(0, total);
             return;

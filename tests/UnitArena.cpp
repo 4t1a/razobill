@@ -175,3 +175,20 @@ TEST_CASE("ThreadPool chunked parallelFor") {
         REQUIRE(data[i] == 1);
     }
 }
+
+TEST_CASE("ThreadPool parallelFor handles zero chunkSize safely") {
+    ThreadPool pool(4);
+    constexpr std::size_t N = 1000;
+    std::vector<int> data(N, 0);
+
+    // If unhandled, chunkSize == 0 causes hardware division-by-zero (SIGFPE)
+    pool.parallelFor(N, 0, [&](std::size_t start, std::size_t end) {
+        for (std::size_t i = start; i < end; ++i) {
+            data[i] = 1;
+        }
+    });
+
+    for (std::size_t i = 0; i < N; ++i) {
+        REQUIRE(data[i] == 1);
+    }
+}
