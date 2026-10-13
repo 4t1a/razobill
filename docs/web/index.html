@@ -39,13 +39,14 @@ nav ul{display:flex;gap:20px;list-style:none;margin:0 0 0 auto;padding:0;font-si
 @media(max-width:700px){nav li:not(:last-child){display:none}}
 .btn{display:inline-block;font:600 1rem Figtree,sans-serif;padding:13px 22px;border-radius:999px;text-decoration:none;border:2px solid var(--ink);color:var(--ink);cursor:pointer;background:none;transition:transform .15s}
 .btn:hover{transform:translateY(-2px)}.btn.go{background:var(--lamp)}
-.hero{display:grid;grid-template-columns:1.25fr .75fr;gap:40px;align-items:end;padding:clamp(40px,7vw,84px) 0 0}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:end;padding:clamp(40px,7vw,84px) 0 0}
 .hero p.lead{font-size:1.2rem;color:var(--soft);margin:1.2em 0 .6em}.def{font-size:1rem;border-left:4px solid var(--tide);padding-left:14px;color:var(--ink)}
 .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
-.mascot{justify-self:center;width:min(300px,62vw)}.bird{position:relative;width:100%;aspect-ratio:534/900;animation:bob 4.5s ease-in-out infinite;transform-origin:50% 100%}
-.bird img{width:100%;height:100%;display:block}.lid{position:absolute;left:49.7%;top:4.5%;width:11.8%;aspect-ratio:1;border-radius:50%;background:#1e1e20;transform:scaleY(0);animation:blink 6s infinite}
-@keyframes bob{50%{transform:translateY(-6px) rotate(.8deg)}}@keyframes blink{0%,93%,100%{transform:scaleY(0)}96%{transform:scaleY(1)}}
-.tide{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--tide),var(--peri));margin-top:-3px}
+.mascot{justify-self:center;width:min(440px,100%)}.stage{position:relative}.stage video{display:block;width:100%;height:auto;aspect-ratio:576/512}
+.snd{position:absolute;right:2px;top:4px;font:600 .85rem Figtree,system-ui,sans-serif;background:var(--chalk);color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}.snd[aria-pressed=true]{background:var(--ink);color:#fff}
+.fig{margin:0}.fig img{display:block;width:100%;height:auto;-webkit-mask-image:linear-gradient(90deg,transparent,#000 1.5%,#000 98.5%,transparent),linear-gradient(180deg,transparent,#000 1.5%,#000 98.5%,transparent);-webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent,#000 1.5%,#000 98.5%,transparent),linear-gradient(180deg,transparent,#000 1.5%,#000 98.5%,transparent);mask-composite:intersect}.fig figcaption{font-size:.97rem;color:var(--soft);margin-top:8px;max-width:46ch}
+.head{display:grid;grid-template-columns:1fr 230px;gap:clamp(20px,5vw,56px);align-items:end;margin-bottom:12px}.pair .fig img{aspect-ratio:8/7;object-fit:contain;object-position:50% 100%}.pair{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,4vw,48px)}@media(max-width:700px){.head,.pair{grid-template-columns:1fr}.head .fig{order:-1;width:min(170px,50vw)}}
+.tide{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--tide),var(--peri));margin-top:-1.6%}
 .panel{background:var(--ink);color:#E9ECF7;border-radius:var(--r);padding:clamp(20px,3.4vw,34px);overflow:hidden}
 .panel h2{color:#fff}.panel p{color:#B9C0DA}.pick{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
 .pick button{font:600 .88rem "JetBrains Mono",monospace;color:#CBD1EA;background:transparent;border:1px solid #3A4260;border-radius:8px;padding:8px 12px;cursor:pointer}
@@ -61,7 +62,7 @@ nav ul{display:flex;gap:20px;list-style:none;margin:0 0 0 auto;padding:0;font-si
 .tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{font:600 .95rem Figtree,system-ui,sans-serif;border:2px solid var(--ink);border-radius:999px;background:none;padding:7px 18px;cursor:pointer;color:var(--ink)}.tabs button[aria-selected=true]{background:var(--ink);color:#fff}
 .code{position:relative;background:var(--deep);color:#E9ECF7;border-radius:var(--r);padding:20px 22px;overflow-x:auto;font-size:.88rem;line-height:1.7}.code pre{margin:0}.code .c{color:#8E97BB}
 .copy{position:absolute;top:10px;right:10px;font:600 .8rem Figtree,system-ui,sans-serif;background:var(--mist);color:var(--ink);border:0;border-radius:8px;padding:5px 11px;cursor:pointer}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,5vw,64px)}@media(max-width:860px){.hero,.two{grid-template-columns:1fr}.mascot{order:-1;width:min(140px,38vw);justify-self:start}}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,5vw,64px)}@media(max-width:860px){.hero,.two{grid-template-columns:1fr}.mascot{order:-1;width:min(250px,72vw);justify-self:start;margin-bottom:46px}.snd{top:auto;right:auto;left:0;bottom:-46px}}
 table{border-collapse:collapse;width:100%;font-size:.97rem}th,td{text-align:left;padding:14px 16px 14px 0;border-bottom:1px solid #D9DDEE;vertical-align:top}th{font-weight:600;color:var(--soft)}td:first-child{font-weight:600;white-space:nowrap}.tw{overflow-x:auto}td:nth-child(3){color:var(--soft)}@media(max-width:640px){thead{display:none}tr{display:block;padding:14px 0;border-bottom:1px solid #D9DDEE}td{display:block;border:0;padding:1px 0;white-space:normal}td:first-child{font-size:.9rem;color:var(--soft)}td:nth-child(2){font-weight:600;font-size:1.1rem}}
 dl{margin:0}dt{font-weight:600;margin-top:18px}dt a{font-size:1.1rem}dd{margin:2px 0 0;color:var(--soft);max-width:60ch}
 .lim{background:var(--mist);border-radius:var(--r);padding:clamp(22px,4vw,40px)}.lim li{margin-bottom:.7em;max-width:70ch}
@@ -84,7 +85,7 @@ footer{border-top:1px solid #D9DDEE;padding:40px 0;color:var(--soft);font-size:.
 <p class="def"><strong>Razobill</strong> is an open-source log parser. It splits each line into a template and typed values, and rebuilds the exact line from them. C++20 core, with a Python package, a DuckDB extension and a C API. Version 1.0.1, Apache 2.0.</p>
 <div class="cta"><a class="btn go" href="#install">Install pyrazobill</a><a class="btn" href="https://github.com/razobill/razobill">View on GitHub</a></div>
 </div>
-<div class="mascot"><div class="bird"><img src="assets/razobill-char.webp" width="534" height="900" alt="Razobill's mascot, a razorbill seabird standing upright"><span class="lid"></span></div><div class="tide"></div></div>
+<div class="mascot"><div class="stage"><video id="hv" autoplay muted loop playsinline preload="auto" width="576" height="512" poster="assets/razobill-hero-poster.webp" aria-label="Razobill's razorbill mascot waves and opens its beak to say hello"><source src="assets/razobill-hero.mp4" type="video/mp4"><source src="assets/razobill-hero.webm" type="video/webm"><img src="assets/razobill-hero-poster.webp" width="576" height="512" alt="Razobill's razorbill mascot standing upright"></video><button class="snd" id="snd" type="button" aria-pressed="false">Play with sound</button></div><div class="tide"></div></div>
 </header>
 </div>
 
@@ -150,8 +151,8 @@ if (parse("Worker 42 timeout", slots, ScanMode::Exact) == razobill::Status::Ok) 
 </div></section>
 
 <section id="numbers"><div class="wrap">
-<h2>What was measured, and how</h2>
-<p>All figures come from the project's own benchmarks on one Windows 11 machine with 12 logical cores. The scripts are in the repo if you want to rerun them.</p>
+<div class="head"><div><h2>What was measured, and how</h2>
+<p>All figures come from the project's own benchmarks on one Windows 11 machine with 12 logical cores. The scripts are in the repo if you want to rerun them.</p></div><figure class="fig"><img src="assets/bill-lab.webp" width="646" height="860" loading="lazy" alt="Razobill's razorbill mascot in a lab coat and safety goggles, taking notes on a clipboard"></figure></div>
 <div class="tw"><table>
 <thead><tr><th>Result</th><th>Number</th><th>Context</th></tr></thead><tbody>
 <tr><td>Round trip</td><td>0 mismatches</td><td>69.6 million lines, 4,861 log files, 6.82 GB</td></tr>
@@ -163,6 +164,11 @@ if (parse("Worker 42 timeout", slots, ScanMode::Exact) == razobill::Status::Ok) 
 </tbody></table></div>
 <p style="margin-top:18px"><a href="https://github.com/razobill/razobill/blob/main/docs/benchmarks/DrainComparison.md">Read the Drain3 comparison</a> or <a href="https://github.com/razobill/razobill/blob/main/evidence/README.md">see how each experiment is reproduced</a>.</p>
 </div></section>
+
+<section><div class="wrap"><h2>It already gets along with your database</h2><div class="pair">
+<figure class="fig"><img src="assets/with-duckdb.webp" width="860" height="691" loading="lazy" alt="Razobill's razorbill mascot waving happily at a yellow duck wearing a blue bandana with a database icon, standing for DuckDB"><figcaption><a href="https://github.com/razobill/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md">DuckDB</a>: split logs into columns with plain SQL, rebuild the originals when you need them.</figcaption></figure>
+<figure class="fig"><img src="assets/with-chdb.webp" width="860" height="781" loading="lazy" alt="Razobill's razorbill mascot saying hello to a yellow and black cobra, standing for chDB"><figcaption><a href="https://github.com/razobill/razobill/blob/main/docs/guides/ClickHouseChdbGuide.md">chDB and ClickHouse</a>: the template key is an xxHash64, so both sides can agree on it.</figcaption></figure>
+</div></div></section>
 
 <section><div class="wrap two"><div>
 <h2>Where it plugs in</h2>
@@ -211,6 +217,10 @@ if(RM){st.className="panel final";return}
 st.className="panel";st.dataset.s=0;[1,2,3].forEach((s,i)=>timers.push(setTimeout(()=>st.dataset.s=s,700+i*1100)))}
 EX.forEach((e,i)=>{const b=document.createElement("button");b.type="button";b.textContent=["ssh login","db timeout","worker job","http request"][i];b.onclick=()=>show(i);$("pick").append(b)});
 $("replay").onclick=()=>show(cur);show(0);
+const hv=$("hv"),snd=$("snd");
+if(RM){hv.pause();hv.removeAttribute("autoplay");hv.controls=true;snd.hidden=true}
+else{snd.onclick=()=>{const on=snd.getAttribute("aria-pressed")!=="true";hv.muted=!on;snd.setAttribute("aria-pressed",on);snd.textContent=on?"Mute":"Play with sound";if(on)hv.currentTime=0;hv.play().catch(()=>{})};
+new IntersectionObserver(([e])=>{e.isIntersecting?hv.play().catch(()=>{}):hv.pause()},{threshold:.15}).observe(hv)}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x==b));document.querySelectorAll(".code").forEach(c=>c.hidden=c.dataset.p!=b.dataset.t)});
 document.querySelectorAll(".copy").forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.nextElementSibling.innerText).then(()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy",1400)})});
 const bar=document.querySelector(".run i"),bird=document.querySelector(".run span");
