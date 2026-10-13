@@ -312,13 +312,14 @@ Kind classify(duckdb_logical_type t) {
     case DUCKDB_TYPE_BIGINT:
         return Kind::Int;
     case DUCKDB_TYPE_VARCHAR:
+    case DUCKDB_TYPE_BLOB:
         return Kind::Str;
     case DUCKDB_TYPE_LIST: {
         auto elem = duckdb_list_type_child_type(t);
         const auto id = duckdb_get_type_id(elem);
         duckdb_destroy_logical_type(&elem);
         if (id == DUCKDB_TYPE_BIGINT) return Kind::IntList;
-        if (id == DUCKDB_TYPE_VARCHAR) return Kind::StrList;
+        if (id == DUCKDB_TYPE_VARCHAR || id == DUCKDB_TYPE_BLOB) return Kind::StrList;
         return Kind::Unsupported;
     }
     default:
@@ -337,8 +338,8 @@ template <Shape S>
     auto formType = duckdb_vector_get_column_type(formVec);
     auto formTypeId = duckdb_get_type_id(formType);
     duckdb_destroy_logical_type(&formType);
-    if (formTypeId != DUCKDB_TYPE_VARCHAR) {
-        duckdb_scalar_function_set_error(info, "razobill: template parameter must be VARCHAR");
+    if (formTypeId != DUCKDB_TYPE_VARCHAR && formTypeId != DUCKDB_TYPE_BLOB) {
+        duckdb_scalar_function_set_error(info, "razobill: template parameter must be VARCHAR or BLOB");
         return;
     }
     auto* formData = static_cast<duckdb_string_t*>(duckdb_vector_get_data(formVec));
@@ -439,19 +440,6 @@ private:
     explicit Type(duckdb_logical_type owned) : t(owned) {}
 };
 
-bool addVarargs(duckdb_connection con, const char* name, duckdb_logical_type any, duckdb_logical_type ret,
-                void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
-    auto f = duckdb_create_scalar_function();
-    duckdb_scalar_function_set_name(f, name);
-    duckdb_scalar_function_set_varargs(f, any);
-    duckdb_scalar_function_set_special_handling(f);
-    duckdb_scalar_function_set_return_type(f, ret);
-    duckdb_scalar_function_set_function(f, fn);
-    const bool ok = duckdb_register_scalar_function(con, f) == DuckDBSuccess;
-    duckdb_destroy_scalar_function(&f);
-    return ok;
-}
-
 bool add(duckdb_connection con, const char* name, std::initializer_list<duckdb_logical_type> params,
          duckdb_logical_type ret, void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
     auto f = duckdb_create_scalar_function();
@@ -465,64 +453,123 @@ bool add(duckdb_connection con, const char* name, std::initializer_list<duckdb_l
     return ok;
 }
 
+class FunctionSet {
+public:
+    explicit FunctionSet(const char* name) : name_(name), set_(duckdb_create_scalar_function_set(name)) {}
+    ~FunctionSet() {
+        if (set_) duckdb_destroy_scalar_function_set(&set_);
+    }
+    FunctionSet(const FunctionSet&) = delete;
+    FunctionSet& operator=(const FunctionSet&) = delete;
+
+    void add(std::initializer_list<duckdb_logical_type> params, duckdb_logical_type ret,
+             void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
+        auto f = duckdb_create_scalar_function();
+        duckdb_scalar_function_set_name(f, name_);
+        for (auto p : params)
+            duckdb_scalar_function_add_parameter(f, p);
+        duckdb_scalar_function_set_return_type(f, ret);
+        duckdb_scalar_function_set_function(f, fn);
+        duckdb_add_scalar_function_to_set(set_, f);
+        duckdb_destroy_scalar_function(&f);
+    }
+
+    void addVarargs(duckdb_logical_type firstParam, duckdb_logical_type varargsType, duckdb_logical_type ret,
+                    void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
+        auto f = duckdb_create_scalar_function();
+        duckdb_scalar_function_set_name(f, name_);
+        if (firstParam)
+            duckdb_scalar_function_add_parameter(f, firstParam);
+        duckdb_scalar_function_set_varargs(f, varargsType);
+        duckdb_scalar_function_set_special_handling(f);
+        duckdb_scalar_function_set_return_type(f, ret);
+        duckdb_scalar_function_set_function(f, fn);
+        duckdb_add_scalar_function_to_set(set_, f);
+        duckdb_destroy_scalar_function(&f);
+    }
+
+    [[nodiscard]] bool registerSet(duckdb_connection con) {
+        return duckdb_register_scalar_function_set(con, set_) == DuckDBSuccess;
+    }
+
+private:
+    const char* name_;
+    duckdb_scalar_function_set set_;
+};
+
 } // namespace
 
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info, struct duckdb_extension_access*) {
-    Type varchar(DUCKDB_TYPE_VARCHAR), bigint(DUCKDB_TYPE_BIGINT), ubigint(DUCKDB_TYPE_UBIGINT),
-        doubleType(DUCKDB_TYPE_DOUBLE);
+    Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT),
+        ubigint(DUCKDB_TYPE_UBIGINT), doubleType(DUCKDB_TYPE_DOUBLE);
     Type any(DUCKDB_TYPE_ANY);
-    Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), doubleList = Type::listOf(doubleType);
+    Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob),
+         doubleList = Type::listOf(doubleType);
 
     std::vector<const char*> structNames = {"form", "ints", "strs"};
-    std::vector<duckdb_logical_type> structTypes = {varchar.t, bigintList.t, varcharList.t};
-    Type decomposeStruct = Type::structOf(structNames, structTypes);
+    std::vector<duckdb_logical_type> structTypesVarchar = {varchar.t, bigintList.t, varcharList.t};
+    std::vector<duckdb_logical_type> structTypesBlob = {blob.t, bigintList.t, blobList.t};
+    Type decomposeStructVarchar = Type::structOf(structNames, structTypesVarchar);
+    Type decomposeStructBlob = Type::structOf(structNames, structTypesBlob);
 
-    // Register primary camelCase functions
+    auto regDualUnary = [&](const char* cName, const char* sName, duckdb_logical_type retVarchar,
+                            duckdb_logical_type retBlob, auto fn) {
+        FunctionSet cSet(cName), sSet(sName);
+        cSet.add({varchar.t}, retVarchar, fn);
+        cSet.add({blob.t}, retBlob, fn);
+        sSet.add({varchar.t}, retVarchar, fn);
+        sSet.add({blob.t}, retBlob, fn);
+        return cSet.registerSet(connection) && sSet.registerSet(connection);
+    };
+
     bool ok = true;
-    ok = ok && add(connection, "rbForm", {varchar.t}, varchar.t, guarded<rbFormImpl<core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rbFormSemantic", {varchar.t}, varchar.t, guarded<rbFormImpl<core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rbInts", {varchar.t}, bigintList.t, guarded<rbListImpl<true, core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rbIntsSemantic", {varchar.t}, bigintList.t,
-                   guarded<rbListImpl<true, core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rbStrs", {varchar.t}, varcharList.t, guarded<rbListImpl<false, core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rbStrsSemantic", {varchar.t}, varcharList.t,
-                   guarded<rbListImpl<false, core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rbDecompose", {varchar.t}, decomposeStruct.t,
-                   guarded<rbDecomposeImpl<core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rbDecomposeSemantic", {varchar.t}, decomposeStruct.t,
-                   guarded<rbDecomposeImpl<core::ScanMode::Semantic>>);
+    ok = ok && regDualUnary("rbForm", "rb_form", varchar.t, blob.t, guarded<rbFormImpl<core::ScanMode::Exact>>);
+    ok = ok && regDualUnary("rbFormSemantic", "rb_form_semantic", varchar.t, blob.t,
+                            guarded<rbFormImpl<core::ScanMode::Semantic>>);
+    ok = ok && regDualUnary("rbInts", "rb_ints", bigintList.t, bigintList.t,
+                            guarded<rbListImpl<true, core::ScanMode::Exact>>);
+    ok = ok && regDualUnary("rbIntsSemantic", "rb_ints_semantic", bigintList.t, bigintList.t,
+                            guarded<rbListImpl<true, core::ScanMode::Semantic>>);
+    ok = ok && regDualUnary("rbStrs", "rb_strs", varcharList.t, blobList.t,
+                            guarded<rbListImpl<false, core::ScanMode::Exact>>);
+    ok = ok && regDualUnary("rbStrsSemantic", "rb_strs_semantic", varcharList.t, blobList.t,
+                            guarded<rbListImpl<false, core::ScanMode::Semantic>>);
+    ok = ok && regDualUnary("rbDecompose", "rb_decompose", decomposeStructVarchar.t, decomposeStructBlob.t,
+                            guarded<rbDecomposeImpl<core::ScanMode::Exact>>);
+    ok = ok && regDualUnary("rbDecomposeSemantic", "rb_decompose_semantic", decomposeStructVarchar.t,
+                            decomposeStructBlob.t, guarded<rbDecomposeImpl<core::ScanMode::Semantic>>);
+    ok = ok && regDualUnary("rbTemplate", "rb_template", varchar.t, blob.t, guarded<rbTemplateImpl>);
+    ok = ok && regDualUnary("rbHash", "rb_hash", ubigint.t, ubigint.t, guarded<rbHashImpl>);
+
+    // Math functions
     ok = ok && add(connection, "rbEntropy", {doubleList.t}, doubleType.t, guarded<rbEntropyImpl>);
+    ok = ok && add(connection, "rb_entropy", {doubleList.t}, doubleType.t, guarded<rbEntropyImpl>);
     ok = ok && add(connection, "rbMillerMadow", {doubleType.t, bigint.t, doubleType.t}, doubleType.t,
                    guarded<rbMillerMadowImpl>);
-    ok = ok && add(connection, "rbReconstruct", {varchar.t, bigintList.t, varcharList.t}, varchar.t,
-                   guarded<rebuildImpl<kJoin>>);
-    ok = ok && addVarargs(connection, "rbRebuild", any.t, varchar.t, guarded<rebuildImpl<kRebuild>>);
-    ok = ok && add(connection, "rbTemplate", {varchar.t}, varchar.t, guarded<rbTemplateImpl>);
-    ok = ok && add(connection, "rbHash", {varchar.t}, ubigint.t, guarded<rbHashImpl>);
-
-    // Register standard backward-compatibility aliases
-    ok = ok && add(connection, "rb_form", {varchar.t}, varchar.t, guarded<rbFormImpl<core::ScanMode::Exact>>);
-    ok = ok &&
-         add(connection, "rb_form_semantic", {varchar.t}, varchar.t, guarded<rbFormImpl<core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rb_ints", {varchar.t}, bigintList.t, guarded<rbListImpl<true, core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rb_ints_semantic", {varchar.t}, bigintList.t,
-                   guarded<rbListImpl<true, core::ScanMode::Semantic>>);
-    ok =
-        ok && add(connection, "rb_strs", {varchar.t}, varcharList.t, guarded<rbListImpl<false, core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rb_strs_semantic", {varchar.t}, varcharList.t,
-                   guarded<rbListImpl<false, core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rb_decompose", {varchar.t}, decomposeStruct.t,
-                   guarded<rbDecomposeImpl<core::ScanMode::Exact>>);
-    ok = ok && add(connection, "rb_decompose_semantic", {varchar.t}, decomposeStruct.t,
-                   guarded<rbDecomposeImpl<core::ScanMode::Semantic>>);
-    ok = ok && add(connection, "rb_entropy", {doubleList.t}, doubleType.t, guarded<rbEntropyImpl>);
     ok = ok && add(connection, "rb_miller_madow", {doubleType.t, bigint.t, doubleType.t}, doubleType.t,
                    guarded<rbMillerMadowImpl>);
-    ok = ok &&
-         add(connection, "rb_join", {varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<rebuildImpl<kJoin>>);
-    ok = ok && addVarargs(connection, "rb_rebuild", any.t, varchar.t, guarded<rebuildImpl<kRebuild>>);
-    ok = ok && add(connection, "rb_template", {varchar.t}, varchar.t, guarded<rbTemplateImpl>);
-    ok = ok && add(connection, "rb_hash", {varchar.t}, ubigint.t, guarded<rbHashImpl>);
+
+    // Reconstruction / Join
+    auto regJoin = [&](const char* name) {
+        FunctionSet s(name);
+        s.add({varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<rebuildImpl<kJoin>>);
+        s.add({blob.t, bigintList.t, blobList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
+        s.add({blob.t, bigintList.t, varcharList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
+        s.add({varchar.t, bigintList.t, blobList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
+        return s.registerSet(connection);
+    };
+    ok = ok && regJoin("rbReconstruct");
+    ok = ok && regJoin("rb_join");
+
+    // Varargs Rebuild
+    auto regRebuild = [&](const char* name) {
+        FunctionSet s(name);
+        s.addVarargs(varchar.t, any.t, varchar.t, guarded<rebuildImpl<kRebuild>>);
+        s.addVarargs(blob.t, any.t, blob.t, guarded<rebuildImpl<kRebuild>>);
+        return s.registerSet(connection);
+    };
+    ok = ok && regRebuild("rbRebuild");
+    ok = ok && regRebuild("rb_rebuild");
 
     return ok;
 }

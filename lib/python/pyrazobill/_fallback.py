@@ -130,8 +130,23 @@ class SlotRecord:
     def formKeyHash(self) -> int:
         return hash64(self.formKey)
 
+    @property
+    def formKeyBytes(self) -> bytes:
+        return self.formKey.encode("utf-8", "surrogateescape")
+
+    @property
+    def skeletonBytes(self) -> bytes:
+        return self.skeleton.encode("utf-8", "surrogateescape")
+
+    @property
+    def strsBytes(self) -> List[bytes]:
+        return [s.encode("utf-8", "surrogateescape") for s in self.strs]
+
     def reconstruct(self) -> str:
         return reconstruct(self.formKey, self.ints, self.strs)
+
+    def reconstructBytes(self) -> bytes:
+        return self.reconstruct().encode("utf-8", "surrogateescape")
 
     def __repr__(self) -> str:
         return f"<pyrazobill.SlotRecord formKey='{templateOf(self.formKey)}' ints={len(self.ints)} strs={len(self.strs)}>"
@@ -146,7 +161,9 @@ class AuditResult:
     mbPerSec: float = 0.0
     mismatches: int = 0
 
-def parse(msg: str, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
+def parse(msg: Any, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
+    if isinstance(msg, bytes):
+        msg = msg.decode("utf-8", "surrogateescape")
     rec = SlotRecord()
     if len(msg) > kMaxMessageBytes:
         return rec
@@ -175,15 +192,22 @@ def parse(msg: str, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
     rec.types = "".join(types_parts)
     return rec
 
-def parseBatch(msgs: List[str], mode: ScanMode = ScanMode.Semantic) -> List[SlotRecord]:
+def parseBatch(msgs: List[Any], mode: ScanMode = ScanMode.Semantic) -> List[SlotRecord]:
     return [parse(m, mode) for m in msgs]
 
-def decompose(msg: str, mode: ScanMode = ScanMode.Semantic) -> Tuple[str, List[int], List[str]]:
+def decompose(msg: Any, mode: ScanMode = ScanMode.Semantic) -> Tuple[str, List[int], List[str]]:
     rec = parse(msg, mode)
     return rec.formKey, list(rec.ints), list(rec.strs)
 
-def decomposeBatch(msgs: List[str], mode: ScanMode = ScanMode.Semantic) -> List[Tuple[str, List[int], List[str]]]:
+def decomposeBytes(msg: Any, mode: ScanMode = ScanMode.Semantic) -> Tuple[bytes, List[int], List[bytes]]:
+    rec = parse(msg, mode)
+    return rec.formKeyBytes, list(rec.ints), rec.strsBytes
+
+def decomposeBatch(msgs: List[Any], mode: ScanMode = ScanMode.Semantic) -> List[Tuple[str, List[int], List[str]]]:
     return [decompose(m, mode) for m in msgs]
+
+def decomposeBatchBytes(msgs: List[Any], mode: ScanMode = ScanMode.Semantic) -> List[Tuple[bytes, List[int], List[bytes]]]:
+    return [decomposeBytes(m, mode) for m in msgs]
 
 def reconstruct(formKey_or_record: Any, ints: Optional[Any] = None, strs: Optional[Any] = None) -> str:
     if isinstance(formKey_or_record, SlotRecord):
@@ -220,13 +244,30 @@ def reconstruct(formKey_or_record: Any, ints: Optional[Any] = None, strs: Option
                         si += 1
     return "".join(out)
 
-def formKey(msg: str, mode: ScanMode = ScanMode.Semantic) -> str:
+def reconstructBytes(formKey_or_record: Any, ints: Optional[Any] = None, strs: Optional[Any] = None) -> bytes:
+    if isinstance(formKey_or_record, SlotRecord):
+        return formKey_or_record.reconstructBytes()
+    if isinstance(formKey_or_record, bytes):
+        formKey_or_record = formKey_or_record.decode("utf-8", "surrogateescape")
+    if strs is not None:
+        strs = [s.decode("utf-8", "surrogateescape") if isinstance(s, bytes) else str(s) for s in strs]
+    return reconstruct(formKey_or_record, ints, strs).encode("utf-8", "surrogateescape")
+
+def formKey(msg: Any, mode: ScanMode = ScanMode.Semantic) -> str:
     return parse(msg, mode).formKey
 
-def templateOf(form: str) -> str:
+def formKeyBytes(msg: Any, mode: ScanMode = ScanMode.Semantic) -> bytes:
+    return parse(msg, mode).formKeyBytes
+
+def templateOf(form: Any) -> str:
+    if isinstance(form, bytes):
+        form = form.decode("utf-8", "surrogateescape")
     sep = form.rfind(chr(kTypeSeparator))
     skeleton = form[:sep] if sep != -1 else form
     return skeleton.replace(chr(kPlaceholder), "<*>")
+
+def templateOfBytes(form: Any) -> bytes:
+    return templateOf(form).encode("utf-8", "surrogateescape")
 
 # Pure-Python xxHash64 implementation (Seed 0, ClickHouse & C++ compatible)
 P1 = 11400714785074694791

@@ -313,6 +313,27 @@ class TestPyRazobill(unittest.TestCase):
             pyrazobill.channelExactFailureProbability(toySeq, 2), 1.0, places=5
         )
 
+    def test_non_utf8_binary_payload_safety(self):
+        # Protected Invariant: reconstruct(parse(m)) == m byte-for-byte for arbitrary byte strings
+        raw_bytes = b"kernel: [1234.56] usb 1-1: \xff\xfe non-utf8 token \x80\x90 id=42"
+        rec = pyrazobill.parse(raw_bytes, pyrazobill.ScanMode.Exact)
+
+        # Binary accessors must return exact bytes
+        self.assertEqual(rec.reconstructBytes(), raw_bytes)
+        self.assertEqual(pyrazobill.reconstructBytes(rec), raw_bytes)
+        self.assertIsInstance(rec.formKeyBytes, bytes)
+        self.assertIsInstance(rec.skeletonBytes, bytes)
+        self.assertIsInstance(rec.strsBytes, list)
+        for s in rec.strsBytes:
+            self.assertIsInstance(s, bytes)
+
+        # String accessors must not crash with UnicodeDecodeError (surrogateescape)
+        form_key_str = rec.formKey
+        self.assertIsInstance(form_key_str, str)
+        rebuilt_str = rec.reconstruct()
+        self.assertIsInstance(rebuilt_str, str)
+        self.assertEqual(rebuilt_str.encode("utf-8", "surrogateescape"), raw_bytes)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -504,3 +504,27 @@ TEST_CASE("composite struct decomposition and entropy in DuckDB SQL") {
     auto mm2 = b->query("SELECT rb_miller_madow(1.5, 4, 1000.0)").f64(0, 0);
     CHECK(mm1 == doctest::Approx(mm2));
 }
+
+TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 byte payloads") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
+    auto b = open();
+    b->exec("CREATE TABLE bin_sample(raw_bin BLOB)");
+    b->exec("INSERT INTO bin_sample VALUES ('\\xAA\\xBB\\xCC\\xFF\\xFE 1234 port 22'::BLOB)");
+
+    const auto forms = b->query("SELECT count(DISTINCT rb_form(raw_bin)) FROM bin_sample").i64(0, 0);
+    CHECK(forms == 1);
+
+    const auto mismatches = b->query(
+        "SELECT count(*) FROM bin_sample WHERE rb_join(rb_form(raw_bin), rb_ints(raw_bin), rb_strs(raw_bin)) IS DISTINCT FROM raw_bin"
+    ).i64(0, 0);
+    CHECK(mismatches == 0);
+
+    const auto rebuildMismatches = b->query(
+        "SELECT count(*) FROM bin_sample WHERE rb_rebuild(rb_form(raw_bin), rb_ints(raw_bin), rb_strs(raw_bin)) IS DISTINCT FROM raw_bin"
+    ).i64(0, 0);
+    CHECK(rebuildMismatches == 0);
+}
+

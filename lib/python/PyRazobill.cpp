@@ -32,6 +32,15 @@
 namespace py = pybind11;
 using namespace razobill;
 
+inline py::object toPyStrSafe(std::string_view sv) {
+    PyObject* u = PyUnicode_DecodeUTF8(sv.data(), static_cast<Py_ssize_t>(sv.size()), "surrogateescape");
+    if (!u) {
+        PyErr_Clear();
+        u = PyUnicode_DecodeLatin1(sv.data(), static_cast<Py_ssize_t>(sv.size()), nullptr);
+    }
+    return py::reinterpret_steal<py::object>(u);
+}
+
 // Python-facing SlotRecord: owns its underlying message buffer to prevent dangling string views.
 struct PySlotRecord {
     std::shared_ptr<std::string> msgBuffer;
@@ -44,24 +53,41 @@ struct PySlotRecord {
         (void)core::parse(*msgBuffer, slots, mode);
     }
 
-    [[nodiscard]] std::string formKey() const { return slots.formKey(); }
+    [[nodiscard]] py::object formKey() const { return toPyStrSafe(slots.formKey()); }
+    [[nodiscard]] py::bytes formKeyBytes() const {
+        std::string k = slots.formKey();
+        return py::bytes(k);
+    }
     [[nodiscard]] std::uint64_t formKeyHash() const noexcept { return slots.formKeyHash(); }
     [[nodiscard]] const std::vector<std::int64_t>& ints() const noexcept { return slots.ints; }
-    [[nodiscard]] std::vector<std::string> strs() const {
-        std::vector<std::string> v;
-        v.reserve(slots.strs.size());
+    [[nodiscard]] py::list strs() const {
+        py::list v;
         for (const auto& sv : slots.strs)
-            v.emplace_back(sv);
+            v.append(toPyStrSafe(sv));
         return v;
     }
-    [[nodiscard]] const std::string& skeleton() const noexcept { return slots.skeleton; }
+    [[nodiscard]] py::list strsBytes() const {
+        py::list v;
+        for (const auto& sv : slots.strs)
+            v.append(py::bytes(sv.data(), sv.size()));
+        return v;
+    }
+    [[nodiscard]] py::object skeleton() const { return toPyStrSafe(slots.skeleton); }
+    [[nodiscard]] py::bytes skeletonBytes() const { return py::bytes(slots.skeleton); }
     [[nodiscard]] const std::string& types() const noexcept { return slots.types; }
 
-    [[nodiscard]] std::string reconstruct() const {
+    [[nodiscard]] py::object reconstruct() const {
         std::string out;
         std::string key = slots.formKey();
         (void)core::reconstruct(key, slots.ints, slots.strs, out);
-        return out;
+        return toPyStrSafe(out);
+    }
+
+    [[nodiscard]] py::bytes reconstructBytes() const {
+        std::string out;
+        std::string key = slots.formKey();
+        (void)core::reconstruct(key, slots.ints, slots.strs, out);
+        return py::bytes(out);
     }
 };
 
@@ -157,15 +183,19 @@ PYBIND11_MODULE(Core, m) {
     py::class_<PySlotRecord>(m, "SlotRecord")
         .def(py::init<>())
         .def_property_readonly("formKey", &PySlotRecord::formKey)
+        .def_property_readonly("formKeyBytes", &PySlotRecord::formKeyBytes)
         .def_property_readonly("formKeyHash", &PySlotRecord::formKeyHash)
         .def_property_readonly("ints", &PySlotRecord::ints)
         .def_property_readonly("strs", &PySlotRecord::strs)
+        .def_property_readonly("strsBytes", &PySlotRecord::strsBytes)
         .def_property_readonly("skeleton", &PySlotRecord::skeleton)
+        .def_property_readonly("skeletonBytes", &PySlotRecord::skeletonBytes)
         .def_property_readonly("types", &PySlotRecord::types)
         .def("reconstruct", &PySlotRecord::reconstruct)
+        .def("reconstructBytes", &PySlotRecord::reconstructBytes)
         .def("__repr__", [](const PySlotRecord& s) {
-            return "<pyrazobill.SlotRecord formKey=" + s.formKey() + " ints=" + std::to_string(s.ints().size()) +
-                   " strs=" + std::to_string(s.strs().size()) + ">";
+            return "<pyrazobill.SlotRecord ints=" + std::to_string(s.ints().size()) +
+                   " strs=" + std::to_string(s.slots.strs.size()) + ">";
         });
 
     py::class_<AuditResult>(m, "AuditResult")
@@ -217,64 +247,128 @@ PYBIND11_MODULE(Core, m) {
             for (const auto& s : strs)
                 strViews.emplace_back(s);
             (void)core::reconstruct(formKey, ints, strViews, out);
-            return out;
+            return toPyStrSafe(out);
         },
         py::arg("formKey"), py::arg("ints"), py::arg("strs"),
         "Reconstructs the original log line from decomposed slots");
+
+    m.def(
+        "reconstructBytes", [](const PySlotRecord& record) { return record.reconstructBytes(); }, py::arg("record"),
+        "Reconstructs the original log line as exact bytes with 100% fidelity");
+
+    m.def(
+        "reconstructBytes",
+        [](std::string_view formKey, const std::vector<std::int64_t>& ints, const std::vector<std::string>& strs) {
+            std::string out;
+            std::vector<std::string_view> strViews;
+            strViews.reserve(strs.size());
+            for (const auto& s : strs)
+                strViews.emplace_back(s);
+            (void)core::reconstruct(formKey, ints, strViews, out);
+            return py::bytes(out);
+        },
+        py::arg("formKey"), py::arg("ints"), py::arg("strs"),
+        "Reconstructs the original log line as raw bytes from decomposed slots");
 
     m.def(
         "decompose",
         [](std::string_view msg, core::ScanMode mode) {
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
-            std::vector<std::string> strCopies;
-            strCopies.reserve(slots.strs.size());
+            py::list pyStrs;
             for (const auto& sv : slots.strs)
-                strCopies.emplace_back(sv);
-            return py::make_tuple(slots.formKey(), slots.ints, std::move(strCopies));
+                pyStrs.append(toPyStrSafe(sv));
+            return py::make_tuple(toPyStrSafe(slots.formKey()), slots.ints, std::move(pyStrs));
         },
         py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic,
         "Decomposes a message into (formKey, ints, strs) tuple");
 
     m.def(
+        "decomposeBytes",
+        [](std::string_view msg, core::ScanMode mode) {
+            core::SlotRecord slots;
+            (void)core::parse(msg, slots, mode);
+            py::list pyStrs;
+            for (const auto& sv : slots.strs)
+                pyStrs.append(py::bytes(sv.data(), sv.size()));
+            std::string k = slots.formKey();
+            return py::make_tuple(py::bytes(k), slots.ints, std::move(pyStrs));
+        },
+        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic,
+        "Decomposes a message into (formKeyBytes, ints, strsBytes) tuple");
+
+    m.def(
         "decomposeBatch",
         [](const std::vector<std::string>& msgs, core::ScanMode mode) {
-            std::vector<std::tuple<std::string, std::vector<std::int64_t>, std::vector<std::string>>> results;
+            std::vector<std::tuple<py::object, std::vector<std::int64_t>, py::list>> results;
             results.reserve(msgs.size());
-            {
-                py::gil_scoped_release release;
-                for (const auto& msg : msgs) {
-                    core::SlotRecord slots;
-                    (void)core::parse(msg, slots, mode);
-                    std::vector<std::string> strCopies;
-                    strCopies.reserve(slots.strs.size());
-                    for (const auto& sv : slots.strs)
-                        strCopies.emplace_back(sv);
-                    results.emplace_back(slots.formKey(), slots.ints, std::move(strCopies));
-                }
+            for (const auto& msg : msgs) {
+                core::SlotRecord slots;
+                (void)core::parse(msg, slots, mode);
+                py::list pyStrs;
+                for (const auto& sv : slots.strs)
+                    pyStrs.append(toPyStrSafe(sv));
+                results.emplace_back(toPyStrSafe(slots.formKey()), slots.ints, std::move(pyStrs));
             }
             return results;
         },
         py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
-        "High-speed batch decomposition into (formKey, ints, strs) tuples releasing GIL");
+        "High-speed batch decomposition into (formKey, ints, strs) tuples");
+
+    m.def(
+        "decomposeBatchBytes",
+        [](const std::vector<std::string>& msgs, core::ScanMode mode) {
+            std::vector<std::tuple<py::bytes, std::vector<std::int64_t>, py::list>> results;
+            results.reserve(msgs.size());
+            for (const auto& msg : msgs) {
+                core::SlotRecord slots;
+                (void)core::parse(msg, slots, mode);
+                py::list pyStrs;
+                for (const auto& sv : slots.strs)
+                    pyStrs.append(py::bytes(sv.data(), sv.size()));
+                std::string k = slots.formKey();
+                results.emplace_back(py::bytes(k), slots.ints, std::move(pyStrs));
+            }
+            return results;
+        },
+        py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
+        "High-speed batch decomposition into (formKeyBytes, ints, strsBytes) tuples");
 
     m.def(
         "formKey",
         [](std::string_view msg, core::ScanMode mode) {
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
-            return slots.formKey();
+            return toPyStrSafe(slots.formKey());
         },
         py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Extracts the canonical form key");
+
+    m.def(
+        "formKeyBytes",
+        [](std::string_view msg, core::ScanMode mode) {
+            core::SlotRecord slots;
+            (void)core::parse(msg, slots, mode);
+            return py::bytes(slots.formKey());
+        },
+        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Extracts the canonical form key as raw bytes");
 
     m.def(
         "templateOf",
         [](std::string_view form) {
             std::string tmpl;
             (void)core::templateOf(form, tmpl);
-            return tmpl;
+            return toPyStrSafe(tmpl);
         },
         py::arg("form"), "Converts form key to human-readable <*> template");
+
+    m.def(
+        "templateOfBytes",
+        [](std::string_view form) {
+            std::string tmpl;
+            (void)core::templateOf(form, tmpl);
+            return py::bytes(tmpl);
+        },
+        py::arg("form"), "Converts form key to human-readable <*> template byte string");
 
     m.def(
         "hash64", [](std::string_view s) { return core::xxh64(s); }, py::arg("s"),
