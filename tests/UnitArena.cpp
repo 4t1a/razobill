@@ -90,7 +90,34 @@ TEST_CASE("FormCatalog thread-safe registration") {
     auto h2 = catalog.registerForm("test_key_2\x13S", "test_key_2 <*>", 0, 1);
     CHECK(catalog.contains(h1));
     CHECK(catalog.contains(h2));
+    CHECK(catalog.contains("test_key_1\x13I"));
+    CHECK(catalog.contains("test_key_2\x13S"));
     CHECK(catalog.size() == 2);
+}
+
+TEST_CASE("FormCatalog full-key comparison and hash collision safety") {
+    FormCatalog catalog;
+    // Two distinct keys simulating a 64-bit hash collision
+    const std::uint64_t simulatedHash = 0xABCD1234EFEF9988ULL;
+    catalog.registerFormWithHash("login_failed_user\x13S", "login failed for <*>", 0, 1, simulatedHash);
+    catalog.registerFormWithHash("query_timeout_ms\x13I", "query timeout after <*> ms", 1, 0, simulatedHash);
+
+    // In a hash-only keyed map, the second form would be dropped/aliased and size would be 1.
+    // Under full-key comparison, both distinct forms must be safely preserved.
+    CHECK(catalog.size() == 2);
+    CHECK(catalog.collisionCount() == 1);
+    CHECK(catalog.contains("login_failed_user\x13S"));
+    CHECK(catalog.contains("query_timeout_ms\x13I"));
+    CHECK(catalog.contains(simulatedHash));
+
+    FormEntry e1{}, e2{};
+    REQUIRE(catalog.findForm("login_failed_user\x13S", e1));
+    CHECK(e1.templateStr == "login failed for <*>");
+    CHECK(e1.strSlots == 1);
+
+    REQUIRE(catalog.findForm("query_timeout_ms\x13I", e2));
+    CHECK(e2.templateStr == "query timeout after <*> ms");
+    CHECK(e2.intSlots == 1);
 }
 
 TEST_CASE("ThreadPool chunked parallelFor") {
