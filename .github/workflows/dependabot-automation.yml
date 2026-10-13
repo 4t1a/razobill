@@ -20,9 +20,9 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve SemVer Minor & Patch Updates
+      - name: Validate & Comment SemVer Minor & Patch Updates
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        run: gh pr review --approve "$PR_URL"
+        run: gh pr comment "$PR_URL" --body "Dependabot metadata validation passed for minor/patch update."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
