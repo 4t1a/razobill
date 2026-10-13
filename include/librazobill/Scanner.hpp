@@ -100,8 +100,8 @@ template <class OnToken>
     unsigned char all = 0;
     std::string_view lastWord;
 
-    const auto* unclosedDoubleQuoteEnd = nullptr;
-    const auto* unclosedSingleQuoteEnd = nullptr;
+    const unsigned char* unclosedDoubleQuoteEnd = nullptr;
+    const unsigned char* unclosedSingleQuoteEnd = nullptr;
 
     while (p < end) {
         const auto* const dStart = p;
