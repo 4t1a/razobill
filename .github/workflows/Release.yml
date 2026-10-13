@@ -183,7 +183,7 @@ jobs:
         run: echo "VERSION=$(cat VERSION | tr -d '[:space:]')" >> $GITHUB_OUTPUT
 
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-binaries
           merge-multiple: true
@@ -213,7 +213,7 @@ jobs:
           python-version: "3.12"
 
       - name: Download Pre-built Wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
           path: lib/python/dist
