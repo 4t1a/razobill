@@ -89,10 +89,11 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
 [[nodiscard]] inline std::size_t findWhitespace(const char* data, std::size_t length) noexcept;
 
 // Scans up to 32 bytes at once using AVX2 for spaces, tabs, or newlines.
+[[nodiscard]]
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
 __attribute__((target("avx2")))
 #endif
-[[nodiscard]] inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noexcept {
+inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noexcept {
 #if defined(__x86_64__) || defined(_M_X64)
     std::size_t i = 0;
     const __m256i spaceVec = _mm256_set1_epi8(' ');
@@ -131,10 +132,11 @@ __attribute__((target("avx2")))
 
 // Scans up to 64 bytes at once using AVX-512BW for spaces, tabs, or newlines.
 // Unlocks 64-byte vector throughput on Intel Xeon Scalable and AMD EPYC server chips.
+[[nodiscard]]
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
 __attribute__((target("avx512bw,avx512f")))
 #endif
-[[nodiscard]] inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) noexcept {
+inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) noexcept {
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
     std::size_t i = 0;
     const __m512i spaceVec = _mm512_set1_epi8(' ');

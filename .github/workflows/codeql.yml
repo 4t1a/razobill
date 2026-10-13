@@ -46,6 +46,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
+          build-mode: ${{ matrix.language == 'c-cpp' && 'manual' || 'none' }}
 
       - name: Build C++ Codebase for CodeQL Tracing
         if: matrix.language == 'c-cpp'
