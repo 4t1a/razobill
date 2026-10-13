@@ -120,3 +120,49 @@ TEST_CASE("Universal C ABI: Information Theory and Ledger computation") {
     CHECK(RzComputePriceOfSaying(nullptr, 100.0, &price) == RZ_ERR_INVALID_PARAM);
     CHECK(RzComputePriceOfSaying(&ledger, -1.0, &price) == RZ_ERR_INVALID_PARAM);
 }
+
+TEST_CASE("Universal C ABI: RzFreeRecord safe pointer zeroing and idempotency") {
+    const char* msg = "User alice logged in from 10.0.0.1";
+    RzSlotRecord record{};
+    RzStatusCode status = RzParse(msg, std::strlen(msg), RZ_SCAN_SEMANTIC, &record);
+    REQUIRE(status == RZ_SUCCESS);
+    CHECK(record.internalHandle != nullptr);
+    CHECK(record.formKey != nullptr);
+    CHECK(record.strValues != nullptr);
+
+    // Free record and verify all dangling pointers are zeroed
+    RzFreeRecord(&record);
+    CHECK(record.internalHandle == nullptr);
+    CHECK(record.formKey == nullptr);
+    CHECK(record.formKeyLength == 0);
+    CHECK(record.formKeyHash == 0);
+    CHECK(record.intValues == nullptr);
+    CHECK(record.intCount == 0);
+    CHECK(record.strValues == nullptr);
+    CHECK(record.strLengths == nullptr);
+    CHECK(record.strCount == 0);
+
+    // Idempotent free must not crash
+    RzFreeRecord(&record);
+    RzFreeRecord(nullptr);
+}
+
+TEST_CASE("Universal C ABI: Exception barrier and error code mappings") {
+    CHECK(RZ_ERR_NO_MEMORY == 6);
+    CHECK(RZ_ERR_INTERNAL == 7);
+
+    // Invalid parameters guard across entrypoints
+    CHECK(RzParse(nullptr, 10, RZ_SCAN_EXACT, nullptr) == RZ_ERR_INVALID_PARAM);
+    RzSlotRecord rec{};
+    CHECK(RzParse(nullptr, 10, RZ_SCAN_EXACT, &rec) == RZ_ERR_INVALID_PARAM);
+    const char* m = "test";
+    CHECK(RzParse(m, 4, RZ_SCAN_EXACT, nullptr) == RZ_ERR_INVALID_PARAM);
+
+    char buf[64];
+    size_t outLen = 0;
+    CHECK(RzReconstruct(nullptr, buf, sizeof(buf), &outLen) == RZ_ERR_INVALID_PARAM);
+    CHECK(RzReconstructSlots(nullptr, 0, nullptr, 0, nullptr, nullptr, 0, buf, sizeof(buf), &outLen) ==
+          RZ_ERR_INVALID_PARAM);
+    CHECK(RzTemplateOf(nullptr, 0, buf, sizeof(buf), &outLen) == RZ_ERR_INVALID_PARAM);
+}
+

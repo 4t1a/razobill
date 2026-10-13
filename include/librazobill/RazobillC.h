@@ -39,7 +39,9 @@ typedef enum RzStatusCode {
     RZ_ERR_MALFORMED = 2,
     RZ_ERR_SLOT_UNDERFLOW = 3,
     RZ_ERR_BUFFER_TOO_SMALL = 4,
-    RZ_ERR_INVALID_PARAM = 5
+    RZ_ERR_INVALID_PARAM = 5,
+    RZ_ERR_NO_MEMORY = 6,
+    RZ_ERR_INTERNAL = 7
 } RzStatusCode;
 
 typedef enum RzScanMode { RZ_SCAN_EXACT = 0, RZ_SCAN_SEMANTIC = 1 } RzScanMode;

@@ -21,6 +21,9 @@
 #include "librazobill/Version.hpp"
 
 #include <cstring>
+#include <exception>
+#include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -50,40 +53,46 @@ RZ_API void RzDestroyEngine(RzEngine* engine) {
 
 RZ_API RzStatusCode RzParse(const char* message, size_t messageLength, RzScanMode mode, RzSlotRecord* outRecord) {
     if (!message || !outRecord) return RZ_ERR_INVALID_PARAM;
+    std::memset(outRecord, 0, sizeof(RzSlotRecord));
 
-    auto* internal = new RzInternalRecord();
-    std::string_view msgView(message, messageLength);
-    auto scanMode = (mode == RZ_SCAN_SEMANTIC) ? razobill::core::ScanMode::Semantic : razobill::core::ScanMode::Exact;
+    try {
+        auto internal = std::make_unique<RzInternalRecord>();
+        std::string_view msgView(message, messageLength);
+        auto scanMode = (mode == RZ_SCAN_SEMANTIC) ? razobill::core::ScanMode::Semantic : razobill::core::ScanMode::Exact;
 
-    razobill::Status status = razobill::core::parse(msgView, internal->slots, scanMode);
-    if (status != razobill::Status::Ok) {
-        delete internal;
-        if (status == razobill::Status::TooLarge) return RZ_ERR_TOO_LARGE;
-        if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED;
-        return RZ_ERR_INVALID_PARAM;
+        razobill::Status status = razobill::core::parse(msgView, internal->slots, scanMode);
+        if (status != razobill::Status::Ok) {
+            if (status == razobill::Status::TooLarge) return RZ_ERR_TOO_LARGE;
+            if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED;
+            return RZ_ERR_INVALID_PARAM;
+        }
+
+        internal->formKeyStr = internal->slots.formKey();
+        outRecord->formKey = internal->formKeyStr.c_str();
+        outRecord->formKeyLength = internal->formKeyStr.size();
+        outRecord->formKeyHash = razobill::core::xxh64(internal->formKeyStr);
+
+        outRecord->intValues = internal->slots.ints.data();
+        outRecord->intCount = internal->slots.ints.size();
+
+        internal->strPointers.reserve(internal->slots.strs.size());
+        internal->strLengths.reserve(internal->slots.strs.size());
+        for (const auto& sv : internal->slots.strs) {
+            internal->strPointers.push_back(sv.data());
+            internal->strLengths.push_back(sv.size());
+        }
+
+        outRecord->strValues = internal->strPointers.data();
+        outRecord->strLengths = internal->strLengths.data();
+        outRecord->strCount = internal->strPointers.size();
+        outRecord->internalHandle = internal.release();
+
+        return RZ_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RZ_ERR_NO_MEMORY;
+    } catch (...) {
+        return RZ_ERR_INTERNAL;
     }
-
-    internal->formKeyStr = internal->slots.formKey();
-    outRecord->formKey = internal->formKeyStr.c_str();
-    outRecord->formKeyLength = internal->formKeyStr.size();
-    outRecord->formKeyHash = razobill::core::xxh64(internal->formKeyStr);
-
-    outRecord->intValues = internal->slots.ints.data();
-    outRecord->intCount = internal->slots.ints.size();
-
-    internal->strPointers.reserve(internal->slots.strs.size());
-    internal->strLengths.reserve(internal->slots.strs.size());
-    for (const auto& sv : internal->slots.strs) {
-        internal->strPointers.push_back(sv.data());
-        internal->strLengths.push_back(sv.size());
-    }
-
-    outRecord->strValues = internal->strPointers.data();
-    outRecord->strLengths = internal->strLengths.data();
-    outRecord->strCount = internal->strPointers.size();
-    outRecord->internalHandle = internal;
-
-    return RZ_SUCCESS;
 }
 
 RZ_API RzStatusCode RzDecompose(const char* message, size_t messageLength, RzScanMode mode, RzSlotRecord* outRecord) {
@@ -105,64 +114,90 @@ RZ_API RzStatusCode RzReconstructSlots(const char* formKey, size_t formKeyLength
     if (intCount > 0 && !intValues) return RZ_ERR_INVALID_PARAM;
     if (strCount > 0 && (!strValues || !strLengths)) return RZ_ERR_INVALID_PARAM;
 
-    std::string rebuilt;
-    std::vector<std::string_view> strViews;
-    strViews.reserve(strCount);
-    for (size_t i = 0; i < strCount; ++i) {
-        strViews.emplace_back(strValues[i], strLengths[i]);
-    }
+    try {
+        std::string rebuilt;
+        std::vector<std::string_view> strViews;
+        strViews.reserve(strCount);
+        for (size_t i = 0; i < strCount; ++i) {
+            strViews.emplace_back(strValues[i], strLengths[i]);
+        }
 
-    std::string_view fKey(formKey, formKeyLength);
-    std::span<const int64_t> intSpan(intValues, intCount);
-    std::span<const std::string_view> strSpan(strViews.data(), strViews.size());
+        std::string_view fKey(formKey, formKeyLength);
+        std::span<const int64_t> intSpan(intValues, intCount);
+        std::span<const std::string_view> strSpan(strViews.data(), strViews.size());
 
-    razobill::Status status = razobill::core::reconstruct(fKey, intSpan, strSpan, rebuilt);
-    if (status != razobill::Status::Ok) {
-        if (status == razobill::Status::SlotUnderflow) return RZ_ERR_SLOT_UNDERFLOW;
-        if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED;
-        return RZ_ERR_INVALID_PARAM;
-    }
+        razobill::Status status = razobill::core::reconstruct(fKey, intSpan, strSpan, rebuilt);
+        if (status != razobill::Status::Ok) {
+            if (status == razobill::Status::SlotUnderflow) return RZ_ERR_SLOT_UNDERFLOW;
+            if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED;
+            return RZ_ERR_INVALID_PARAM;
+        }
 
-    if (rebuilt.size() > bufferCapacity) {
+        if (rebuilt.size() > bufferCapacity) {
+            *outLength = rebuilt.size();
+            return RZ_ERR_BUFFER_TOO_SMALL;
+        }
+
+        std::memcpy(outBuffer, rebuilt.data(), rebuilt.size());
         *outLength = rebuilt.size();
-        return RZ_ERR_BUFFER_TOO_SMALL;
+        return RZ_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RZ_ERR_NO_MEMORY;
+    } catch (...) {
+        return RZ_ERR_INTERNAL;
     }
-
-    std::memcpy(outBuffer, rebuilt.data(), rebuilt.size());
-    *outLength = rebuilt.size();
-    return RZ_SUCCESS;
 }
 
 RZ_API void RzFreeRecord(RzSlotRecord* record) {
-    if (record && record->internalHandle) {
-        auto* internal = static_cast<RzInternalRecord*>(record->internalHandle);
-        delete internal;
-        record->internalHandle = nullptr;
+    if (record) {
+        if (record->internalHandle) {
+            auto* internal = static_cast<RzInternalRecord*>(record->internalHandle);
+            delete internal;
+            record->internalHandle = nullptr;
+        }
+        record->formKey = nullptr;
+        record->formKeyLength = 0;
+        record->formKeyHash = 0;
+        record->intValues = nullptr;
+        record->intCount = 0;
+        record->strValues = nullptr;
+        record->strLengths = nullptr;
+        record->strCount = 0;
     }
 }
 
 RZ_API uint64_t RzHash64(const char* text, size_t length) {
     if (!text) return 0;
-    return razobill::core::xxh64(std::string_view(text, length));
+    try {
+        return razobill::core::xxh64(std::string_view(text, length));
+    } catch (...) {
+        return 0;
+    }
 }
 
 RZ_API RzStatusCode RzTemplateOf(const char* formKey, size_t formKeyLength, char* outBuffer, size_t bufferCapacity,
                                  size_t* outLength) {
     if (!formKey || !outBuffer || !outLength) return RZ_ERR_INVALID_PARAM;
 
-    std::string tmpl;
-    std::string_view keyView(formKey, formKeyLength);
-    razobill::Status status = razobill::core::templateOf(keyView, tmpl);
-    if (status != razobill::Status::Ok) return RZ_ERR_MALFORMED;
+    try {
+        std::string tmpl;
+        std::string_view keyView(formKey, formKeyLength);
+        razobill::Status status = razobill::core::templateOf(keyView, tmpl);
+        if (status != razobill::Status::Ok) return RZ_ERR_MALFORMED;
 
-    if (tmpl.size() > bufferCapacity) {
+        if (tmpl.size() > bufferCapacity) {
+            *outLength = tmpl.size();
+            return RZ_ERR_BUFFER_TOO_SMALL;
+        }
+
+        std::memcpy(outBuffer, tmpl.data(), tmpl.size());
         *outLength = tmpl.size();
-        return RZ_ERR_BUFFER_TOO_SMALL;
+        return RZ_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RZ_ERR_NO_MEMORY;
+    } catch (...) {
+        return RZ_ERR_INTERNAL;
     }
-
-    std::memcpy(outBuffer, tmpl.data(), tmpl.size());
-    *outLength = tmpl.size();
-    return RZ_SUCCESS;
 }
 
 RZ_API RzStatusCode RzComputeLedger(const RzCell* cells, size_t cellCount, double totalEvents, double confidenceAlpha,
@@ -170,58 +205,78 @@ RZ_API RzStatusCode RzComputeLedger(const RzCell* cells, size_t cellCount, doubl
     if (!cells || cellCount == 0 || !outLedger || totalEvents <= 0.0) {
         return RZ_ERR_INVALID_PARAM;
     }
-    std::vector<razobill::stats::Cell> cppCells;
-    cppCells.reserve(cellCount);
-    for (size_t i = 0; i < cellCount; ++i) {
-        cppCells.push_back({cells[i].form, cells[i].meaning, cells[i].mass});
+    try {
+        std::vector<razobill::stats::Cell> cppCells;
+        cppCells.reserve(cellCount);
+        for (size_t i = 0; i < cellCount; ++i) {
+            cppCells.push_back({cells[i].form, cells[i].meaning, cells[i].mass});
+        }
+        auto l = razobill::stats::ledger(cppCells, totalEvents, confidenceAlpha);
+        outLedger->coverage = l.coverage;
+        outLedger->content = l.content;
+        outLedger->expression = l.expression;
+        outLedger->latitude = l.latitude;
+        outLedger->doubt = l.doubt;
+        outLedger->conveyance = l.conveyance;
+        outLedger->distance = l.distance;
+        outLedger->effectiveVocabulary = l.effectiveVocabulary;
+        outLedger->effectiveContent = l.effectiveContent;
+        outLedger->effectiveLatitude = l.effectiveLatitude;
+        outLedger->effectiveDoubt = l.effectiveDoubt;
+        outLedger->contentMm = l.contentMm;
+        outLedger->expressionMm = l.expressionMm;
+        outLedger->latitudeMm = l.latitudeMm;
+        outLedger->doubtMm = l.doubtMm;
+        outLedger->conveyanceMm = l.conveyanceMm;
+        outLedger->contentEpsilon = l.contentEpsilon;
+        outLedger->contentHalfWidth = l.contentHalfWidth;
+        return RZ_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RZ_ERR_NO_MEMORY;
+    } catch (...) {
+        return RZ_ERR_INTERNAL;
     }
-    auto l = razobill::stats::ledger(cppCells, totalEvents, confidenceAlpha);
-    outLedger->coverage = l.coverage;
-    outLedger->content = l.content;
-    outLedger->expression = l.expression;
-    outLedger->latitude = l.latitude;
-    outLedger->doubt = l.doubt;
-    outLedger->conveyance = l.conveyance;
-    outLedger->distance = l.distance;
-    outLedger->effectiveVocabulary = l.effectiveVocabulary;
-    outLedger->effectiveContent = l.effectiveContent;
-    outLedger->effectiveLatitude = l.effectiveLatitude;
-    outLedger->effectiveDoubt = l.effectiveDoubt;
-    outLedger->contentMm = l.contentMm;
-    outLedger->expressionMm = l.expressionMm;
-    outLedger->latitudeMm = l.latitudeMm;
-    outLedger->doubtMm = l.doubtMm;
-    outLedger->conveyanceMm = l.conveyanceMm;
-    outLedger->contentEpsilon = l.contentEpsilon;
-    outLedger->contentHalfWidth = l.contentHalfWidth;
-    return RZ_SUCCESS;
 }
 
 RZ_API double RzMillerMadow(double pluginEntropy, size_t observedCategories, double sampleSize) {
-    return razobill::stats::millerMadow(pluginEntropy, observedCategories, sampleSize);
+    try {
+        return razobill::stats::millerMadow(pluginEntropy, observedCategories, sampleSize);
+    } catch (...) {
+        return pluginEntropy;
+    }
 }
 
 RZ_API RzCertifiedInterval RzComputeCertifiedInterval(size_t alphabetSize, double sampleSize, double confidenceAlpha) {
-    auto ci = razobill::stats::certifiedInterval(alphabetSize, sampleSize, confidenceAlpha);
-    return {ci.epsilon, ci.halfWidth};
+    try {
+        auto ci = razobill::stats::certifiedInterval(alphabetSize, sampleSize, confidenceAlpha);
+        return {ci.epsilon, ci.halfWidth};
+    } catch (...) {
+        return {0.0, 0.0};
+    }
 }
 
 RZ_API RzStatusCode RzComputePriceOfSaying(const RzLedger* ledger, double nMessages, RzPriceOfSaying* outPrice) {
     if (!ledger || !outPrice || nMessages <= 0.0) return RZ_ERR_INVALID_PARAM;
-    razobill::stats::Ledger cppL;
-    cppL.content = ledger->content;
-    cppL.expression = ledger->expression;
-    cppL.latitude = ledger->latitude;
-    cppL.doubt = ledger->doubt;
-    auto p = razobill::stats::priceOfSaying(cppL, nMessages);
-    outPrice->expectedMeaningBits = p.expectedMeaningBits;
-    outPrice->expectedExpressionBits = p.expectedExpressionBits;
-    outPrice->expectedClarificationBits = p.expectedClarificationBits;
-    outPrice->totalSayingBits = p.totalSayingBits;
-    outPrice->sayingCostBits = p.sayingCostBits;
-    outPrice->lowerBoundBits = p.lowerBoundBits;
-    outPrice->upperBoundBits = p.upperBoundBits;
-    return RZ_SUCCESS;
+    try {
+        razobill::stats::Ledger cppL;
+        cppL.content = ledger->content;
+        cppL.expression = ledger->expression;
+        cppL.latitude = ledger->latitude;
+        cppL.doubt = ledger->doubt;
+        auto p = razobill::stats::priceOfSaying(cppL, nMessages);
+        outPrice->expectedMeaningBits = p.expectedMeaningBits;
+        outPrice->expectedExpressionBits = p.expectedExpressionBits;
+        outPrice->expectedClarificationBits = p.expectedClarificationBits;
+        outPrice->totalSayingBits = p.totalSayingBits;
+        outPrice->sayingCostBits = p.sayingCostBits;
+        outPrice->lowerBoundBits = p.lowerBoundBits;
+        outPrice->upperBoundBits = p.upperBoundBits;
+        return RZ_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RZ_ERR_NO_MEMORY;
+    } catch (...) {
+        return RZ_ERR_INTERNAL;
+    }
 }
 
 RZ_API const char* RzVersion(void) {
