@@ -1,4 +1,4 @@
-# name: test/sql/razobill.test
+# name: tests/sql/razobill.test
 # description: test razobill extension
 # group: [razobill]
 
