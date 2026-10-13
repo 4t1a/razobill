@@ -131,15 +131,29 @@ AuditResult auditBatchParallel(const std::vector<std::string>& lines, core::Scan
     return result;
 }
 
+/**
+ * @brief PyBind11 Python module initialization for the pyrazobill C++20 engine.
+ *
+ * Exposes zero-copy log tokenization, structural slot extraction, bit-level
+ * lossless reconstruction, Shannon entropy computation, and dual-key information
+ * channel ledger analysis to Python runtimes.
+ *
+ * @param Core Target Python module handle.
+ * @param m Module builder reference.
+ */
 PYBIND11_MODULE(Core, m) {
     m.doc() = "pyrazobill: High-performance log parsing and information-theoretic analysis engine";
 
+    // -------------------------------------------------------------------------
+    // 1. Scan Mode Enumeration & Core Slot Record Structures
+    // -------------------------------------------------------------------------
     py::enum_<core::ScanMode>(m, "ScanMode")
         .value("Exact", core::ScanMode::Exact)
         .value("DigitOnly", core::ScanMode::DigitOnly)
         .value("Semantic", core::ScanMode::Semantic)
         .export_values();
 
+    // PySlotRecord: Python wrapper over core::Slots for zero-copy field access.
     py::class_<PySlotRecord>(m, "SlotRecord")
         .def(py::init<>())
         .def_property_readonly("formKey", &PySlotRecord::formKey)

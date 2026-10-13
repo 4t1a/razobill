@@ -337,7 +337,8 @@ class MockS3Server:
 
 if __name__ == "__main__":
     server = MockS3Server()
-    port = server.start()
+    assignedPort = server.start()
+    print(f"[*] Mock S3 Server listening on port {assignedPort}")
     try:
         while True:
             time.sleep(1)

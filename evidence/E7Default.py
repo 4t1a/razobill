@@ -54,6 +54,7 @@ def measureDuckDbStorage(tablesDict, variantName, blockSize=262144):
             try:
                 os.remove(path)
             except OSError:
+                # File may already have been removed or temporarily held by OS
                 pass
 
     con = duckdb.connect()
@@ -88,6 +89,7 @@ def measureDuckDbStorage(tablesDict, variantName, blockSize=262144):
         try:
             os.remove(dbFile)
         except OSError:
+            # Database file may already have been removed or closed
             pass
 
     return usedBlocks * sizePerBlock, encodings
@@ -117,6 +119,7 @@ def measureParquetStorage(tablesDict, variantName, useV2=False):
             try:
                 os.remove(parquetFile)
             except OSError:
+                # Temporary parquet file may already have been unlinked
                 pass
     con.close()
     return totalBytes
@@ -132,6 +135,7 @@ def main():
 
     # Decompose corpus using high-speed C++20 SIMD core (fallback to reference CLP tokenizer)
     print("[E7] Decomposing messages into typed structural slots...")
+    pyrazobill = None
     try:
         import pyrazobill
 

@@ -90,7 +90,7 @@ inline void put(duckdb_vector out, idx_t row, std::string_view v) {
 
 // ---- rb_form / rbForm ----
 template <core::ScanMode Mode = core::ScanMode::Exact>
-void rbFormImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+[[maybe_unused]] void rbFormImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     auto vec = duckdb_data_chunk_get_vector(in, 0);
@@ -113,7 +113,7 @@ void rbFormImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
 
 // ---- rb_ints / rb_strs ----
 template <bool Ints, core::ScanMode Mode = core::ScanMode::Exact>
-void rbListImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+[[maybe_unused]] void rbListImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     auto vec = duckdb_data_chunk_get_vector(in, 0);
@@ -189,7 +189,7 @@ void rbHashImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vect
 
 // ---- rb_decompose / rbDecompose ----
 template <core::ScanMode Mode = core::ScanMode::Exact>
-void rbDecomposeImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+[[maybe_unused]] void rbDecomposeImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     auto vec = duckdb_data_chunk_get_vector(in, 0);
@@ -326,7 +326,8 @@ Kind classify(duckdb_logical_type t) {
     }
 }
 
-template <Shape S> void rebuildImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+template <Shape S>
+[[maybe_unused]] void rebuildImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     const idx_t numCols = duckdb_data_chunk_get_column_count(in);

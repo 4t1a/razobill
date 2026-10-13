@@ -138,6 +138,7 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
     print("\n[Phase 2: Network Wire & Cloud Egress Reduction]")
     print(f"  - Raw Text Wire Payload : {rawBytes:>12,} bytes (100.0%)")
     print(f"  - Raw Gzip Wire Stream  : {rawWireGzip:>12,} bytes (Baseline compressed)")
+    print(f"  - Unique Forms Dictionary: {dictFormBytes:>12,} bytes ({len(uniqueForms):,} unique forms)")
     print(
         f"  - Razobill Columnar Gzip: {razobillGzipWire:>12,} bytes [Compressed Wire Reduced by {gzipSavedPct:.2f}%]"
     )

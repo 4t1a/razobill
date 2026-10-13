@@ -1,0 +1,12 @@
+name: "Razobill CodeQL Analysis Configuration"
+
+# Exclude vendored thirdparty libraries from analysis
+paths-ignore:
+  - "thirdparty/**"
+
+# Filter out false-positive quality queries on test runner macros and bindings
+query-filters:
+  - exclude:
+      id: cpp/unused-static-function
+  - exclude:
+      id: cpp/poorly-documented-function

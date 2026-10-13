@@ -152,6 +152,7 @@ def configureDuckDbS3(
             )
             urllib.request.urlopen(req, timeout=1.0)
         except Exception:
+            # Bucket may already exist or LocalStack emulator returned an error; continue configuration
             pass
         con.execute("SET s3_endpoint = '127.0.0.1:4566';")
         con.execute("SET s3_use_ssl = false;")

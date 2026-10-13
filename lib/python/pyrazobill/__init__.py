@@ -29,13 +29,15 @@ _pkg_dir = Path(__file__).resolve().parent
 if sys.platform == "win32":
     try:
         os.add_dll_directory(str(_pkg_dir))
-    except Exception:
+    except (AttributeError, OSError, ValueError):
+        # Ignore if add_dll_directory is unavailable or target directory is not present
         pass
     for _p in os.environ.get("PATH", "").split(os.pathsep):
         if _p and os.path.isdir(_p):
             try:
                 os.add_dll_directory(_p)
-            except Exception:
+            except (AttributeError, OSError, ValueError):
+                # Ignore invalid or duplicate PATH entries when registering DLL search paths
                 pass
 
 try:
@@ -131,11 +133,18 @@ except ImportError:
     )
     _NATIVE = False
 
+def isNative() -> bool:
+    """Return True if the high-performance C++20 SIMD native engine is loaded."""
+    return _NATIVE
+
+
 __version__ = version()
 __version_info__ = versionInfo()
 __abi_version__ = abiVersion()
 
 __all__ = [
+    "_NATIVE",
+    "isNative",
     "ScanMode",
     "SlotRecord",
     "AuditResult",

@@ -68,9 +68,25 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
+    template <typename F>
+    auto submit(F&& f) -> std::future<typename std::invoke_result<F>::type> {
+        using ReturnType = typename std::invoke_result<F>::type;
+        auto task = std::make_shared<std::packaged_task<ReturnType()>>(std::forward<F>(f));
+        std::future<ReturnType> res = task->get_future();
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            if (stopping_) throw std::runtime_error("ThreadPool is stopping");
+            tasks_.emplace([task]() { (*task)(); });
+        }
+        cv_.notify_one();
+        return res;
+    }
+
     template <typename F, typename... Args>
-    auto submit(F&& f, Args&&... args) -> std::future<typename std::invoke_result<F, Args...>::type> {
-        using ReturnType = typename std::invoke_result<F, Args...>::type;
+        requires(sizeof...(Args) > 0)
+    auto submit(F&& f, Args&&... args)
+        -> std::future<typename std::invoke_result<std::decay_t<F>, std::decay_t<Args>&...>::type> {
+        using ReturnType = typename std::invoke_result<std::decay_t<F>, std::decay_t<Args>&...>::type;
         auto task = std::make_shared<std::packaged_task<ReturnType()>>(
             std::bind(std::forward<F>(f), std::forward<Args>(args)...));
         std::future<ReturnType> res = task->get_future();

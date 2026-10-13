@@ -36,13 +36,6 @@ sys.path.insert(0, str(ROOT_DIR))
 from S3ClientConfig import configureDuckDbS3
 from TestAwsS3Export import parseRazobill, reconstructRazobill
 
-try:
-    import pyrazobill
-
-    HAS_PYRAZOBILL = True
-except ImportError:
-    HAS_PYRAZOBILL = False
-
 
 def generateCorpus(count: int = 50000):
     templates = [

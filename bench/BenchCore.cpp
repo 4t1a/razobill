@@ -25,6 +25,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -37,8 +38,16 @@
 
 int main(int argc, char** argv) {
     std::string path;
-    if (argc > 1) {
-        path = argv[1];
+    if (argc > 1 && argv[1] != nullptr) {
+        std::error_code ec;
+        std::filesystem::path inputPath(argv[1]);
+        if (std::filesystem::is_regular_file(inputPath, ec) && !ec) {
+            auto canonicalPath = std::filesystem::canonical(inputPath, ec);
+            path = ec ? inputPath.string() : canonicalPath.string();
+        } else {
+            std::printf("[BENCH] Error: '%s' is not a valid regular file.\n", argv[1]);
+            return 1;
+        }
     } else {
         const std::vector<std::string> candidates = {"logs/SSH/SSH.log", "logs/Linux/Linux.log",
                                                      "logs/Zookeeper/Zookeeper.log", "/tmp/corpus.txt"};
