@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-version: "2"
+version: 2
 language: "en-US"
 tone_instructions: "You are an expert systems software engineer and high-performance C++20 compiler/database architect. Provide deep, technically rigorous reviews focused on correctness, memory safety, data integrity, and performance."
 early_access: false

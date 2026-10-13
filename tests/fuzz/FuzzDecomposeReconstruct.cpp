@@ -34,19 +34,25 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     {
         razobill::core::SlotRecord rec;
         const auto status = razobill::core::parse(input, rec, razobill::core::ScanMode::DigitOnly);
-        if (status == razobill::Status::Ok) {
-            const std::string form = rec.formKey();
-            std::string rebuilt;
-            const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
-            if (recStatus == razobill::Status::Ok) {
-                // Invariant: Reconstructed message must match input byte-for-byte
-                if (rebuilt != input) {
-                    std::cerr << "FUZZ INVARIANT VIOLATION (Exact mode):\n"
-                              << "Original:      " << input << "\n"
-                              << "Reconstructed: " << rebuilt << "\n";
-                    std::abort();
-                }
-            }
+        if (status != razobill::Status::Ok) {
+            std::cerr << "FUZZ ERROR: parse failed in Exact mode with status "
+                      << static_cast<int>(status) << "\n";
+            std::abort();
+        }
+        const std::string form = rec.formKey();
+        std::string rebuilt;
+        const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
+        if (recStatus != razobill::Status::Ok) {
+            std::cerr << "FUZZ ERROR: reconstruct failed in Exact mode with status "
+                      << static_cast<int>(recStatus) << "\n";
+            std::abort();
+        }
+        // Invariant: Reconstructed message must match input byte-for-byte
+        if (rebuilt != input) {
+            std::cerr << "FUZZ INVARIANT VIOLATION (Exact mode):\n"
+                      << "Original:      " << input << "\n"
+                      << "Reconstructed: " << rebuilt << "\n";
+            std::abort();
         }
     }
 
@@ -56,18 +62,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     {
         razobill::core::SlotRecord rec;
         const auto status = razobill::core::parse(input, rec, razobill::core::ScanMode::Semantic);
-        if (status == razobill::Status::Ok) {
-            const std::string form = rec.formKey();
-            std::string rebuilt;
-            const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
-            if (recStatus == razobill::Status::Ok) {
-                if (rebuilt != input) {
-                    std::cerr << "FUZZ INVARIANT VIOLATION (Semantic mode):\n"
-                              << "Original:      " << input << "\n"
-                              << "Reconstructed: " << rebuilt << "\n";
-                    std::abort();
-                }
-            }
+        if (status != razobill::Status::Ok) {
+            std::cerr << "FUZZ ERROR: parse failed in Semantic mode with status "
+                      << static_cast<int>(status) << "\n";
+            std::abort();
+        }
+        const std::string form = rec.formKey();
+        std::string rebuilt;
+        const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
+        if (recStatus != razobill::Status::Ok) {
+            std::cerr << "FUZZ ERROR: reconstruct failed in Semantic mode with status "
+                      << static_cast<int>(recStatus) << "\n";
+            std::abort();
+        }
+        if (rebuilt != input) {
+            std::cerr << "FUZZ INVARIANT VIOLATION (Semantic mode):\n"
+                      << "Original:      " << input << "\n"
+                      << "Reconstructed: " << rebuilt << "\n";
+            std::abort();
         }
     }
 
@@ -77,23 +89,28 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     {
         RzSlotRecord crec{};
         const RzStatusCode parseCode = RzParse(reinterpret_cast<const char*>(data), size, RZ_SCAN_EXACT, &crec);
-        if (parseCode == RZ_SUCCESS) {
-            // Allocate sufficient buffer for reconstruction
-            std::vector<char> buffer(size + 512);
-            size_t outLength = 0;
-            const RzStatusCode recCode = RzReconstruct(&crec, buffer.data(), buffer.size(), &outLength);
-            if (recCode == RZ_SUCCESS) {
-                const std::string_view rebuiltView(buffer.data(), outLength);
-                if (rebuiltView != input) {
-                    std::cerr << "FUZZ C-ABI INVARIANT VIOLATION:\n"
-                              << "Original:      " << input << "\n"
-                              << "Reconstructed: " << rebuiltView << "\n";
-                    RzFreeRecord(&crec);
-                    std::abort();
-                }
-            }
-            RzFreeRecord(&crec);
+        if (parseCode != RZ_SUCCESS) {
+            std::cerr << "FUZZ ERROR: C-ABI RzParse failed with status " << parseCode << "\n";
+            std::abort();
         }
+        // Allocate sufficient buffer for reconstruction
+        std::vector<char> buffer(size + 512);
+        size_t outLength = 0;
+        const RzStatusCode recCode = RzReconstruct(&crec, buffer.data(), buffer.size(), &outLength);
+        if (recCode != RZ_SUCCESS) {
+            std::cerr << "FUZZ ERROR: C-ABI RzReconstruct failed with status " << recCode << "\n";
+            RzFreeRecord(&crec);
+            std::abort();
+        }
+        const std::string_view rebuiltView(buffer.data(), outLength);
+        if (rebuiltView != input) {
+            std::cerr << "FUZZ C-ABI INVARIANT VIOLATION:\n"
+                      << "Original:      " << input << "\n"
+                      << "Reconstructed: " << rebuiltView << "\n";
+            RzFreeRecord(&crec);
+            std::abort();
+        }
+        RzFreeRecord(&crec);
     }
 
     return 0;
