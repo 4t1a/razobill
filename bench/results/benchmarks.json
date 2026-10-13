@@ -1,0 +1,621 @@
+{
+  "metadata": {
+    "git_commit": "796d66d566777cb7cf77816962114818ff1f39c6",
+    "os": "Windows 11 (AMD64)",
+    "cpu_model": "Intel64 Family 6 Model 165 Stepping 2, GenuineIntel",
+    "physical_cores": 6,
+    "logical_cores": 12,
+    "ram_gb": 7.78,
+    "compiler": "gcc (Rev6, Built by MSYS2 project) 15.1.0",
+    "python_version": "3.13.11",
+    "timestamp_utc": "2026-10-13T22:26:06Z"
+  },
+  "datasets": {
+    "SSH": {
+      "dataset_info": {
+        "name": "SSH",
+        "path": "logs/SSH/SSH.log",
+        "description": "OpenSSH auth & session log corpus (Loghub)",
+        "total_file_bytes": 73417506,
+        "total_file_lines": 655146,
+        "sha256": "89eee9e36c182722f9fadc6e5617a4818ffc66109e7e222b8f9e8b78fc3aa2f3",
+        "benchmarked_lines": 50000
+      },
+      "cold_vs_warm": {
+        "cold_sec": 0.061412000039126724,
+        "cold_msgs_per_sec": 814173.1252547397,
+        "warm_sec": 0.06460070004686713,
+        "warm_msgs_per_sec": 773985.4206490878,
+        "warmup_speedup": 0.9506398536637058
+      },
+      "component_breakdown": {
+        "parse_exact": {
+          "median_sec": 0.06872159999329597,
+          "ns_per_msg": 1374.4319998659194,
+          "mb_per_sec": 80.19368001527353,
+          "msgs_per_sec": 727573.2812518579,
+          "spread_pct": 3.6468883023314254
+        },
+        "parse_semantic": {
+          "median_sec": 0.07614870002726093,
+          "ns_per_msg": 1522.9740005452186,
+          "mb_per_sec": 72.37205622718537,
+          "msgs_per_sec": 656610.027250632,
+          "spread_pct": 10.964205572008364
+        },
+        "reconstruct_only": {
+          "median_sec": 0.039655999979004264,
+          "ns_per_msg": 793.1199995800853,
+          "mb_per_sec": 138.97110154624272,
+          "msgs_per_sec": 1260843.2526344648,
+          "spread_pct": 15.074389760576109
+        },
+        "round_trip_parse_reconstruct": {
+          "median_sec": 0.1064905000384897,
+          "ns_per_msg": 2129.810000769794,
+          "mb_per_sec": 51.75145198875113,
+          "msgs_per_sec": 469525.450457347,
+          "spread_pct": 5.8823087727163905
+        }
+      },
+      "multicore_scaling": {
+        "1_threads": {
+          "threads": 1,
+          "median_msgs_per_sec": 1853664.3236349616,
+          "median_mb_per_sec": 194.84738401024956,
+          "min_msgs_per_sec": 1750749.3207092637,
+          "max_msgs_per_sec": 1915826.2575483555,
+          "spread_pct": 8.905438527045854,
+          "speedup": 1.0,
+          "efficiency_pct": 100.0
+        },
+        "2_threads": {
+          "threads": 2,
+          "median_msgs_per_sec": 3665877.281092138,
+          "median_mb_per_sec": 385.3376197707263,
+          "min_msgs_per_sec": 3537168.5673052436,
+          "max_msgs_per_sec": 3735580.6586575815,
+          "spread_pct": 5.412404075163887,
+          "speedup": 1.9776381485853378,
+          "efficiency_pct": 98.88190742926689
+        },
+        "4_threads": {
+          "threads": 4,
+          "median_msgs_per_sec": 6803091.3246979425,
+          "median_mb_per_sec": 715.1049577308788,
+          "min_msgs_per_sec": 5943041.886559217,
+          "max_msgs_per_sec": 7178235.589692053,
+          "spread_pct": 18.156359281090186,
+          "speedup": 3.670077283117448,
+          "efficiency_pct": 91.7519320779362
+        },
+        "6_threads": {
+          "threads": 6,
+          "median_msgs_per_sec": 9673799.481484348,
+          "median_mb_per_sec": 1016.8586072319134,
+          "min_msgs_per_sec": 5745343.399174968,
+          "max_msgs_per_sec": 10120023.47845447,
+          "spread_pct": 45.221942915528075,
+          "speedup": 5.218743953875324,
+          "efficiency_pct": 86.97906589792207
+        },
+        "12_threads": {
+          "threads": 12,
+          "median_msgs_per_sec": 9705910.899737941,
+          "median_mb_per_sec": 1020.2339895833966,
+          "min_msgs_per_sec": 8052696.848174453,
+          "max_msgs_per_sec": 10292725.10189798,
+          "spread_pct": 23.07901109811349,
+          "speedup": 5.236067164903426,
+          "efficiency_pct": 43.633893040861885
+        }
+      },
+      "native_benchcore_metrics": {
+        "single_core_ops": {
+          "C++20 parse (form + slots)": {
+            "ns_per_msg": 233.7,
+            "mb_per_sec": 471.7,
+            "mega_msgs_per_sec": 4.28
+          },
+          "C++20 parse + formKey": {
+            "ns_per_msg": 248.5,
+            "mb_per_sec": 443.6,
+            "mega_msgs_per_sec": 4.02
+          },
+          "C++20 parse + formKey + xxh64": {
+            "ns_per_msg": 263.0,
+            "mb_per_sec": 419.1,
+            "mega_msgs_per_sec": 3.8
+          },
+          "C++20 parse + reconstruct (round-trip)": {
+            "ns_per_msg": 471.3,
+            "mb_per_sec": 233.9,
+            "mega_msgs_per_sec": 2.12
+          },
+          "C ABI RzParse": {
+            "ns_per_msg": 885.3,
+            "mb_per_sec": 124.5,
+            "mega_msgs_per_sec": 1.13
+          },
+          "C ABI RzDecompose (zero-copy)": {
+            "ns_per_msg": 875.1,
+            "mb_per_sec": 125.9,
+            "mega_msgs_per_sec": 1.14
+          },
+          "C ABI RzReconstruct": {
+            "ns_per_msg": 1259.1,
+            "mb_per_sec": 87.5,
+            "mega_msgs_per_sec": 0.79
+          },
+          "C ABI RzReconstructSlots": {
+            "ns_per_msg": 1238.0,
+            "mb_per_sec": 89.0,
+            "mega_msgs_per_sec": 0.81
+          },
+          "SIMD findWhitespace (AVX2 / NEON)": {
+            "ns_per_msg": 4.9,
+            "mb_per_sec": 22688.5,
+            "mega_msgs_per_sec": 205.85
+          },
+          "SIMD findWhitespaceDynamic (CPUID)": {
+            "ns_per_msg": 4.9,
+            "mb_per_sec": 22558.5,
+            "mega_msgs_per_sec": 204.67
+          },
+          "Scalar std::isspace delimiter check": {
+            "ns_per_msg": 9.2,
+            "mb_per_sec": 12019.7,
+            "mega_msgs_per_sec": 109.05
+          },
+          "XXH64 raw message hash baseline": {
+            "ns_per_msg": 19.5,
+            "mb_per_sec": 5648.3,
+            "mega_msgs_per_sec": 51.25
+          }
+        },
+        "parallel_scaling": {
+          "1_threads": {
+            "cores": 1,
+            "threads": 1,
+            "mb_per_sec": 489.0,
+            "mega_msgs_per_sec": 4.44,
+            "speedup": 1.0
+          },
+          "2_threads": {
+            "cores": 2,
+            "threads": 2,
+            "mb_per_sec": 948.2,
+            "mega_msgs_per_sec": 8.6,
+            "speedup": 1.94
+          },
+          "4_threads": {
+            "cores": 4,
+            "threads": 4,
+            "mb_per_sec": 1857.1,
+            "mega_msgs_per_sec": 16.85,
+            "speedup": 3.8
+          },
+          "6_threads": {
+            "cores": 6,
+            "threads": 6,
+            "mb_per_sec": 1620.2,
+            "mega_msgs_per_sec": 14.7,
+            "speedup": 3.31
+          },
+          "12_threads": {
+            "cores": 12,
+            "threads": 12,
+            "mb_per_sec": 3103.8,
+            "mega_msgs_per_sec": 28.16,
+            "speedup": 6.35
+          }
+        }
+      },
+      "native_benchcore_output": "===================================================================================================\nRAZOBILL SINGLE-CORE COMPREHENSIVE BENCHMARK (C++20, C ABI & HARDWARE SIMD)\n===================================================================================================\nCorpus Dataset : C:\\FM\\rzd\\razobill\\logs\\SSH\\SSH.log\nSample Events  : 50000\nTotal Payload  : 5511038 bytes (5.51 MB)\nMean Msg Length: 110.2 bytes/msg\n---------------------------------------------------------------------------------------------------\nC++20 parse (form + slots)                  233.7 ns/msg    471.7 MB/s    4.28 M msg/s  (sink 0)\nC++20 parse + formKey                       248.5 ns/msg    443.6 MB/s    4.02 M msg/s  (sink 0)\nC++20 parse + formKey + xxh64               263.0 ns/msg    419.1 MB/s    3.80 M msg/s  (sink 0)\nC++20 parse + reconstruct (round-trip)      471.3 ns/msg    233.9 MB/s    2.12 M msg/s  (sink 0)\nC ABI RzParse                               885.3 ns/msg    124.5 MB/s    1.13 M msg/s  (sink 0)\nC ABI RzDecompose (zero-copy)               875.1 ns/msg    125.9 MB/s    1.14 M msg/s  (sink 0)\nC ABI RzReconstruct                        1259.1 ns/msg     87.5 MB/s    0.79 M msg/s  (sink 0)\nC ABI RzReconstructSlots                   1238.0 ns/msg     89.0 MB/s    0.81 M msg/s  (sink 0)\nSIMD findWhitespace (AVX2 / NEON)             4.9 ns/msg  22688.5 MB/s  205.85 M msg/s  (sink 0)\nSIMD findWhitespaceDynamic (CPUID)            4.9 ns/msg  22558.5 MB/s  204.67 M msg/s  (sink 0)\nScalar std::isspace delimiter check           9.2 ns/msg  12019.7 MB/s  109.05 M msg/s  (sink 0)\nXXH64 raw message hash baseline              19.5 ns/msg   5648.3 MB/s   51.25 M msg/s  (sink 0)\n---------------------------------------------------------------------------------------------------\nMULTI-CORE PARALLEL SCALING (C++20 ThreadPool::parallelFor, Coarse Chunks)\n---------------------------------------------------------------------------------------------------\n 1 Cores ( 1 Threads)                   489.0 MB/s    4.44 M msg/s  (Speedup  1.00x)\n 2 Cores ( 2 Threads)                   948.2 MB/s    8.60 M msg/s  (Speedup  1.94x)\n 4 Cores ( 4 Threads)                  1857.1 MB/s   16.85 M msg/s  (Speedup  3.80x)\n 6 Cores ( 6 Threads)                  1620.2 MB/s   14.70 M msg/s  (Speedup  3.31x)\n12 Cores (12 Threads)                  3103.8 MB/s   28.16 M msg/s  (Speedup  6.35x)\n===================================================================================================\n"
+    },
+    "Linux": {
+      "dataset_info": {
+        "name": "Linux",
+        "path": "logs/Linux/Linux.log",
+        "description": "Linux system / syslog kernel events (Loghub)",
+        "total_file_bytes": 2349686,
+        "total_file_lines": 25567,
+        "sha256": "b541078328bf5402c254e7e8971a95963c464858031889ff6e15b6d1a857d490",
+        "benchmarked_lines": 25000
+      },
+      "cold_vs_warm": {
+        "cold_sec": 0.028986899997107685,
+        "cold_msgs_per_sec": 862458.5589523027,
+        "warm_sec": 0.03196669998578727,
+        "warm_msgs_per_sec": 782063.8355261963,
+        "warmup_speedup": 0.906784247670093
+      },
+      "component_breakdown": {
+        "parse_exact": {
+          "median_sec": 0.033206599997356534,
+          "ns_per_msg": 1328.2639998942614,
+          "mb_per_sec": 67.92559311039248,
+          "msgs_per_sec": 752862.3828392598,
+          "spread_pct": 6.2689345454602305
+        },
+        "parse_semantic": {
+          "median_sec": 0.03658799995901063,
+          "ns_per_msg": 1463.5199983604252,
+          "mb_per_sec": 61.6480267444767,
+          "msgs_per_sec": 683284.1376409584,
+          "spread_pct": 1.7896577589509937
+        },
+        "reconstruct_only": {
+          "median_sec": 0.017211400030646473,
+          "ns_per_msg": 688.4560012258589,
+          "mb_per_sec": 131.0513959343073,
+          "msgs_per_sec": 1452525.6490166525,
+          "spread_pct": 31.562220546268044
+        },
+        "round_trip_parse_reconstruct": {
+          "median_sec": 0.04889700002968311,
+          "ns_per_msg": 1955.8800011873248,
+          "mb_per_sec": 46.12916945069723,
+          "msgs_per_sec": 511278.8102506013,
+          "spread_pct": 4.7675727638973
+        }
+      },
+      "multicore_scaling": {
+        "1_threads": {
+          "threads": 1,
+          "median_msgs_per_sec": 1955049.5018533869,
+          "median_mb_per_sec": 168.2550456639232,
+          "min_msgs_per_sec": 1834027.8185339516,
+          "max_msgs_per_sec": 1980198.0198019801,
+          "spread_pct": 7.47654732677915,
+          "speedup": 1.0,
+          "efficiency_pct": 100.0
+        },
+        "2_threads": {
+          "threads": 2,
+          "median_msgs_per_sec": 3584948.9503269475,
+          "median_mb_per_sec": 308.5270980444608,
+          "min_msgs_per_sec": 3523508.8510542335,
+          "max_msgs_per_sec": 3719573.8856156636,
+          "spread_pct": 5.469116500070355,
+          "speedup": 1.8336870482964325,
+          "efficiency_pct": 91.68435241482162
+        },
+        "4_threads": {
+          "threads": 4,
+          "median_msgs_per_sec": 6310581.583198708,
+          "median_mb_per_sec": 543.0999017878765,
+          "min_msgs_per_sec": 5568548.836173294,
+          "max_msgs_per_sec": 6486262.096878811,
+          "spread_pct": 14.5424514144439,
+          "speedup": 3.227837237479806,
+          "efficiency_pct": 80.69593093699515
+        },
+        "6_threads": {
+          "threads": 6,
+          "median_msgs_per_sec": 4994306.490600715,
+          "median_mb_per_sec": 429.81892061506915,
+          "min_msgs_per_sec": 4530709.146595625,
+          "max_msgs_per_sec": 7711289.32757557,
+          "spread_pct": 63.68412084772523,
+          "speedup": 2.5545677927163037,
+          "efficiency_pct": 42.57612987860506
+        },
+        "12_threads": {
+          "threads": 12,
+          "median_msgs_per_sec": 5420759.339968342,
+          "median_mb_per_sec": 466.5202131275291,
+          "min_msgs_per_sec": 5151134.2797684055,
+          "max_msgs_per_sec": 7490861.149397735,
+          "spread_pct": 43.16234540017401,
+          "speedup": 2.772696719356447,
+          "efficiency_pct": 23.10580599463706
+        }
+      },
+      "native_benchcore_metrics": {
+        "single_core_ops": {
+          "C++20 parse (form + slots)": {
+            "ns_per_msg": 230.1,
+            "mb_per_sec": 392.0,
+            "mega_msgs_per_sec": 4.35
+          },
+          "C++20 parse + formKey": {
+            "ns_per_msg": 230.5,
+            "mb_per_sec": 391.3,
+            "mega_msgs_per_sec": 4.34
+          },
+          "C++20 parse + formKey + xxh64": {
+            "ns_per_msg": 241.2,
+            "mb_per_sec": 374.1,
+            "mega_msgs_per_sec": 4.15
+          },
+          "C++20 parse + reconstruct (round-trip)": {
+            "ns_per_msg": 429.4,
+            "mb_per_sec": 210.1,
+            "mega_msgs_per_sec": 2.33
+          },
+          "C ABI RzParse": {
+            "ns_per_msg": 1155.4,
+            "mb_per_sec": 78.1,
+            "mega_msgs_per_sec": 0.87
+          },
+          "C ABI RzDecompose (zero-copy)": {
+            "ns_per_msg": 1154.5,
+            "mb_per_sec": 78.1,
+            "mega_msgs_per_sec": 0.87
+          },
+          "C ABI RzReconstruct": {
+            "ns_per_msg": 1470.4,
+            "mb_per_sec": 61.4,
+            "mega_msgs_per_sec": 0.68
+          },
+          "C ABI RzReconstructSlots": {
+            "ns_per_msg": 1479.1,
+            "mb_per_sec": 61.0,
+            "mega_msgs_per_sec": 0.68
+          },
+          "SIMD findWhitespace (AVX2 / NEON)": {
+            "ns_per_msg": 4.2,
+            "mb_per_sec": 21709.1,
+            "mega_msgs_per_sec": 240.62
+          },
+          "SIMD findWhitespaceDynamic (CPUID)": {
+            "ns_per_msg": 4.2,
+            "mb_per_sec": 21709.1,
+            "mega_msgs_per_sec": 240.62
+          },
+          "Scalar std::isspace delimiter check": {
+            "ns_per_msg": 8.7,
+            "mb_per_sec": 10384.8,
+            "mega_msgs_per_sec": 115.1
+          },
+          "XXH64 raw message hash baseline": {
+            "ns_per_msg": 18.4,
+            "mb_per_sec": 4901.3,
+            "mega_msgs_per_sec": 54.32
+          }
+        },
+        "parallel_scaling": {
+          "1_threads": {
+            "cores": 1,
+            "threads": 1,
+            "mb_per_sec": 418.8,
+            "mega_msgs_per_sec": 4.64,
+            "speedup": 1.0
+          },
+          "2_threads": {
+            "cores": 2,
+            "threads": 2,
+            "mb_per_sec": 783.4,
+            "mega_msgs_per_sec": 8.68,
+            "speedup": 1.87
+          },
+          "4_threads": {
+            "cores": 4,
+            "threads": 4,
+            "mb_per_sec": 1413.0,
+            "mega_msgs_per_sec": 15.66,
+            "speedup": 3.37
+          },
+          "6_threads": {
+            "cores": 6,
+            "threads": 6,
+            "mb_per_sec": 1615.9,
+            "mega_msgs_per_sec": 17.91,
+            "speedup": 3.86
+          },
+          "12_threads": {
+            "cores": 12,
+            "threads": 12,
+            "mb_per_sec": 2253.1,
+            "mega_msgs_per_sec": 24.97,
+            "speedup": 5.38
+          }
+        }
+      },
+      "native_benchcore_output": "===================================================================================================\nRAZOBILL SINGLE-CORE COMPREHENSIVE BENCHMARK (C++20, C ABI & HARDWARE SIMD)\n===================================================================================================\nCorpus Dataset : C:\\FM\\rzd\\razobill\\logs\\Linux\\Linux.log\nSample Events  : 25000\nTotal Payload  : 2255578 bytes (2.26 MB)\nMean Msg Length: 90.2 bytes/msg\n---------------------------------------------------------------------------------------------------\nC++20 parse (form + slots)                  230.1 ns/msg    392.0 MB/s    4.35 M msg/s  (sink 0)\nC++20 parse + formKey                       230.5 ns/msg    391.3 MB/s    4.34 M msg/s  (sink 0)\nC++20 parse + formKey + xxh64               241.2 ns/msg    374.1 MB/s    4.15 M msg/s  (sink 0)\nC++20 parse + reconstruct (round-trip)      429.4 ns/msg    210.1 MB/s    2.33 M msg/s  (sink 0)\nC ABI RzParse                              1155.4 ns/msg     78.1 MB/s    0.87 M msg/s  (sink 0)\nC ABI RzDecompose (zero-copy)              1154.5 ns/msg     78.1 MB/s    0.87 M msg/s  (sink 0)\nC ABI RzReconstruct                        1470.4 ns/msg     61.4 MB/s    0.68 M msg/s  (sink 0)\nC ABI RzReconstructSlots                   1479.1 ns/msg     61.0 MB/s    0.68 M msg/s  (sink 0)\nSIMD findWhitespace (AVX2 / NEON)             4.2 ns/msg  21709.1 MB/s  240.62 M msg/s  (sink 0)\nSIMD findWhitespaceDynamic (CPUID)            4.2 ns/msg  21709.1 MB/s  240.62 M msg/s  (sink 0)\nScalar std::isspace delimiter check           8.7 ns/msg  10384.8 MB/s  115.10 M msg/s  (sink 0)\nXXH64 raw message hash baseline              18.4 ns/msg   4901.3 MB/s   54.32 M msg/s  (sink 0)\n---------------------------------------------------------------------------------------------------\nMULTI-CORE PARALLEL SCALING (C++20 ThreadPool::parallelFor, Coarse Chunks)\n---------------------------------------------------------------------------------------------------\n 1 Cores ( 1 Threads)                   418.8 MB/s    4.64 M msg/s  (Speedup  1.00x)\n 2 Cores ( 2 Threads)                   783.4 MB/s    8.68 M msg/s  (Speedup  1.87x)\n 4 Cores ( 4 Threads)                  1413.0 MB/s   15.66 M msg/s  (Speedup  3.37x)\n 6 Cores ( 6 Threads)                  1615.9 MB/s   17.91 M msg/s  (Speedup  3.86x)\n12 Cores (12 Threads)                  2253.1 MB/s   24.97 M msg/s  (Speedup  5.38x)\n===================================================================================================\n"
+    },
+    "Zookeeper": {
+      "dataset_info": {
+        "name": "Zookeeper",
+        "path": "logs/Zookeeper/Zookeeper.log",
+        "description": "Apache Zookeeper distributed coordination log (Loghub)",
+        "total_file_bytes": 10426438,
+        "total_file_lines": 74380,
+        "sha256": "5c793ff30e960e387845fa81e595977a9037bc4801ef67f6c3298622d5d4572a",
+        "benchmarked_lines": 50000
+      },
+      "cold_vs_warm": {
+        "cold_sec": 0.06755209999391809,
+        "cold_msgs_per_sec": 740169.43965475,
+        "warm_sec": 0.06950649997452274,
+        "warm_msgs_per_sec": 719357.1826854646,
+        "warmup_speedup": 0.9718817667222343
+      },
+      "component_breakdown": {
+        "parse_exact": {
+          "median_sec": 0.07283229997847229,
+          "ns_per_msg": 1456.6459995694458,
+          "mb_per_sec": 94.50994959701373,
+          "msgs_per_sec": 686508.5959770452,
+          "spread_pct": 35.3843006800884
+        },
+        "parse_semantic": {
+          "median_sec": 0.08013259997824207,
+          "ns_per_msg": 1602.6519995648414,
+          "mb_per_sec": 85.89983354925464,
+          "msgs_per_sec": 623965.7768944999,
+          "spread_pct": 10.039234998040577
+        },
+        "reconstruct_only": {
+          "median_sec": 0.03760660003172234,
+          "ns_per_msg": 752.1320006344467,
+          "mb_per_sec": 183.0364083483659,
+          "msgs_per_sec": 1329553.853786927,
+          "spread_pct": 6.436370305261807
+        },
+        "round_trip_parse_reconstruct": {
+          "median_sec": 0.11649719998240471,
+          "ns_per_msg": 2329.943999648094,
+          "mb_per_sec": 59.086201222343874,
+          "msgs_per_sec": 429194.86483410595,
+          "spread_pct": 40.30294286180289
+        }
+      },
+      "multicore_scaling": {
+        "1_threads": {
+          "threads": 1,
+          "median_msgs_per_sec": 1657742.486282181,
+          "median_mb_per_sec": 217.64500621791038,
+          "min_msgs_per_sec": 1418705.3462492267,
+          "max_msgs_per_sec": 1865824.8065139675,
+          "spread_pct": 26.97158720154996,
+          "speedup": 1.0,
+          "efficiency_pct": 100.0
+        },
+        "2_threads": {
+          "threads": 2,
+          "median_msgs_per_sec": 3614231.397550997,
+          "median_mb_per_sec": 474.51242970619944,
+          "min_msgs_per_sec": 3406690.740614567,
+          "max_msgs_per_sec": 3636363.6363636362,
+          "spread_pct": 6.354681548743549,
+          "speedup": 2.180212805944688,
+          "efficiency_pct": 109.0106402972344
+        },
+        "4_threads": {
+          "threads": 4,
+          "median_msgs_per_sec": 6248906.44137276,
+          "median_mb_per_sec": 820.418908571188,
+          "min_msgs_per_sec": 5599982.0800573435,
+          "max_msgs_per_sec": 6453611.440962362,
+          "spread_pct": 13.660459936690833,
+          "speedup": 3.7695278326292896,
+          "efficiency_pct": 94.23819581573224
+        },
+        "6_threads": {
+          "threads": 6,
+          "median_msgs_per_sec": 8564723.6163689,
+          "median_mb_per_sec": 1124.4625387624837,
+          "min_msgs_per_sec": 5500610.567773023,
+          "max_msgs_per_sec": 8689154.197730392,
+          "spread_pct": 37.22879771465626,
+          "speedup": 5.166498227102211,
+          "efficiency_pct": 86.10830378503684
+        },
+        "12_threads": {
+          "threads": 12,
+          "median_msgs_per_sec": 8647227.698799765,
+          "median_mb_per_sec": 1135.2944995056387,
+          "min_msgs_per_sec": 8189069.230391273,
+          "max_msgs_per_sec": 9037832.36628527,
+          "spread_pct": 9.815436408732536,
+          "speedup": 5.216267164746982,
+          "efficiency_pct": 43.46889303955818
+        }
+      },
+      "native_benchcore_metrics": {
+        "single_core_ops": {
+          "C++20 parse (form + slots)": {
+            "ns_per_msg": 249.4,
+            "mb_per_sec": 551.9,
+            "mega_msgs_per_sec": 4.01
+          },
+          "C++20 parse + formKey": {
+            "ns_per_msg": 254.7,
+            "mb_per_sec": 540.5,
+            "mega_msgs_per_sec": 3.93
+          },
+          "C++20 parse + formKey + xxh64": {
+            "ns_per_msg": 283.3,
+            "mb_per_sec": 485.9,
+            "mega_msgs_per_sec": 3.53
+          },
+          "C++20 parse + reconstruct (round-trip)": {
+            "ns_per_msg": 513.5,
+            "mb_per_sec": 268.1,
+            "mega_msgs_per_sec": 1.95
+          },
+          "C ABI RzParse": {
+            "ns_per_msg": 917.0,
+            "mb_per_sec": 150.1,
+            "mega_msgs_per_sec": 1.09
+          },
+          "C ABI RzDecompose (zero-copy)": {
+            "ns_per_msg": 913.5,
+            "mb_per_sec": 150.7,
+            "mega_msgs_per_sec": 1.09
+          },
+          "C ABI RzReconstruct": {
+            "ns_per_msg": 1296.9,
+            "mb_per_sec": 106.1,
+            "mega_msgs_per_sec": 0.77
+          },
+          "C ABI RzReconstructSlots": {
+            "ns_per_msg": 1291.0,
+            "mb_per_sec": 106.6,
+            "mega_msgs_per_sec": 0.77
+          },
+          "SIMD findWhitespace (AVX2 / NEON)": {
+            "ns_per_msg": 5.2,
+            "mb_per_sec": 26252.4,
+            "mega_msgs_per_sec": 190.69
+          },
+          "SIMD findWhitespaceDynamic (CPUID)": {
+            "ns_per_msg": 4.8,
+            "mb_per_sec": 28621.1,
+            "mega_msgs_per_sec": 207.9
+          },
+          "Scalar std::isspace delimiter check": {
+            "ns_per_msg": 21.0,
+            "mb_per_sec": 6555.0,
+            "mega_msgs_per_sec": 47.61
+          },
+          "XXH64 raw message hash baseline": {
+            "ns_per_msg": 22.4,
+            "mb_per_sec": 6150.3,
+            "mega_msgs_per_sec": 44.67
+          }
+        },
+        "parallel_scaling": {
+          "1_threads": {
+            "cores": 1,
+            "threads": 1,
+            "mb_per_sec": 565.3,
+            "mega_msgs_per_sec": 4.11,
+            "speedup": 1.0
+          },
+          "2_threads": {
+            "cores": 2,
+            "threads": 2,
+            "mb_per_sec": 1103.0,
+            "mega_msgs_per_sec": 8.01,
+            "speedup": 1.95
+          },
+          "4_threads": {
+            "cores": 4,
+            "threads": 4,
+            "mb_per_sec": 1892.5,
+            "mega_msgs_per_sec": 13.75,
+            "speedup": 3.35
+          },
+          "6_threads": {
+            "cores": 6,
+            "threads": 6,
+            "mb_per_sec": 2506.9,
+            "mega_msgs_per_sec": 18.21,
+            "speedup": 4.43
+          },
+          "12_threads": {
+            "cores": 12,
+            "threads": 12,
+            "mb_per_sec": 3236.6,
+            "mega_msgs_per_sec": 23.51,
+            "speedup": 5.73
+          }
+        }
+      },
+      "native_benchcore_output": "===================================================================================================\nRAZOBILL SINGLE-CORE COMPREHENSIVE BENCHMARK (C++20, C ABI & HARDWARE SIMD)\n===================================================================================================\nCorpus Dataset : C:\\FM\\rzd\\razobill\\logs\\Zookeeper\\Zookeeper.log\nSample Events  : 50000\nTotal Payload  : 6883377 bytes (6.88 MB)\nMean Msg Length: 137.7 bytes/msg\n---------------------------------------------------------------------------------------------------\nC++20 parse (form + slots)                  249.4 ns/msg    551.9 MB/s    4.01 M msg/s  (sink 0)\nC++20 parse + formKey                       254.7 ns/msg    540.5 MB/s    3.93 M msg/s  (sink 0)\nC++20 parse + formKey + xxh64               283.3 ns/msg    485.9 MB/s    3.53 M msg/s  (sink 0)\nC++20 parse + reconstruct (round-trip)      513.5 ns/msg    268.1 MB/s    1.95 M msg/s  (sink 0)\nC ABI RzParse                               917.0 ns/msg    150.1 MB/s    1.09 M msg/s  (sink 0)\nC ABI RzDecompose (zero-copy)               913.5 ns/msg    150.7 MB/s    1.09 M msg/s  (sink 0)\nC ABI RzReconstruct                        1296.9 ns/msg    106.1 MB/s    0.77 M msg/s  (sink 0)\nC ABI RzReconstructSlots                   1291.0 ns/msg    106.6 MB/s    0.77 M msg/s  (sink 0)\nSIMD findWhitespace (AVX2 / NEON)             5.2 ns/msg  26252.4 MB/s  190.69 M msg/s  (sink 0)\nSIMD findWhitespaceDynamic (CPUID)            4.8 ns/msg  28621.1 MB/s  207.90 M msg/s  (sink 0)\nScalar std::isspace delimiter check          21.0 ns/msg   6555.0 MB/s   47.61 M msg/s  (sink 0)\nXXH64 raw message hash baseline              22.4 ns/msg   6150.3 MB/s   44.67 M msg/s  (sink 0)\n---------------------------------------------------------------------------------------------------\nMULTI-CORE PARALLEL SCALING (C++20 ThreadPool::parallelFor, Coarse Chunks)\n---------------------------------------------------------------------------------------------------\n 1 Cores ( 1 Threads)                   565.3 MB/s    4.11 M msg/s  (Speedup  1.00x)\n 2 Cores ( 2 Threads)                  1103.0 MB/s    8.01 M msg/s  (Speedup  1.95x)\n 4 Cores ( 4 Threads)                  1892.5 MB/s   13.75 M msg/s  (Speedup  3.35x)\n 6 Cores ( 6 Threads)                  2506.9 MB/s   18.21 M msg/s  (Speedup  4.43x)\n12 Cores (12 Threads)                  3236.6 MB/s   23.51 M msg/s  (Speedup  5.73x)\n===================================================================================================\n"
+    }
+  }
+}

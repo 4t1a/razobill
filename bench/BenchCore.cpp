@@ -35,9 +35,15 @@
 #include "librazobill/RazobillC.h"
 #include "librazobill/SimdScanner.hpp"
 #include "librazobill/Slots.hpp"
+#include "librazobill/ThreadPool.hpp"
 
 int main(int argc, char** argv) {
     std::string path;
+    std::size_t maxLines = 50000;
+    if (argc > 2 && argv[2] != nullptr) {
+        maxLines = std::strtoul(argv[2], nullptr, 10);
+    }
+
     if (argc > 1 && argv[1] != nullptr) {
         std::error_code ec;
         std::filesystem::path inputPath(argv[1]);
@@ -77,11 +83,11 @@ int main(int argc, char** argv) {
     }
 
     std::vector<std::string> msgs;
-    msgs.reserve(50000);
+    msgs.reserve(maxLines > 0 ? maxLines : 100000);
     for (std::string line; std::getline(in, line);) {
         if (!line.empty()) {
             msgs.push_back(std::move(line));
-            if (msgs.size() >= 50000) break;
+            if (maxLines > 0 && msgs.size() >= maxLines) break;
         }
     }
 
@@ -220,11 +226,44 @@ int main(int argc, char** argv) {
         return idx;
     });
 
-    // 11. XXH64 Raw Message Hash Theoretical Ceiling
+    // 12. XXH64 Raw Message Hash Theoretical Ceiling
     timeOperation("XXH64 raw message hash baseline",
                   [&](const std::string& m) { return razobill::core::xxh64(m) & 1; });
+
+    // 13. Multi-Core Scaling Benchmarks (C++20 ThreadPool::parallelFor)
+    std::printf(
+        "---------------------------------------------------------------------------------------------------\n");
+    std::printf("MULTI-CORE PARALLEL SCALING (C++20 ThreadPool::parallelFor, Coarse Chunks)\n");
+    std::printf(
+        "---------------------------------------------------------------------------------------------------\n");
+    const std::vector<std::size_t> threadCounts = {1, 2, 4, 6, 12};
+    double baselineThroughput = 0.0;
+    for (std::size_t numThreads : threadCounts) {
+        razobill::core::ThreadPool pool(numThreads);
+        const std::size_t chunkSize = std::max<std::size_t>(1000, (msgs.size() + numThreads - 1) / numThreads);
+        double bestSeconds = 1e300;
+        for (int rep = 0; rep < 5; ++rep) {
+            const auto t0 = std::chrono::steady_clock::now();
+            pool.parallelFor(msgs.size(), chunkSize, [&](std::size_t start, std::size_t end) {
+                razobill::core::SlotRecord localSlots;
+                for (std::size_t i = start; i < end; ++i) {
+                    (void)razobill::core::parse(msgs[i], localSlots);
+                }
+            });
+            const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            bestSeconds = std::min(bestSeconds, elapsed);
+        }
+        const double totalMsgs = static_cast<double>(msgs.size());
+        const double mbPerSec = (static_cast<double>(totalBytes) / bestSeconds) / 1e6;
+        const double megaMsgsPerSec = (totalMsgs / bestSeconds) / 1e6;
+        if (numThreads == 1) baselineThroughput = megaMsgsPerSec;
+        const double speedup = baselineThroughput > 0 ? (megaMsgsPerSec / baselineThroughput) : 1.0;
+        std::printf("%2zu Cores (%2zu Threads)                 %7.1f MB/s  %6.2f M msg/s  (Speedup %5.2fx)\n",
+                    numThreads, numThreads, mbPerSec, megaMsgsPerSec, speedup);
+    }
 
     std::printf(
         "===================================================================================================\n");
     return 0;
 }
+
