@@ -189,7 +189,7 @@ jobs:
           merge-multiple: true
 
       - name: Generate SLSA Attestations & Publish
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.get_version.outputs.VERSION }}
           name: librazobill v${{ steps.get_version.outputs.VERSION }}
