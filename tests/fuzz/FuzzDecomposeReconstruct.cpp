@@ -99,9 +99,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
 }
 
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-// Standalone harness when built without libFuzzer engine (e.g. local verification)
-int main() {
+#if !defined(LIBRAZOBILL_USE_LIBFUZZER) && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+// Standalone harness when built without libFuzzer engine (e.g. local verification or MSVC)
+int main(int /*argc*/, char** /*argv*/) {
     const std::vector<std::string> testCases = {
         "Simple log line without digits",
         "Failed password for root from 192.168.1.1 port 22 ssh2",
