@@ -24,10 +24,16 @@ struct TransparentStringHash {
     [[nodiscard]] std::size_t operator()(std::string_view sv) const noexcept {
         return std::hash<std::string_view>{}(sv);
     }
+    [[nodiscard]] std::size_t operator()(const std::string& s) const noexcept {
+        return std::hash<std::string_view>{}(s);
+    }
 };
 struct TransparentStringEqual {
     using is_transparent = void;
     [[nodiscard]] bool operator()(std::string_view a, std::string_view b) const noexcept { return a == b; }
+    [[nodiscard]] bool operator()(const std::string& a, const std::string& b) const noexcept { return a == b; }
+    [[nodiscard]] bool operator()(const std::string& a, std::string_view b) const noexcept { return a == b; }
+    [[nodiscard]] bool operator()(std::string_view a, const std::string& b) const noexcept { return a == b; }
 };
 } // namespace detail
 
@@ -59,12 +65,35 @@ public:
         return id;
     }
 
-    [[nodiscard]] std::string_view lookup(std::uint32_t id) const {
+    // Thread-safe lookup returning by-value copy under read lock.
+    // Eliminates data races and dangling string_view use-after-free when vectors reallocate.
+    [[nodiscard]] std::string lookup(std::uint32_t id) const {
         std::shared_lock<std::shared_mutex> lock(mutex_);
         if (id < idToStr_.size()) {
             return idToStr_[id];
         }
         return {};
+    }
+
+    // Thread-safe buffer assignment under read lock.
+    bool lookup(std::uint32_t id, std::string& out) const {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        if (id < idToStr_.size()) {
+            out = idToStr_[id];
+            return true;
+        }
+        return false;
+    }
+
+    // Zero-allocation scoped inspection accessor: holds the read lock during callback execution.
+    template <typename F>
+    bool withString(std::uint32_t id, F&& fn) const {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        if (id < idToStr_.size()) {
+            fn(std::string_view(idToStr_[id]));
+            return true;
+        }
+        return false;
     }
 
     [[nodiscard]] std::size_t size() const noexcept {

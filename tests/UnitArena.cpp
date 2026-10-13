@@ -84,6 +84,46 @@ TEST_CASE("StringPool interning and garbage collection") {
     CHECK(pool.size() == 2);
 }
 
+TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
+    StringPool pool;
+    auto id0 = pool.intern("thread_safe_token");
+    CHECK(pool.lookup(id0) == "thread_safe_token");
+
+    std::string outBuf;
+    CHECK(pool.lookup(id0, outBuf));
+    CHECK(outBuf == "thread_safe_token");
+
+    bool inspected = false;
+    CHECK(pool.withString(id0, [&](std::string_view sv) {
+        inspected = (sv == "thread_safe_token");
+    }));
+    CHECK(inspected);
+
+    // Invalid ID bounds check
+    CHECK(pool.lookup(9999).empty());
+    CHECK_FALSE(pool.lookup(9999, outBuf));
+    CHECK_FALSE(pool.withString(9999, [](std::string_view) {}));
+
+    // Concurrent growth and lookup stress test
+    std::atomic<bool> stop{false};
+    std::thread reader([&]() {
+        while (!stop.load()) {
+            std::string s = pool.lookup(id0);
+            CHECK(s == "thread_safe_token");
+            pool.withString(id0, [](std::string_view sv) {
+                CHECK(sv == "thread_safe_token");
+            });
+        }
+    });
+
+    for (int i = 0; i < 1000; ++i) {
+        pool.intern("token_" + std::to_string(i));
+    }
+    stop.store(true);
+    reader.join();
+}
+
+
 TEST_CASE("FormCatalog thread-safe registration") {
     FormCatalog catalog;
     auto h1 = catalog.registerForm("test_key_1\x13I", "test_key_1 <*>", 1, 0);
