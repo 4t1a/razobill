@@ -240,8 +240,8 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         db_.exec("INSERT INTO rb_layout SELECT CAST(least(coalesce(quantile_disc(len(rbi), 0.99), 0), 32) AS INTEGER), "
                  "CAST(least(coalesce(quantile_disc(len(rbs), 0.99), 0), 32) AS INTEGER) FROM rb_s");
     const auto lay = db_.query("SELECT ki, ks FROM rb_layout");
-    const auto ki = std::clamp(lay.i64(0, 0), 0LL, 32LL);
-    const auto ks = std::clamp(lay.i64(0, 1), 0LL, 32LL);
+    const auto ki = std::clamp<std::int64_t>(lay.i64(0, 0), 0, 32);
+    const auto ks = std::clamp<std::int64_t>(lay.i64(0, 1), 0, 32);
 
     registerFormsLocked("SELECT rbf AS form FROM rb_s");
     db_.exec("INSERT INTO rb_str SELECT CAST(coalesce((SELECT max(id) + 1 FROM rb_str), 0) + row_number() OVER () - 1 AS INTEGER), s "
