@@ -1,21 +1,66 @@
 version: 2
 updates:
-  # Monitor GitHub Actions workflows for dependency updates
+  # 1. GitHub Actions Workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Etc/UTC"
     commit-message:
       prefix: "ci"
       include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      actions-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
 
-  # Monitor Python package dependencies
+  # 2. Python Package Ecosystem
   - package-ecosystem: "pip"
     directory: "/lib/python"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Etc/UTC"
     commit-message:
       prefix: "deps"
       include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      python-dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "hypothesis*"
+          - "psutil*"
+          - "duckdb*"
+        update-types:
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
+
+  # 3. Git Submodules (DuckDB Extension CI Toolchain)
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Etc/UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "submodules"
+    open-pull-requests-limit: 5
