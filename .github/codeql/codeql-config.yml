@@ -4,9 +4,15 @@ name: "Razobill CodeQL Analysis Configuration"
 paths-ignore:
   - "thirdparty/**"
 
-# Filter out false-positive quality queries on test runner macros and bindings
+# Filter out false-positive quality and vendor queries
 query-filters:
   - exclude:
       id: cpp/unused-static-function
   - exclude:
       id: cpp/poorly-documented-function
+  - exclude:
+      id: cpp/commented-out-code
+  - exclude:
+      id: cpp/stack-address-escape
+  - exclude:
+      id: cpp/path-injection

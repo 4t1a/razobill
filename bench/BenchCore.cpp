@@ -43,7 +43,12 @@ int main(int argc, char** argv) {
         std::filesystem::path inputPath(argv[1]);
         if (std::filesystem::is_regular_file(inputPath, ec) && !ec) {
             auto canonicalPath = std::filesystem::canonical(inputPath, ec);
-            path = ec ? inputPath.string() : canonicalPath.string();
+            if (!ec) {
+                path = canonicalPath.string();
+            } else {
+                std::printf("[BENCH] Error: Cannot resolve canonical path for '%s'.\n", argv[1]);
+                return 1;
+            }
         } else {
             std::printf("[BENCH] Error: '%s' is not a valid regular file.\n", argv[1]);
             return 1;
