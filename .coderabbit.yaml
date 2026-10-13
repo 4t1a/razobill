@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+version: "2"
+language: "en-US"
+tone_instructions: "You are an expert systems software engineer and high-performance C++20 compiler/database architect. Provide deep, technically rigorous reviews focused on correctness, memory safety, data integrity, and performance."
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+  tools:
+    ast-grep:
+      enabled: true
+    shellcheck:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+instructions: |
+  Review rules for the Razobill C++20 / DuckDB analytical compaction engine:
+
+  1. **Lossless Invertibility (The Iron Law)**:
+     - In librazobill, every log parsing operation MUST be losslessly invertible:
+       `reconstruct(decompose(x)) == x` byte-for-byte across all inputs.
+     - Flag any parsing change that drops raw bytes, truncates tokens, alters whitespace, or fails on non-ASCII / binary bytes.
+
+  2. **Memory Safety & Lifetime**:
+     - `std::string_view` must NEVER outlive its underlying buffer.
+     - Watch out for dangling string_views in return types or asynchronous tasks.
+     - Verify bounds checking on raw pointer offsets and SIMD register loads.
+
+  3. **Universal C ABI Stability**:
+     - Functions in `RazobillC.h` (`Rz*`) form a stable C ABI.
+     - Never alter parameter signatures or struct layouts without backwards compatibility.
+     - Any memory allocated in the C++ layer must be freed by `RzFreeRecord()`. Never use `free()` directly on record pointers.
+
+  4. **Performance & Allocation Invariants**:
+     - The zero-copy data plane must avoid dynamic allocations in hot scanning paths.
+     - Do not introduce `std::string` copies, `std::regex`, or runtime polymorphism in `scan()`, `parse()`, or `reconstruct()`.
+
+  5. **Information Theory Integrity**:
+     - Verify that ledger calculations in `Stats.cpp` conform to "Latitude and Doubt" (2026):
+       - Conveyance <= Content + epsilon (Theorem 1).
+       - Latitude >= 0, Doubt >= 0.
+
+  6. **Noise Reduction**:
+     - Ignore trivial style, indentation, or formatting differences handled by clang-format. Focus exclusively on bugs, edge cases, invariants, and undefined behavior.

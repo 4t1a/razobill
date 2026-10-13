@@ -31,7 +31,7 @@ def isIntToken(s: str) -> bool:
         return False
     if s[0] == '0':
         return len(s) == 1
-    return s.isdigit()
+    return all('0' <= c <= '9' for c in s)
 
 def _scan(msg: str, mode: ScanMode = ScanMode.Semantic):
     n = len(msg)
@@ -72,7 +72,7 @@ def _scan(msg: str, mode: ScanMode = ScanMode.Semantic):
         start = p
         seen_digit = False
         while p < n and msg[p] not in DELIMITERS:
-            if msg[p].isdigit():
+            if '0' <= msg[p] <= '9':
                 seen_digit = True
             p += 1
 
@@ -142,8 +142,8 @@ def parse(msg: str, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
     if len(msg) > kMaxMessageBytes:
         return rec
     
-    # Check for reserved bytes
-    if chr(kPlaceholder) in msg or chr(kTypeSeparator) in msg:
+    # Check for reserved bytes (0x11..0x13) matching C++ Scanner
+    if '\x11' in msg or chr(kPlaceholder) in msg or chr(kTypeSeparator) in msg:
         rec.skeleton = chr(kPlaceholder)
         rec.types = "S"
         rec.strs.append(msg)

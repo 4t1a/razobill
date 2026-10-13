@@ -78,8 +78,9 @@ env/
 venv/
 ENV/
 
-# Pytest, coverage, and mypy caches
+# Pytest, coverage, hypothesis, and mypy caches
 .pytest_cache/
+.hypothesis/
 .coverage
 .coverage.*
 htmlcov/

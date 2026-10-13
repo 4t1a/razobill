@@ -1,0 +1,113 @@
+name: Sanitizers & Static Analysis
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asan-ubsan:
+    name: ASan + UBSan (Address & Undefined Behavior)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang llvm
+          python -m pip install --upgrade pip pybind11 duckdb pytest hypothesis
+
+      - name: Configure CMake with ASan + UBSan + Fuzzing
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_SANITIZER_ASAN_UBSAN=ON \
+            -DENABLE_FUZZING=ON
+
+      - name: Build Targets
+        run: |
+          ninja -C build
+
+      - name: Run C++ Unit & Integration Tests under ASan + UBSan
+        env:
+          ASAN_OPTIONS: "detect_leaks=1:check_initialization_order=1:strict_init_order=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          ctest --test-dir build --output-on-failure -C Debug
+
+      - name: Run Standalone Fuzz Verification Harness
+        env:
+          ASAN_OPTIONS: "detect_leaks=1"
+          UBSAN_OPTIONS: "halt_on_error=1"
+        run: |
+          ./build/FuzzDecomposeReconstruct
+
+  tsan:
+    name: TSan (ThreadSanitizer - Data Race Detector)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang llvm
+          python -m pip install --upgrade pip pybind11 duckdb pytest
+
+      - name: Configure CMake with TSan
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_SANITIZER_TSAN=ON
+
+      - name: Build Targets
+        run: |
+          ninja -C build
+
+      - name: Run Tests under ThreadSanitizer
+        env:
+          TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
+        run: |
+          ctest --test-dir build --output-on-failure -C Debug
+
+  clang-tidy:
+    name: Clang-Tidy Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Install Clang-Tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy ninja-build
+
+      - name: Generate Compilation Database
+        run: |
+          cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run Clang-Tidy on Core Sources
+        run: |
+          clang-tidy -p build src/*.cpp --warnings-as-errors=''

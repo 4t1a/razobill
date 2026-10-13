@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Python Build Dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel pybind11 duckdb pytest ninja
+          python -m pip install --upgrade pip setuptools wheel pybind11 duckdb pytest hypothesis ninja
 
       - name: Set up MSVC Compiler
         if: runner.os == 'Windows'
@@ -57,6 +57,10 @@ jobs:
         run: |
           ctest --test-dir build --output-on-failure -C Release
 
-      - name: Run Python Bindings Test Suite
+      - name: Run Python Unit Test Suite
         run: |
           python lib/python/tests/TestPyRazobill.py
+
+      - name: Run Python Property-Based Test Suite (Hypothesis)
+        run: |
+          python lib/python/tests/TestProperties.py

@@ -1,17 +1,26 @@
 ---
-# Clang-Tidy configuration for librazobill
 Checks: >
   -*,
   bugprone-*,
+  -bugprone-narrowing-conversions,
   -bugprone-easily-swappable-parameters,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-macro-usage,
   modernize-*,
   -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
   performance-*,
   readability-*,
-  -readability-identifier-length,
-  -readability-magic-numbers
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length
 
 WarningsAsErrors: ''
-HeaderFilterRegex: 'include/.*'
+HeaderFilterRegex: 'include/librazobill/.*'
 FormatStyle: file
 ...
