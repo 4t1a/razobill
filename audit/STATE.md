@@ -1,8 +1,8 @@
 # Razobill Audit State
 
 ## Current Phase
-Phase 4: Production Hardening - Complete. Phase 4 Gate Passed.
-Phase 5: Live Traffic Map (Optional) / Release Tagging - Ready to Begin.
+Audit & Production Release Hardening Complete (Phase 5 Skipped per User Directive).
+Release Candidate Verified & Ready for Tagging.
 
 ## Completed Items
 - **Phase 0 Orient Deliverables**:
@@ -49,4 +49,4 @@ Phase 5: Live Traffic Map (Optional) / Release Tagging - Ready to Begin.
 None.
 
 ## Next Step
-- Phase 5: Live Traffic Map (optional web telemetry module with H3 coarse spatial indexing and MapLibre GL JS) or Final Release Candidate tagging.
+- Release Candidate Tagging (`v1.0.0`): All gates P0–P4 passed, zero open findings, 100% tests green.
