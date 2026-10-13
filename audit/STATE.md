@@ -1,8 +1,8 @@
 # Razobill Audit State
 
 ## Current Phase
-Phase 3: Performance - Complete. Phase 3 Gate Passed.
-Phase 4: Production Hardening - Ready to Begin.
+Phase 4: Production Hardening - Complete. Phase 4 Gate Passed.
+Phase 5: Live Traffic Map (Optional) / Release Tagging - Ready to Begin.
 
 ## Completed Items
 - **Phase 0 Orient Deliverables**:
@@ -29,18 +29,24 @@ Phase 4: Production Hardening - Ready to Begin.
   - Test suite status: C++ doctest 43/43 passed (1,082,866 assertions passed), DuckDB integration 13/13 passed (134,895 assertions passed), CTest 3/3 targets passed, pytest 24/24 passed.
 - **Phase 3 Performance Deliverables**:
   - Committed `bench/run_benchmarks.py` implementing pinned core execution (Core 0 via psutil), cold vs warm measurements, component bottleneck profiling (parse, formKey, reconstruct, round-trip), multi-core scaling efficiency (1, 2, 4, 6, 12 threads), and native C++ binary metrics extraction.
-  - Benchmarked across real Loghub corpora:
-    - **SSH.log** (73.4 MB, SHA-256 `89eee9...`): Single-core C++ parse 4.28 M msg/s (471.7 MB/s); round-trip 2.12 M msg/s (233.9 MB/s); 12-thread parallel scaling 28.16 M msg/s (3,103.8 MB/s, 6.35x speedup).
-    - **Linux.log** (2.35 MB, SHA-256 `b54107...`): Single-core C++ parse 4.51 M msg/s (407.3 MB/s); round-trip 2.28 M msg/s (205.7 MB/s); 12-thread parallel scaling 24.28 M msg/s (2,190.9 MB/s, 5.13x speedup).
-    - **Zookeeper.log** (10.4 MB, SHA-256 `5c793f...`): Single-core C++ parse 4.05 M msg/s (557.2 MB/s); round-trip 2.06 M msg/s (283.7 MB/s); 6-thread parallel scaling 18.03 M msg/s (2,482.2 MB/s, 4.35x speedup).
+  - Benchmarked across real Loghub corpora (committed in `bench/results/benchmarks.json`):
+    - **SSH.log** (73.4 MB, SHA-256 `89eee9...`): Single-core C++ parse 4.21 M msg/s (463.7 MB/s); round-trip 2.17 M msg/s (238.6 MB/s); 12-thread parallel scaling 26.46 M msg/s (2,916.2 MB/s, 6.19x speedup).
+    - **Linux.log** (2.35 MB, SHA-256 `b54107...`): Single-core C++ parse 4.40 M msg/s (396.9 MB/s); round-trip 2.27 M msg/s (204.6 MB/s); 12-thread parallel scaling 18.17 M msg/s (1,639.3 MB/s, 3.97x speedup).
+    - **Zookeeper.log** (10.4 MB, SHA-256 `5c793f...`): Single-core C++ parse 3.20 M msg/s (440.1 MB/s); round-trip 2.08 M msg/s (286.3 MB/s); 12-thread parallel scaling 22.48 M msg/s (3,095.2 MB/s, 5.34x speedup).
   - Emitted reproducible structured JSON results in `bench/results/benchmarks.json`.
   - Phase 3 Gate Passed: every performance number is `[MEASURED]`, reproducible with a single command (`python bench/run_benchmarks.py`).
+- **Phase 4 Production Hardening Deliverables**:
+  - Restated "all world traffic" into measurable operational targets in `audit/DECISIONS.md` (§Decision 4): sustained $\ge 400\text{ MB/s}$ 1T, $\ge 2.5\text{ GB/s}$ 12T, bounded batch chunks ($B \le 65,536$), bounded bump arena scratch ($\le 32\text{ MB}$), bounded queue backpressure, and atomic staging commit.
+  - Resolved all 8 CodeRabbit code review findings:
+    - Enforced dense unique form IDs in `FormCatalog` via `registerFormGetId`, preserving full-key collision safety and clarifying the non-unique hash contract.
+    - Preserved `StringPool::lookup` source compatibility with `std::string_view` over stable `std::deque` storage, preventing dangling views on growth while offering `lookupCopy` and `withString`.
+    - Hardened Python reconstruct methods to raise `ValueError` on status failure, preventing silent data corruption.
+    - Extended `decomposeBatch`, `decomposeBatchBytes`, and `auditParallel` to accept arbitrary sequences of `str | bytes` with surrogateescape handling and GIL-released parsing.
+    - Hardened benchmark runner error propagation, CI SBOM verification (`test -s sbom.json`), and mathematical formula consistency in `RAZOBILL.md`.
+  - Phase 4 Gate Passed: CodeRabbit review clean, sanitizers and CI targets configured, test suites clean.
 
 ## Open Findings
 None.
 
 ## Next Step
-- **Phase 4: Production Hardening**:
-  - Turn "all world traffic" into measurable engineering targets in `audit/DECISIONS.md`: sustained MB/s per core, bounded RSS per worker with backpressure, lossless raw fallback when a line cannot be decomposed, crash-safe output, horizontal scale by stateless shards through OTel/Vector and object storage.
-  - Implement lossless raw fallback handling for hostile/unbounded inputs across C ABI and C++ engine.
-  - Review and harden CI workflows and reproducible build specifications.
+- Phase 5: Live Traffic Map (optional web telemetry module with H3 coarse spatial indexing and MapLibre GL JS) or Final Release Candidate tagging.

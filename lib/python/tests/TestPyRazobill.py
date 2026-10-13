@@ -334,6 +334,39 @@ class TestPyRazobill(unittest.TestCase):
         self.assertIsInstance(rebuilt_str, str)
         self.assertEqual(rebuilt_str.encode("utf-8", "surrogateescape"), raw_bytes)
 
+        # Decompose -> Reconstruct via tuple API
+        fk, ints, strs = pyrazobill.decompose(raw_bytes, pyrazobill.ScanMode.Exact)
+        rebuilt_from_tuple = pyrazobill.reconstruct(fk, ints, strs)
+        self.assertEqual(rebuilt_from_tuple.encode("utf-8", "surrogateescape"), raw_bytes)
+
+        fk_b, ints_b, strs_b = pyrazobill.decomposeBytes(raw_bytes, pyrazobill.ScanMode.Exact)
+        rebuilt_from_bytes_tuple = pyrazobill.reconstructBytes(fk_b, ints_b, strs_b)
+        self.assertEqual(rebuilt_from_bytes_tuple, raw_bytes)
+
+    def test_reconstruct_error_handling(self):
+        # Malformed form key with missing slots must raise ValueError
+        with self.assertRaises(ValueError):
+            pyrazobill.reconstruct("invalid_key\x13I\x13S", [], [])
+
+        with self.assertRaises(ValueError):
+            pyrazobill.reconstructBytes("invalid_key\x13I", [], [])
+
+    def test_batch_bytes_and_surrogates(self):
+        raw_msgs = [b"user=alice id=100 status=\xff\xfe", b"user=bob id=200 status=\xaa\xbb"]
+        # Batch decompose with bytes
+        batch = pyrazobill.decomposeBatch(raw_msgs)
+        self.assertEqual(len(batch), 2)
+
+        batch_b = pyrazobill.decomposeBatchBytes(raw_msgs)
+        self.assertEqual(len(batch_b), 2)
+        self.assertIsInstance(batch_b[0][0], bytes)
+
+        # Audit parallel with bytes
+        res = pyrazobill.auditParallel(raw_msgs, pyrazobill.ScanMode.Exact, numThreads=2)
+        self.assertEqual(res.totalLines, 2)
+        self.assertEqual(res.mismatches, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+

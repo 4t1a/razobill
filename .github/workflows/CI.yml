@@ -89,16 +89,79 @@ jobs:
       - name: Download & Extract Intel SDE
         run: |
           SDE_URL="https://downloadmirror.intel.com/832777/sde-external-9.44.0-2024-08-20-lin.tar.xz"
-          curl -sSL "$SDE_URL" -o sde.tar.xz || curl -sSL "https://downloadmirror.intel.com/813576/sde-external-9.38.0-2024-04-18-lin.tar.xz" -o sde.tar.xz
+          curl -fsSL "$SDE_URL" -o sde.tar.xz || curl -fsSL "https://downloadmirror.intel.com/813576/sde-external-9.38.0-2024-04-18-lin.tar.xz" -o sde.tar.xz
           mkdir -p "$HOME/sde" && tar -xf sde.tar.xz -C "$HOME/sde" --strip-components=1
-          echo "$HOME/sde" >> $GITHUB_PATH
+          echo "$HOME/sde" >> "$GITHUB_PATH"
 
       - name: Build with Explicit AVX-512 Flags
         run: |
-          cmake -B build-avx512 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-mavx512bw -mavx512f"
+          cmake -B build-avx512 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-13 -DCMAKE_CXX_FLAGS="-mavx512bw -mavx512f"
           ninja -C build-avx512 UnitTests
 
       - name: Execute Test Suite under Intel SDE (Sapphire Rapids Target)
         run: |
           sde64 -spr -- ./build-avx512/UnitTests
+
+  sanitizers:
+    name: Memory & Thread Sanitizers (ASan, UBSan, TSan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v7
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-18 llvm-18
+          python -m pip install --upgrade pip pybind11 duckdb pytest
+
+      - name: Build & Run AddressSanitizer + UndefinedBehaviorSanitizer
+        run: |
+          cmake -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          ninja -C build-asan UnitTests
+          ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:abort_on_error=1 ./build-asan/UnitTests
+
+      - name: Build & Run ThreadSanitizer
+        run: |
+          cmake -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+          ninja -C build-tsan UnitTests
+          TSAN_OPTIONS=abort_on_error=1 ./build-tsan/UnitTests
+
+  fuzzing:
+    name: Hostile Input & Differential Fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v7
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-13
+
+      - name: Build Standalone Fuzz Target
+        run: |
+          cmake -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-13
+          ninja -C build-fuzz FuzzDecomposeReconstruct
+
+      - name: Execute Hostile Differential Fuzzer (100,000 iterations)
+        run: |
+          ./build-fuzz/FuzzDecomposeReconstruct 100000
+
+  abi-and-compliance:
+    name: ABI Stability, SBOM & Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v7
+
+      - name: Verify C ABI Contract Version
+        run: |
+          grep -E "#define RZ_ABI_VERSION 1" include/librazobill/RazobillC.h || (echo "ABI version header mismatch!" && exit 1)
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          python -m pip install --upgrade pip cyclonedx-bom
+          cyclonedx-py poetry --output-format json --outfile sbom.json || cyclonedx-py requirements requirements.txt --outfile sbom.json
+          test -s sbom.json
 

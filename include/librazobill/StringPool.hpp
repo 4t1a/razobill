@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
@@ -65,9 +66,19 @@ public:
         return id;
     }
 
-    // Thread-safe lookup returning by-value copy under read lock.
-    // Eliminates data races and dangling string_view use-after-free when vectors reallocate.
-    [[nodiscard]] std::string lookup(std::uint32_t id) const {
+    // Fast string_view accessor preserving source compatibility.
+    // References remain stable across intern() operations because idToStr_ uses std::deque
+    // (guaranteeing pointer stability on push_back). Invalidated only on gc() or clear().
+    [[nodiscard]] std::string_view lookup(std::uint32_t id) const {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        if (id < idToStr_.size()) {
+            return idToStr_[id];
+        }
+        return {};
+    }
+
+    // Thread-safe owning copy under read lock.
+    [[nodiscard]] std::string lookupCopy(std::uint32_t id) const {
         std::shared_lock<std::shared_mutex> lock(mutex_);
         if (id < idToStr_.size()) {
             return idToStr_[id];
@@ -86,6 +97,9 @@ public:
     }
 
     // Zero-allocation scoped inspection accessor: holds the read lock during callback execution.
+    // CONTRACT: The callback `fn` MUST NOT invoke mutating methods (such as intern() or clear())
+    // on the same StringPool instance, as std::shared_mutex is not recursive and attempting to
+    // acquire an exclusive lock while holding a shared lock will result in deadlock.
     template <typename F>
     bool withString(std::uint32_t id, F&& fn) const {
         std::shared_lock<std::shared_mutex> lock(mutex_);
@@ -113,10 +127,9 @@ public:
         StringPoolStats stats;
         stats.totalBefore = idToStr_.size();
 
-        std::vector<std::string> newIdToStr;
+        std::deque<std::string> newIdToStr;
         std::unordered_map<std::string, std::uint32_t, detail::TransparentStringHash, detail::TransparentStringEqual>
             newStrToId;
-        newIdToStr.reserve(activeIds.size());
 
         for (std::uint32_t id = 0; id < static_cast<std::uint32_t>(idToStr_.size()); ++id) {
             if (activeIds.find(id) != activeIds.end()) {
@@ -138,7 +151,7 @@ private:
     mutable std::shared_mutex mutex_;
     std::unordered_map<std::string, std::uint32_t, detail::TransparentStringHash, detail::TransparentStringEqual>
         strToId_;
-    std::vector<std::string> idToStr_;
+    std::deque<std::string> idToStr_;
 };
 
 } // namespace razobill::core

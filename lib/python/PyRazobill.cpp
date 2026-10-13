@@ -35,10 +35,27 @@ using namespace razobill;
 inline py::object toPyStrSafe(std::string_view sv) {
     PyObject* u = PyUnicode_DecodeUTF8(sv.data(), static_cast<Py_ssize_t>(sv.size()), "surrogateescape");
     if (!u) {
-        PyErr_Clear();
-        u = PyUnicode_DecodeLatin1(sv.data(), static_cast<Py_ssize_t>(sv.size()), nullptr);
+        throw py::error_already_set();
     }
     return py::reinterpret_steal<py::object>(u);
+}
+
+inline std::string toCppBytesSafe(const py::handle& obj) {
+    if (py::isinstance<py::bytes>(obj)) {
+        return obj.cast<std::string>();
+    }
+    if (py::isinstance<py::str>(obj)) {
+        PyObject* encoded = PyUnicode_AsEncodedString(obj.ptr(), "utf-8", "surrogateescape");
+        if (!encoded) {
+            throw py::error_already_set();
+        }
+        const char* buf = PyBytes_AS_STRING(encoded);
+        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
+        std::string res(buf, static_cast<std::size_t>(len));
+        Py_DECREF(encoded);
+        return res;
+    }
+    throw py::type_error("Expected str or bytes");
 }
 
 // Python-facing SlotRecord: owns its underlying message buffer to prevent dangling string views.
@@ -79,14 +96,20 @@ struct PySlotRecord {
     [[nodiscard]] py::object reconstruct() const {
         std::string out;
         std::string key = slots.formKey();
-        (void)core::reconstruct(key, slots.ints, slots.strs, out);
+        auto s = core::reconstruct(key, slots.ints, slots.strs, out);
+        if (s != Status::Ok) {
+            throw py::value_error(std::string("reconstruct failed: ") + razobill::describe(s));
+        }
         return toPyStrSafe(out);
     }
 
     [[nodiscard]] py::bytes reconstructBytes() const {
         std::string out;
         std::string key = slots.formKey();
-        (void)core::reconstruct(key, slots.ints, slots.strs, out);
+        auto s = core::reconstruct(key, slots.ints, slots.strs, out);
+        if (s != Status::Ok) {
+            throw py::value_error(std::string("reconstructBytes failed: ") + razobill::describe(s));
+        }
         return py::bytes(out);
     }
 };
@@ -213,20 +236,23 @@ PYBIND11_MODULE(Core, m) {
         });
 
     m.def(
-        "parse", [](std::string msg, core::ScanMode mode) { return PySlotRecord(std::move(msg), mode); },
+        "parse", [](const py::object& msgObj, core::ScanMode mode) {
+            return PySlotRecord(toCppBytesSafe(msgObj), mode);
+        },
         py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Parses a single log line into a SlotRecord");
 
     m.def(
         "parseBatch",
-        [](std::vector<std::string> msgs, core::ScanMode mode) {
+        [](const py::iterable& msgsObj, core::ScanMode mode) {
+            std::vector<std::string> rawMsgs;
+            for (auto item : msgsObj) {
+                rawMsgs.push_back(toCppBytesSafe(item));
+            }
             std::vector<PySlotRecord> records;
-            records.reserve(msgs.size());
+            records.reserve(rawMsgs.size());
             {
-                // PERFORMANCE: Release CPython's Global Interpreter Lock (GIL)
-                // While we parse the batch in C++, other Python threads (e.g. asyncio event loops,
-                // web servers, Kafka consumer threads) can run concurrently without waiting on us!
                 py::gil_scoped_release release;
-                for (auto& msg : msgs) {
+                for (auto& msg : rawMsgs) {
                     records.emplace_back(std::move(msg), mode);
                 }
             }
@@ -240,13 +266,21 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "reconstruct",
-        [](std::string_view formKey, const std::vector<std::int64_t>& ints, const std::vector<std::string>& strs) {
-            std::string out;
+        [](const py::object& formKeyObj, const std::vector<std::int64_t>& ints, const py::iterable& strsObj) {
+            std::string formKey = toCppBytesSafe(formKeyObj);
+            std::vector<std::string> strs;
+            for (auto item : strsObj) {
+                strs.push_back(toCppBytesSafe(item));
+            }
             std::vector<std::string_view> strViews;
             strViews.reserve(strs.size());
             for (const auto& s : strs)
                 strViews.emplace_back(s);
-            (void)core::reconstruct(formKey, ints, strViews, out);
+            std::string out;
+            auto s = core::reconstruct(formKey, ints, strViews, out);
+            if (s != Status::Ok) {
+                throw py::value_error(std::string("reconstruct failed: ") + razobill::describe(s));
+            }
             return toPyStrSafe(out);
         },
         py::arg("formKey"), py::arg("ints"), py::arg("strs"),
@@ -258,13 +292,21 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "reconstructBytes",
-        [](std::string_view formKey, const std::vector<std::int64_t>& ints, const std::vector<std::string>& strs) {
-            std::string out;
+        [](const py::object& formKeyObj, const std::vector<std::int64_t>& ints, const py::iterable& strsObj) {
+            std::string formKey = toCppBytesSafe(formKeyObj);
+            std::vector<std::string> strs;
+            for (auto item : strsObj) {
+                strs.push_back(toCppBytesSafe(item));
+            }
             std::vector<std::string_view> strViews;
             strViews.reserve(strs.size());
             for (const auto& s : strs)
                 strViews.emplace_back(s);
-            (void)core::reconstruct(formKey, ints, strViews, out);
+            std::string out;
+            auto s = core::reconstruct(formKey, ints, strViews, out);
+            if (s != Status::Ok) {
+                throw py::value_error(std::string("reconstructBytes failed: ") + razobill::describe(s));
+            }
             return py::bytes(out);
         },
         py::arg("formKey"), py::arg("ints"), py::arg("strs"),
@@ -272,7 +314,8 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "decompose",
-        [](std::string_view msg, core::ScanMode mode) {
+        [](const py::object& msgObj, core::ScanMode mode) {
+            std::string msg = toCppBytesSafe(msgObj);
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
             py::list pyStrs;
@@ -285,7 +328,8 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "decomposeBytes",
-        [](std::string_view msg, core::ScanMode mode) {
+        [](const py::object& msgObj, core::ScanMode mode) {
+            std::string msg = toCppBytesSafe(msgObj);
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
             py::list pyStrs;
@@ -297,46 +341,90 @@ PYBIND11_MODULE(Core, m) {
         py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic,
         "Decomposes a message into (formKeyBytes, ints, strsBytes) tuple");
 
+    struct DecomposedBatchItem {
+        std::string formKey;
+        std::vector<std::int64_t> ints;
+        std::vector<std::string> strs;
+    };
+
     m.def(
         "decomposeBatch",
-        [](const std::vector<std::string>& msgs, core::ScanMode mode) {
+        [](const py::iterable& msgsObj, core::ScanMode mode) {
+            std::vector<std::string> rawMsgs;
+            for (auto item : msgsObj) {
+                rawMsgs.push_back(toCppBytesSafe(item));
+            }
+            std::vector<DecomposedBatchItem> batch;
+            batch.reserve(rawMsgs.size());
+            {
+                py::gil_scoped_release release;
+                for (const auto& msg : rawMsgs) {
+                    core::SlotRecord slots;
+                    (void)core::parse(msg, slots, mode);
+                    DecomposedBatchItem item;
+                    item.formKey = slots.formKey();
+                    item.ints = std::move(slots.ints);
+                    item.strs.reserve(slots.strs.size());
+                    for (const auto& sv : slots.strs) {
+                        item.strs.emplace_back(sv);
+                    }
+                    batch.push_back(std::move(item));
+                }
+            }
             std::vector<std::tuple<py::object, std::vector<std::int64_t>, py::list>> results;
-            results.reserve(msgs.size());
-            for (const auto& msg : msgs) {
-                core::SlotRecord slots;
-                (void)core::parse(msg, slots, mode);
+            results.reserve(batch.size());
+            for (auto& item : batch) {
                 py::list pyStrs;
-                for (const auto& sv : slots.strs)
-                    pyStrs.append(toPyStrSafe(sv));
-                results.emplace_back(toPyStrSafe(slots.formKey()), slots.ints, std::move(pyStrs));
+                for (const auto& s : item.strs)
+                    pyStrs.append(toPyStrSafe(s));
+                results.emplace_back(toPyStrSafe(item.formKey), std::move(item.ints), std::move(pyStrs));
             }
             return results;
         },
         py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
-        "High-speed batch decomposition into (formKey, ints, strs) tuples");
+        "High-speed batch decomposition into (formKey, ints, strs) tuples releasing GIL during parsing");
 
     m.def(
         "decomposeBatchBytes",
-        [](const std::vector<std::string>& msgs, core::ScanMode mode) {
+        [](const py::iterable& msgsObj, core::ScanMode mode) {
+            std::vector<std::string> rawMsgs;
+            for (auto item : msgsObj) {
+                rawMsgs.push_back(toCppBytesSafe(item));
+            }
+            std::vector<DecomposedBatchItem> batch;
+            batch.reserve(rawMsgs.size());
+            {
+                py::gil_scoped_release release;
+                for (const auto& msg : rawMsgs) {
+                    core::SlotRecord slots;
+                    (void)core::parse(msg, slots, mode);
+                    DecomposedBatchItem item;
+                    item.formKey = slots.formKey();
+                    item.ints = std::move(slots.ints);
+                    item.strs.reserve(slots.strs.size());
+                    for (const auto& sv : slots.strs) {
+                        item.strs.emplace_back(sv);
+                    }
+                    batch.push_back(std::move(item));
+                }
+            }
             std::vector<std::tuple<py::bytes, std::vector<std::int64_t>, py::list>> results;
-            results.reserve(msgs.size());
-            for (const auto& msg : msgs) {
-                core::SlotRecord slots;
-                (void)core::parse(msg, slots, mode);
+            results.reserve(batch.size());
+            for (auto& item : batch) {
                 py::list pyStrs;
-                for (const auto& sv : slots.strs)
-                    pyStrs.append(py::bytes(sv.data(), sv.size()));
-                std::string k = slots.formKey();
-                results.emplace_back(py::bytes(k), slots.ints, std::move(pyStrs));
+                for (const auto& s : item.strs)
+                    pyStrs.append(py::bytes(s.data(), s.size()));
+                results.emplace_back(py::bytes(item.formKey.data(), item.formKey.size()), std::move(item.ints), std::move(pyStrs));
             }
             return results;
         },
         py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
-        "High-speed batch decomposition into (formKeyBytes, ints, strsBytes) tuples");
+        "High-speed batch decomposition into (formKeyBytes, ints, strsBytes) tuples releasing GIL during parsing");
 
     m.def(
         "formKey",
-        [](std::string_view msg, core::ScanMode mode) {
+        [](const py::object& msgObj, core::ScanMode mode) {
+            std::string msg = toCppBytesSafe(msgObj);
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
             return toPyStrSafe(slots.formKey());
@@ -345,7 +433,8 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "formKeyBytes",
-        [](std::string_view msg, core::ScanMode mode) {
+        [](const py::object& msgObj, core::ScanMode mode) {
+            std::string msg = toCppBytesSafe(msgObj);
             core::SlotRecord slots;
             (void)core::parse(msg, slots, mode);
             return py::bytes(slots.formKey());
@@ -354,7 +443,8 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "templateOf",
-        [](std::string_view form) {
+        [](const py::object& formObj) {
+            std::string form = toCppBytesSafe(formObj);
             std::string tmpl;
             (void)core::templateOf(form, tmpl);
             return toPyStrSafe(tmpl);
@@ -363,7 +453,8 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "templateOfBytes",
-        [](std::string_view form) {
+        [](const py::object& formObj) {
+            std::string form = toCppBytesSafe(formObj);
             std::string tmpl;
             (void)core::templateOf(form, tmpl);
             return py::bytes(tmpl);
@@ -371,7 +462,7 @@ PYBIND11_MODULE(Core, m) {
         py::arg("form"), "Converts form key to human-readable <*> template byte string");
 
     m.def(
-        "hash64", [](std::string_view s) { return core::xxh64(s); }, py::arg("s"),
+        "hash64", [](const py::object& sObj) { return core::xxh64(toCppBytesSafe(sObj)); }, py::arg("s"),
         "Computes 64-bit XXH64 hash matching ClickHouse xxHash64");
 
     m.def(
@@ -380,7 +471,11 @@ PYBIND11_MODULE(Core, m) {
 
     m.def(
         "auditParallel",
-        [](const std::vector<std::string>& lines, core::ScanMode mode, std::size_t numThreads) {
+        [](const py::iterable& linesObj, core::ScanMode mode, std::size_t numThreads) {
+            std::vector<std::string> lines;
+            for (auto item : linesObj) {
+                lines.push_back(toCppBytesSafe(item));
+            }
             AuditResult res;
             {
                 py::gil_scoped_release release;

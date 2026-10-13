@@ -268,9 +268,8 @@ Traditional logging tools count lines. Razobill balances an **exact information-
 Where heuristic miners parse at 50,000 to 200,000 logs/second and bottleneck your CPU, Razobill's C++20 core engine (`librazobill`):
 * Utilizes **AVX-512, AVX2, SSE4.2, and ARM NEON SIMD vectorization** with **dynamic CPUID multiversion dispatch** to classify and segment delimiter boundaries 16 to 64 bytes at a time across x86-64, Apple Silicon, and AWS Graviton.
 * Allocates memory strictly through a **64-byte aligned monotonic bump arena with chunk block-reuse freelist (`MemoryArena`)**, eliminating `malloc`, `new`, and string allocations in hot per-row loops.
-* Uses **heterogeneous string hashing and lookup in `StringPool`**, avoiding temporary `std::string` allocations during lookup.
-* Delivers sustained multi-core throughput of **29.0 Million logs/second** across 12 hardware cores (with peak burst up to 69.4M on short synthetic strings).
-* Achieves median latency of **$0.1\,\mu\text{s} - 0.8\,\mu\text{s}$** and $p_{99}$ tail latency under **$5.7\,\mu\text{s}$** (up to **151× lower tail latency** than Drain3).
+* Delivers sustained multi-core throughput of **18.2M – 26.5M logs/second (1.6 – 3.1 GB/s)** across 12 hardware threads on real Loghub workloads (see committed reproducible benchmark artifact `bench/results/benchmarks.json`, with peak burst up to 69.4M on short synthetic strings).
+* Achieves median latency of **$0.1\,\mu\text{s} - 0.8\,\mu\text{s}$** and $p_{99}$ tail latency under **$5.7\,\mu\text{s}$** (compared to $11.2\,\mu\text{s} - 529.0\,\mu\text{s}$ measured for Drain3).
 
 ### Pillar III: Native Analytical Database Integration & Cloud Object Storage
 Razobill does not store logs in opaque proprietary formats. It integrates directly into the modern analytical database stack:
@@ -349,11 +348,11 @@ Razobill was evaluated against the entire Loghub standard benchmark suite and ma
 ├─────────────────────────┬──────────────────────┬────────────────────────┬───────────────────────┬──────────────────────┤
 │ Metric / Execution Mode │ Drain3 (He et al.)   │ Razobill Python (1T/4T)│ Razobill C++20 / SIMD │ Razobill Advantage   │
 ├─────────────────────────┼──────────────────────┼────────────────────────┼───────────────────────┼──────────────────────┤
-│ Throughput (1 Thread)   │ 169k - 173k logs/sec │ 515,107 logs/sec       │ 2.54M - 4.27M logs/sec│ 3.0× (Py) / 15-25× C++│
+│ Throughput (1 Thread)   │ 169k - 173k logs/sec │ 515,107 logs/sec       │ 2.54M - 4.27M logs/sec│ 3.0× (Py) / 15-33× C++│
 │ Throughput (4 Threads)  │ N/A (GIL / Lock bound│ 737,376 logs/sec       │ 7.56M logs/sec        │ 4.3× (Py) / 44× (C++)│
 │ Throughput (12 Threads) │ N/A (Tree contention)│ N/A (Python threadpool)│ 29.02M logs/sec (sust)│ ~168× faster (12T)   │
 │ Median Latency (p50)    │ 1.4 μs - 2.4 μs      │ 0.8 μs - 1.2 μs        │ 0.1 μs - 0.8 μs       │ Up to 18× Lower      │
-│ Tail Latency (p99)      │ 11.2 μs - 529.0 μs   │ 1.8 μs - 3.9 μs        │ 0.7 μs - 5.7 μs       │ Up to 151× Lower     │
+│ Tail Latency (p99)      │ 11.2 μs - 529.0 μs   │ 1.8 μs - 3.9 μs        │ 0.7 μs - 5.7 μs       │ 2.0× - 93× Lower     │
 │ S3 Storage Compaction   │ 0% (Must store raw)  │ 92.2% - 93.8% (Columnar│ 92.2% - 93.8% (ZSTD)  │ Invariant to Threads │
 │ In-S3 Query Scan (QPS)  │ N/A (Full raw scans) │ 83.5 QPS (1 Client)    │ 171.8 QPS (4 Clients) │ Instant S3 Pushdown  │
 │ Invertibility Guarantee │ 0% (Destructive <*>) │ 100.000% Exact Lossless│ 100.000% Exact Round  │ Zero bit-level loss  │

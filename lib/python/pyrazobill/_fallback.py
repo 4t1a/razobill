@@ -162,11 +162,12 @@ class AuditResult:
     mismatches: int = 0
 
 def parse(msg: Any, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
+    byte_len = len(msg) if isinstance(msg, bytes) else len(msg.encode("utf-8", "surrogateescape"))
+    if byte_len > kMaxMessageBytes:
+        return SlotRecord()
     if isinstance(msg, bytes):
         msg = msg.decode("utf-8", "surrogateescape")
     rec = SlotRecord()
-    if len(msg) > kMaxMessageBytes:
-        return rec
     
     # Check for reserved bytes (0x11..0x13) matching C++ Scanner
     if '\x11' in msg or chr(kPlaceholder) in msg or chr(kTypeSeparator) in msg:

@@ -219,14 +219,16 @@ def benchmark_multicore_scaling(lines: list[str], thread_counts: list[int], runs
 
 
 def run_benchcore_executable(corpus_path: str, max_lines: int) -> str:
-    """Executes native compiled BenchCore.exe binary."""
-    bench_exe = REPO_ROOT / "build" / "BenchCore.exe"
+    """Executes native compiled BenchCore binary."""
+    exe_name = "BenchCore.exe" if os.name == "nt" else "BenchCore"
+    bench_exe = REPO_ROOT / "build" / exe_name
     if not bench_exe.exists():
-        return "BenchCore.exe not built"
+        raise FileNotFoundError(f"{bench_exe} not built")
 
     try:
         env = os.environ.copy()
-        env["PATH"] = f"C:\\Msys64\\mingw64\\bin;{env.get('PATH', '')}"
+        if os.name == "nt":
+            env["PATH"] = f"C:\\Msys64\\mingw64\\bin;{env.get('PATH', '')}"
         res = subprocess.run(
             [str(bench_exe), corpus_path, str(max_lines)],
             capture_output=True,
@@ -235,8 +237,10 @@ def run_benchcore_executable(corpus_path: str, max_lines: int) -> str:
             check=True,
         )
         return res.stdout
-    except Exception as e:
-        return f"Execution failed: {e}"
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"BenchCore failed on {corpus_path} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}"
+        ) from e
 
 
 def parse_benchcore_output(stdout: str) -> dict:
@@ -256,7 +260,7 @@ def parse_benchcore_output(stdout: str) -> dict:
                 "mega_msgs_per_sec": float(m_op.group(4)),
             }
             continue
-        m_sc = re.match(r"^(\d+)\s+Cores\s*\(\s*(\d+)\s+Threads\)\s+([\d\.]+)\s+MB/s\s+([\d\.]+)\s+M msg/s\s+\(Speedup\s+([\d\.]+)x\)", line)
+        m_sc = re.match(r"^(\d+)\s+Cores\s*\(\s*(\d+)\s+Threads\)\s+([\d\.]+)\s+MB/s\s+([\d\.]+)\s+M msg/s\s+\(Speedup\s+([\d\.]+)x(?:,\s*sink\s+\d+)?\)", line)
         if m_sc:
             cores = int(m_sc.group(1))
             threads = int(m_sc.group(2))
@@ -278,9 +282,11 @@ def main():
     git_commit = get_git_commit()
     compiler_info = get_compiler_info()
     cpu_model = platform.processor() or "AMD Ryzen / Intel x86_64"
-    logical_cores = psutil.cpu_count(logical=True) if psutil else os.cpu_count() or 1
-    physical_cores = psutil.cpu_count(logical=False) if psutil else logical_cores // 2
-    total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 2) if psutil else 32.0
+    if not psutil:
+        print("[WARNING] psutil is not available; CPU pinning disabled and hardware memory will not be reported.")
+    logical_cores = psutil.cpu_count(logical=True) if psutil else (os.cpu_count() or 1)
+    physical_cores = psutil.cpu_count(logical=False) if psutil else None
+    total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 2) if psutil else None
 
     system_metadata = {
         "git_commit": git_commit,
@@ -349,8 +355,7 @@ def main():
         breakdown = profile_component_breakdown(lines, runs=5)
 
         # 3. Multi-Core Scaling
-        thread_counts = [1, 2, 4, min(6, logical_cores), min(12, logical_cores)]
-        thread_counts = sorted(list(set(thread_counts)))
+        thread_counts = sorted(list(set(min(t, logical_cores) for t in [1, 2, 4, 6, 12])))
         print(f"  -> Running multi-core scaling across threads: {thread_counts}...")
         multicore = benchmark_multicore_scaling(lines, thread_counts, runs=5)
 

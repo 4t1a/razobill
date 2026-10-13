@@ -22,6 +22,7 @@
 // ==============================================================================
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdio>
@@ -41,7 +42,12 @@ int main(int argc, char** argv) {
     std::string path;
     std::size_t maxLines = 50000;
     if (argc > 2 && argv[2] != nullptr) {
-        maxLines = std::strtoul(argv[2], nullptr, 10);
+        char* endp = nullptr;
+        maxLines = std::strtoul(argv[2], &endp, 10);
+        if (endp == argv[2] || *endp != '\0') {
+            std::printf("[BENCH] Error: invalid line limit '%s'.\n", argv[2]);
+            return 1;
+        }
     }
 
     if (argc > 1 && argv[1] != nullptr) {
@@ -238,6 +244,7 @@ int main(int argc, char** argv) {
         "---------------------------------------------------------------------------------------------------\n");
     const std::vector<std::size_t> threadCounts = {1, 2, 4, 6, 12};
     double baselineThroughput = 0.0;
+    std::atomic<std::size_t> parallelSink{0};
     for (std::size_t numThreads : threadCounts) {
         razobill::core::ThreadPool pool(numThreads);
         const std::size_t chunkSize = std::max<std::size_t>(1000, (msgs.size() + numThreads - 1) / numThreads);
@@ -246,9 +253,12 @@ int main(int argc, char** argv) {
             const auto t0 = std::chrono::steady_clock::now();
             pool.parallelFor(msgs.size(), chunkSize, [&](std::size_t start, std::size_t end) {
                 razobill::core::SlotRecord localSlots;
+                std::size_t localSink = 0;
                 for (std::size_t i = start; i < end; ++i) {
                     (void)razobill::core::parse(msgs[i], localSlots);
+                    localSink += localSlots.ints.size() + localSlots.strs.size();
                 }
+                parallelSink.fetch_add(localSink, std::memory_order_relaxed);
             });
             const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             bestSeconds = std::min(bestSeconds, elapsed);
@@ -258,8 +268,8 @@ int main(int argc, char** argv) {
         const double megaMsgsPerSec = (totalMsgs / bestSeconds) / 1e6;
         if (numThreads == 1) baselineThroughput = megaMsgsPerSec;
         const double speedup = baselineThroughput > 0 ? (megaMsgsPerSec / baselineThroughput) : 1.0;
-        std::printf("%2zu Cores (%2zu Threads)                 %7.1f MB/s  %6.2f M msg/s  (Speedup %5.2fx)\n",
-                    numThreads, numThreads, mbPerSec, megaMsgsPerSec, speedup);
+        std::printf("%2zu Cores (%2zu Threads)                 %7.1f MB/s  %6.2f M msg/s  (Speedup %5.2fx, sink %zu)\n",
+                    numThreads, numThreads, mbPerSec, megaMsgsPerSec, speedup, parallelSink.load(std::memory_order_relaxed) & 1);
     }
 
     std::printf(

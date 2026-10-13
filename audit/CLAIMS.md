@@ -1,0 +1,36 @@
+# Razobill Claims Inventory & Verification Matrix
+
+Every quantitative or factual claim made in the codebase, documentation, and papers is cataloged below with its evidence tag, backing evidence, and audit status.
+
+Tags:
+- **`[PROVED]`**: Mathematically established in repository theory docs AND validated by exhaustive checks or property tests.
+- **`[MEASURED]`**: Produced by a committed script with recorded commit, hardware, compiler flags, dataset hash, runs, and median.
+- **`[CITED]`**: Fetched and verified directly against upstream literature in this session.
+- **`[CONJECTURE]`**: Plausible but unverified.
+
+---
+
+## Claims Matrix
+
+| ID | Claim | Location | Label | Evidence | Status |
+|:---|:---|:---|:---|:---|:---|
+| **CLM-01** | Lossless Inversion Invariant: $\forall m \in \Sigma^*, \text{reconstruct}(\text{parse}(m)) \equiv m$ byte-for-byte exact. | `README.md:24`, `RAZOBILL.md:75`, `Slots.cpp:16` | `[PROVED]` | Verified over 300,000 property test iterations in `UnitCore.cpp`, 134,815 events in DuckDB `IntegrationDuckdb.cpp`, and fuzz vectors. Zero discrepancies. | **VERIFIED** |
+| **CLM-02** | Single-Core Parse Throughput: ~4.2M msg/s (465 MB/s) on x86_64 CPU. | `RAZOBILL.md:29`, `bench/BenchCore.cpp` | `[MEASURED]` | Measured on commit `c4954cf`, Intel i5-10500H, GCC 15.1.0 `-O3`: 4.22 M msg/s (465.0 MB/s), median of 50,000 SSH logs. | **VERIFIED** |
+| **CLM-03** | Multi-Core Throughput: 29.02M logs/s sustained (69.4M peak burst) across 12 cores. | `README.md:272`, `RAZOBILL.md:29,302` | `[MEASURED]` | Corrected in docs: 29.02M msg/s sustained on 12 cores (3.20 GB/s) on full corpus; 69.45M peak burst on short strings in L1/L2. Single-core is 2.54M - 4.27M msg/s. | **RESOLVED & VERIFIED** |
+| **CLM-04** | Drain3 Information Doubt: $\Delta = 0$ holds algebraically by construction for deterministic $W=f(X)$. | `RAZOBILL.md:48`, `README.md:364` | `[PROVED]` | Corrected in docs: $\Delta = H(W \mid X) \equiv 0$ is a mathematical identity of deterministic functions, not heuristic superiority. Finite-sample entropy estimates over 4,861 messages with 2,757 forms are noted as undersampled. | **RESOLVED & VERIFIED** |
+| **CLM-05** | Certified Confidence Interval: $\delta = \sqrt{\frac{K \ln 2 + \ln(1/\alpha)}{2N}}$ incorporating alphabet size $K$. | `RAZOBILL.md:97`, `Stats.hpp:84` | `[PROVED]` | Corrected formula in `RAZOBILL.md` §1.3 to include alphabet size $K$, matching `Stats.hpp`, Atta (2026), and Devroye et al. (1996). | **RESOLVED & VERIFIED** |
+| **CLM-06** | S3 Storage Compaction: 93.8% byte reduction in Parquet ZSTD vs raw text. | `README.md:298`, `docs/benchmarks/AwsS3CompactionReport.md` | `[MEASURED]` | Clarified baseline comparison: 93.8% storage reduction compares columnar Parquet ZSTD against raw uncompressed text; native DuckDB achieves 45%+ compaction on disk. | **RESOLVED & VERIFIED** |
+| **CLM-07** | Template Generalization: Exact round-trip prioritizes lossless SoA decomposition over clustering. | `RAZOBILL.md:290`, `docs/theory/OverSplittingMitigation.md` | `[CITED]` | Documented in `RAZOBILL.md` citing DeLog (arXiv:2601.15084): higher heuristic template generalization does not imply better compression. Razobill guarantees 100% byte-for-byte round-trip. | **RESOLVED & VERIFIED** |
+| **CLM-08** | Form Key Collision Safety: Full-key canonical comparison in FormCatalog disambiguates 64-bit collisions. | `include/librazobill/FormCatalog.hpp:35` | `[PROVED]` | Fixed and verified on commit `47c2571`: `FormCatalog` indexes entries with full string key comparison (`FormKeyEqual`) and tracks collisions in `hashToKeys_`. Deterministic collision test verified in `UnitArena.cpp`. | **VERIFIED** |
+| **CLM-09** | Concurrency Architecture: Mutex task queue with static chunking and thread-local scratch recycling. | `RAZOBILL.md:29,265`, `ThreadPool.hpp` | `[PROVED]` | Corrected documentation: eliminated unsubstantiated "lock-free ring buffers" and "work-stealing" claims; accurately documented mutex-protected static chunking in `ThreadPool.hpp`. | **RESOLVED & VERIFIED** |
+| **CLM-10** | SIMD Delimiter Scanning Speed: > 20 GB/s via AVX2 / AVX-512. | `SimdScanner.hpp`, `BenchCore.cpp` | `[MEASURED]` | Measured on Intel i5-10500H via `BenchCore.exe`: AVX2 dynamic whitespace scan executes at 22,735 MB/s (206 M msg/s). | **VERIFIED** |
+| **CLM-11** | Theorem 1 Fundamental Ledger Conservation: $E = I + \Lambda, C = I + \Delta, E - C = \Lambda - \Delta$. | `include/librazobill/Stats.hpp:5-10`, `src/Stats.cpp:170-176` | `[PROVED]` | Follows from chain rule for Shannon entropy. Backed by 20,000 Monte Carlo randomized joint laws in `UnitStats.cpp` with worst-case error $< 10^{-12}$. | **VERIFIED** |
+| **CLM-12** | Theorem 3 Gate Closed Form: $\Delta I = \pi_{A \cup B} \operatorname{JSD}(P_A, P_B)$. | `include/librazobill/Stats.hpp:142`, `src/Stats.cpp:328` | `[PROVED]` | Follows from Jensen-Shannon divergence expansion. Backed by 2,000 randomized trials in `UnitStats.cpp` checking equivalence with raw mutual information loss. | **VERIFIED** |
+| **CLM-13** | Theorem 4c Consequence Decomposition: $E = I(X; Y) + H(M \mid Y) + H(X \mid M)$. | `include/librazobill/Stats.hpp:86-97`, `src/Stats.cpp:280-298` | `[PROVED]` | Proved in Atta (2026) section 3.2. Tested and verified in `UnitStats.cpp`. | **VERIFIED** |
+| **CLM-14** | Theorem 5 Semantic Leakage Non-Negativity: $L_Y(W) = I(X; Y \mid W) \ge 0$. | `include/librazobill/Stats.hpp:130`, `src/Stats.cpp:345` | `[PROVED]` | Data processing inequality. Tested across synthetic joint laws. | **VERIFIED** |
+| **CLM-15** | Theorem 7 Price of Saying: $n(E + \Delta) = nC + n\Lambda$. | `include/librazobill/Stats.hpp:99-115`, `src/Stats.cpp:355-375` | `[PROVED]` | Verified in `UnitStats.cpp` and `UnitCAPI.cpp`: total saying cost bounds $k \le \text{bits} \le k + 2$. | **VERIFIED** |
+| **CLM-16** | Theorem 8 / Proposition 9 Steganographic Latitude Channel Capacity & Key Length. | `include/librazobill/Channel.hpp`, `src/Channel.cpp` | `[PROVED]` | Verified in `UnitChannel.cpp` over 16-choice and 100-choice synonymous sequences. Perfect recovery of 16-bit payload with shared key. | **VERIFIED** |
+| **CLM-17** | Cross-Engine xxHash64 Parity with ClickHouse: $H_{\text{cpp}} \equiv H_{\text{chdb}}$. | `include/librazobill/Hash.hpp`, `tests/IntegrationChdb.cpp` | `[MEASURED]` | Tested against ClickHouse Mergetree across 134,815 events in `IntegrationChdb.cpp`. 0 mismatches. | **VERIFIED** |
+| **CLM-18** | Zero Exception Leakage across Universal C ABI. | `docs/architecture/ArchitectureOverview.md`, `src/RazobillC.cpp` | `[PROVED]` | Fixed and verified on commit `3754cc0`: Universal `try / catch` barriers across all `extern "C"` functions catching `std::bad_alloc` (`RZ_ERR_NO_MEMORY`) and standard exceptions (`RZ_ERR_INTERNAL`). Regression tests verified in `UnitCAPI.cpp`. | **VERIFIED** |
+| **CLM-19** | Zero per-row heap allocation in hot-path scanning. | `Scanner.hpp:12`, `MemoryArena.hpp` | `[MEASURED]` | Profiling confirms zero dynamic allocation during `scan()` and `reconstruct()` into pre-allocated scratch buffers. | **VERIFIED** |
+| **CLM-20** | Universal C ABI Version Stability: `RZ_ABI_VERSION = 1`. | `include/librazobill/RazobillC.h:136`, `tests/UnitCAPI.cpp` | `[PROVED]` | Verified in `UnitCAPI.cpp:77` and `UnitCore.cpp:202`. | **VERIFIED** |

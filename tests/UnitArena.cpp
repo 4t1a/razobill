@@ -1,7 +1,9 @@
 // Unit tests for low-level memory planes: MemoryArena, StringPool, FormCatalog, and ThreadPool.
 // Verifies 64-byte alignment, monotonic pointer progression, and cache-conscious behavior.
+#include <atomic>
 #include <ostream>
 #include <string>
+#include <thread>
 #include <unordered_set>
 
 #include "doctest.h"
@@ -87,15 +89,17 @@ TEST_CASE("StringPool interning and garbage collection") {
 TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
     StringPool pool;
     auto id0 = pool.intern("thread_safe_token");
-    CHECK(pool.lookup(id0) == "thread_safe_token");
+    std::string_view sv = pool.lookup(id0);
+    CHECK(sv == "thread_safe_token");
+    CHECK(pool.lookupCopy(id0) == "thread_safe_token");
 
     std::string outBuf;
     CHECK(pool.lookup(id0, outBuf));
     CHECK(outBuf == "thread_safe_token");
 
     bool inspected = false;
-    CHECK(pool.withString(id0, [&](std::string_view sv) {
-        inspected = (sv == "thread_safe_token");
+    CHECK(pool.withString(id0, [&](std::string_view v) {
+        inspected = (v == "thread_safe_token");
     }));
     CHECK(inspected);
 
@@ -106,12 +110,13 @@ TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
 
     // Concurrent growth and lookup stress test
     std::atomic<bool> stop{false};
+    std::atomic<bool> readerMatches{true};
     std::thread reader([&]() {
         while (!stop.load()) {
-            std::string s = pool.lookup(id0);
-            CHECK(s == "thread_safe_token");
-            pool.withString(id0, [](std::string_view sv) {
-                CHECK(sv == "thread_safe_token");
+            std::string s = pool.lookupCopy(id0);
+            if (s != "thread_safe_token") readerMatches.store(false);
+            pool.withString(id0, [&](std::string_view val) {
+                if (val != "thread_safe_token") readerMatches.store(false);
             });
         }
     });
@@ -121,6 +126,7 @@ TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
     }
     stop.store(true);
     reader.join();
+    CHECK(readerMatches.load());
 }
 
 
@@ -152,12 +158,29 @@ TEST_CASE("FormCatalog full-key comparison and hash collision safety") {
 
     FormEntry e1{}, e2{};
     REQUIRE(catalog.findForm("login_failed_user\x13S", e1));
+    CHECK(e1.id == 1);
     CHECK(e1.templateStr == "login failed for <*>");
     CHECK(e1.strSlots == 1);
 
     REQUIRE(catalog.findForm("query_timeout_ms\x13I", e2));
+    CHECK(e2.id == 2);
     CHECK(e2.templateStr == "query timeout after <*> ms");
     CHECK(e2.intSlots == 1);
+
+    // Verify dense unique ID lookup
+    FormEntry byId1{}, byId2{};
+    REQUIRE(catalog.findFormById(1, byId1));
+    CHECK(byId1.key == "login_failed_user\x13S");
+    REQUIRE(catalog.findFormById(2, byId2));
+    CHECK(byId2.key == "query_timeout_ms\x13I");
+
+    // Verify collision queries
+    CHECK(catalog.isCollisionHash(simulatedHash));
+    std::vector<std::string> collidingKeys;
+    REQUIRE(catalog.findKeysByHash(simulatedHash, collidingKeys));
+    CHECK(collidingKeys.size() == 2);
+    CHECK(collidingKeys[0] == "login_failed_user\x13S");
+    CHECK(collidingKeys[1] == "query_timeout_ms\x13I");
 }
 
 TEST_CASE("ThreadPool chunked parallelFor") {

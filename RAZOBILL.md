@@ -95,11 +95,11 @@ Empirical plug-in entropy estimators underestimate conditional entropy in finite
 
 $$\hat{H}_{\text{MM}}(X) = \hat{H}(X) + \frac{|\mathcal{X}_{\text{obs}}| - 1}{2N \ln 2}$$
 
-Furthermore, for confidence parameter $\alpha \in (0, 1)$ and alphabet size $K = |\mathcal{X}|$, `librazobill` computes certified distribution-free confidence half-widths (Atta 2026 Proposition 10; Devroye et al. 1996; Cover & Thomas 1991):
+Furthermore, for significance level $\delta \in (0, 1)$ and alphabet cardinality $K = |\mathcal{X}|$, `librazobill` computes certified distribution-free confidence intervals via $L_1$ total variation bounds (Atta 2026 Proposition 10; Devroye, Györfi & Lugosi 1996; Cover & Thomas 1991):
 
-$$\delta = \sqrt{\frac{K \ln 2 + \ln(1/\alpha)}{2N}}, \qquad CI = [\max(0, \hat{I} - \delta), \hat{I} + \delta]$$
+$$\varepsilon = \sqrt{\frac{2}{N} \left( K \ln 2 + \ln(1/\delta) \right)}, \qquad \text{halfWidth} = \begin{cases} \log_2 K & \text{if } \varepsilon \ge 0.5 \\ \varepsilon \log_2(K / \varepsilon) & \text{if } \varepsilon < 0.5 \end{cases}$$
 
-This half-width is implemented directly in `Stats.hpp` (`certifiedConfidenceDelta`) and incorporates the alphabet cardinality $K$, avoiding the undercoverage of alphabet-free approximations on undersampled distributions.
+This interval is implemented directly in `Stats.hpp` (`certifiedInterval`), explicitly accounting for alphabet cardinality $K$ and avoiding the catastrophic undercoverage of alphabet-free approximations on undersampled distributions.
 
 ### 1.4 The Latitude Channel & Capacity Bounds (Theorem 4c)
 
@@ -172,7 +172,7 @@ razobill/
 │       ├── Stats.hpp                   # Information theory engine (Miller-Madow, Certified CIs)
 │       ├── Status.hpp                  # Strongly-typed error codes
 │       ├── StringPool.hpp              # Compact string dictionary with GC & heterogeneous hashing
-│       └── ThreadPool.hpp              # Work-stealing concurrency pool
+│       └── ThreadPool.hpp              # Mutex task queue with static chunking (parallelFor)
 ├── src/                                # Engine Implementations
 │   ├── BackendAdbc.cpp
 │   ├── Dialect.cpp
@@ -277,7 +277,7 @@ Traditional log compression dictionaries grow monotonically until exhaustion. `S
 
 - Plug-in entropy and mutual information computation with Theorem 1 ledger balance assertion.
 - Stratified Miller-Madow bias correction across form partitions: $\hat{H}_{\text{MM}}(X) = \hat{H}(X) + \frac{|\mathcal{X}_{\text{obs}}| - 1}{2N \ln 2}$.
-- Proposition 10 certified distribution-free confidence intervals: $\delta = \sqrt{\frac{K \ln 2 + \ln(1/\alpha)}{2N}}$.
+- Proposition 10 certified distribution-free confidence intervals: $\varepsilon = \sqrt{\frac{2}{N} \left( K \ln 2 + \ln(1/\delta) \right)}$.
 - Theorem 6 consequence decomposition and JSD semantic leakage gating ($L_Y(W) \le \varepsilon$).
 
 ---
