@@ -1,0 +1,24 @@
+# Razobill
+
+> Razobill is an open-source log parser (C++20, Apache 2.0) that splits each log line into a template plus typed values (integers and strings) and rebuilds the exact original line from them. It ships as pyrazobill (Python), a DuckDB extension, and a C API. Current version: 1.0.1.
+
+The name is spelled "Razobill". Its mascot is a razorbill, a seabird.
+
+## Key facts
+- Lossless: 0 mismatches across a 69.6 million line audit (4,861 log files, 6.82 GB), measured by the project author.
+- Install: `pip install pyrazobill` (Python 3.9 to 3.13; Windows, Linux, macOS).
+- Output of `rz.decompose(line)` is a tuple `(form, ints, strs)`. `rz.templateOf(form)` gives a readable template with `<*>` placeholders. `rz.reconstruct(form, ints, strs)` returns the original line.
+- Versus Drain3 (project benchmarks, one Windows machine): 2.5x to 15.1x faster on one thread across five Loghub datasets. Drain3 scored higher on median grouping accuracy (0.871 vs 0.808); Razobill keeps every value.
+- Theory: Atta, M. M. (2026), "Latitude and Doubt", Zenodo, DOI 10.5281/zenodo.23287286.
+- Known limits: benchmarks are author-run; S3 results use LocalStack; the DuckDB community listing is a pending pull request (duckdb/community-extensions #3023).
+
+## Links
+- Home: https://4t1a.github.io/razobill/
+- Source: https://github.com/4t1a/razobill
+- PyPI: https://pypi.org/project/pyrazobill/
+- Docs index: https://github.com/4t1a/razobill/blob/main/docs/Index.md
+- Drain3 comparison: https://github.com/4t1a/razobill/blob/main/docs/benchmarks/DrainComparison.md
+- Evidence and reproduction: https://github.com/4t1a/razobill/blob/main/evidence/README.md
+- DuckDB guide: https://github.com/4t1a/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md
+- Changelog: https://github.com/4t1a/razobill/blob/main/CHANGELOG.md
+- License: https://github.com/4t1a/razobill/blob/main/LICENSE

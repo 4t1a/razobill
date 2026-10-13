@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# AI search and answer crawlers are welcome
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://4t1a.github.io/razobill/sitemap.xml
