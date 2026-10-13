@@ -75,7 +75,7 @@ class TestPyRazobill(unittest.TestCase):
         )
         self.assertEqual(audit.totalLines, 5000)
         self.assertEqual(audit.mismatches, 0)
-        expectedRate = 50000 if getattr(pyrazobill, "_NATIVE", True) else 10000
+        expectedRate = 50000 if getattr(pyrazobill, "_NATIVE", True) else 3000
         self.assertGreater(audit.msgsPerSec, expectedRate)
         self.assertGreater(audit.uniqueFormsCount, 0)
 

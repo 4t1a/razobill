@@ -1,0 +1,70 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Code Coverage (C++ & Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Build & Coverage Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build lcov
+          python -m pip install --upgrade pip pybind11 duckdb pytest pytest-cov hypothesis codecov-cli
+
+      - name: Configure CMake with Coverage Instrumentation
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_COVERAGE=ON
+
+      - name: Build C++ Binaries & Test Suites
+        run: |
+          ninja -C build
+
+      - name: Run C++ Unit & Integration Tests
+        run: |
+          ctest --test-dir build --output-on-failure -C Debug
+
+      - name: Collect C++ LCOV Coverage Report
+        run: |
+          lcov --capture --directory build --output-file coverage_cpp.info \
+            --ignore-errors mismatch,unused \
+            --exclude '*/thirdparty/*' \
+            --exclude '/usr/*' \
+            --exclude '*/tests/*' \
+            --exclude '*/bench/*' || true
+
+      - name: Run Python Test Suite with Pytest Coverage
+        run: |
+          python -m pytest lib/python/tests -c lib/python/pyproject.toml \
+            --cov=lib/python/pyrazobill \
+            --cov-report=xml:coverage_py.xml
+
+      - name: Upload Coverage Reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage_cpp.info,coverage_py.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
