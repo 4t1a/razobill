@@ -11,6 +11,7 @@
     Grounded in the information-theoretic framework of <em>Latitude and Doubt: An exact ledger of meaning in messages</em> (M. M. Atta, 2026).
   </p>
   <p align="center">
+    <a href="https://4t1a.github.io/razobill/"><img src="https://img.shields.io/badge/Website-4t1a.github.io%2Frazobill-5F96AB.svg" alt="Website"></a>
     <a href="https://doi.org/10.5281/zenodo.23287286"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23287286.svg" alt="DOI: 10.5281/zenodo.23287286"></a>
     <a href="https://github.com/4t1a/razobill/actions/workflows/CI.yml"><img src="https://github.com/4t1a/razobill/actions/workflows/CI.yml/badge.svg" alt="Continuous Integration"></a>
     <a href="https://github.com/4t1a/razobill/actions/workflows/Release.yml"><img src="https://github.com/4t1a/razobill/actions/workflows/Release.yml/badge.svg" alt="Release Engineering"></a>
