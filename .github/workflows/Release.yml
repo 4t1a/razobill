@@ -91,7 +91,7 @@ jobs:
           find lib/python/pyrazobill -maxdepth 1 -name "Core*" -exec cp {} release-staging/ \;
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.os }}
           path: release-staging/*
@@ -117,7 +117,7 @@ jobs:
           python -m build --wheel
         working-directory: lib/python
       - name: Upload Windows Wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-cp${{ matrix.python-version }}
           path: lib/python/dist/*.whl
@@ -140,7 +140,7 @@ jobs:
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_SKIP: "*-musllinux_* pp*"
       - name: Upload Linux Wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux
           path: ./wheelhouse/*.whl
@@ -166,7 +166,7 @@ jobs:
           python -m build --wheel
         working-directory: lib/python
       - name: Upload macOS Wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-cp${{ matrix.python-version }}
           path: lib/python/dist/*.whl
