@@ -3,7 +3,7 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "librazobill-1.0.0-SBOM",
-  "documentNamespace": "https://github.com/4t1a/razobill/spdx/1.0.0",
+  "documentNamespace": "https://github.com/razobill/razobill/spdx/1.0.0",
   "creationInfo": {
     "created": "2026-10-07T12:00:00Z",
     "creators": [
@@ -17,7 +17,7 @@
       "SPDXID": "SPDXRef-Package-librazobill",
       "versionInfo": "1.0.0",
       "packageFileName": "liblibrazobill.a",
-      "downloadLocation": "https://github.com/4t1a/razobill/releases/tag/v1.0.0",
+      "downloadLocation": "https://github.com/razobill/razobill/releases/tag/v1.0.0",
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
       "copyrightText": "Copyright (c) 2026 Razobill Authors",

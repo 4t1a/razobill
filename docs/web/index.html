@@ -5,24 +5,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Razobill: lossless log parsing for DuckDB, Python and C++</title>
 <meta name="description" content="Razobill splits log lines into a template plus typed values and rebuilds the exact original bytes. Open source C++20 with DuckDB, Python and C APIs.">
-<link rel="canonical" href="https://4t1a.github.io/razobill/">
+<link rel="canonical" href="https://razobill.github.io/razobill/">
 <meta name="author" content="Moustafa Mahmoud Atta">
 <meta name="keywords" content="Razobill, razorbill, log parsing, lossless log compression, log template mining, Drain3 alternative, DuckDB extension, pyrazobill, C++20, SIMD, Parquet, observability">
 <meta name="theme-color" content="#F6F7FB">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Razobill">
 <meta property="og:title" content="Razobill: log parsing that gives every byte back">
 <meta property="og:description" content="Split logs into templates and columns, then rebuild the exact original line. C++20, DuckDB, Python.">
-<meta property="og:url" content="https://4t1a.github.io/razobill/">
-<meta property="og:image" content="https://4t1a.github.io/razobill/assets/og-image.png">
+<meta property="og:url" content="https://razobill.github.io/razobill/">
+<meta property="og:image" content="https://razobill.github.io/razobill/assets/og-image.png">
 <meta property="og:image:alt" content="Razobill logo with its razorbill mascot">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/favicon.png" type="image/png"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[
-{"@type":"WebSite","@id":"https://4t1a.github.io/razobill/#site","url":"https://4t1a.github.io/razobill/","name":"Razobill","inLanguage":"en"},
-{"@type":"SoftwareApplication","@id":"https://4t1a.github.io/razobill/#app","name":"Razobill","alternateName":["librazobill","pyrazobill"],"applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","softwareVersion":"1.0.1","description":"Open-source log parser that splits each line into a template and typed values, then rebuilds the exact original text. C++20 core with Python, DuckDB and C interfaces.","url":"https://4t1a.github.io/razobill/","codeRepository":"https://github.com/4t1a/razobill","downloadUrl":"https://pypi.org/project/pyrazobill/","programmingLanguage":["C++","Python"],"license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Moustafa Mahmoud Atta","url":"https://github.com/4t1a","identifier":"https://orcid.org/0009-0008-6724-4698"},"citation":"https://doi.org/10.5281/zenodo.23287286","datePublished":"2026-10-07","dateModified":"2026-10-13","image":"https://4t1a.github.io/razobill/assets/og-image.png"},
-{"@type": "FAQPage", "@id": "https://4t1a.github.io/razobill/#faq", "mainEntity": [{"@type": "Question", "name": "What is Razobill?", "acceptedAnswer": {"@type": "Answer", "text": "Razobill is an open-source log parser written in C++20. It splits each log line into a template and typed values (integers and strings), stores them as columns, and rebuilds the exact original line on demand. It ships as a Python package called pyrazobill, a DuckDB extension and a C API."}}, {"@type": "Question", "name": "Is it really lossless?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.0.1."}}, {"@type": "Question", "name": "How is Razobill different from Drain3?", "acceptedAnswer": {"@type": "Answer", "text": "Drain3 clusters similar lines and replaces changing parts with a wildcard, so the original values are gone. Razobill uses a deterministic scanner and keeps the values, so you can rebuild every line. In the project's benchmarks it is faster, but Drain3 scored higher on median grouping accuracy."}}, {"@type": "Question", "name": "Do I need DuckDB to use it?", "acceptedAnswer": {"@type": "Answer", "text": "No. You can use pyrazobill from Python alone, link the C++ library, or call the C API from another language. DuckDB is one of several integrations."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Run pip install pyrazobill. Wheels are published for Python 3.9 to 3.13 on Windows, Linux and macOS, and a pure-Python fallback is included."}}, {"@type": "Question", "name": "What license is it under, and how do I cite it?", "acceptedAnswer": {"@type": "Answer", "text": "Apache License 2.0. If you use it in research, cite Atta (2026), Latitude and Doubt, Zenodo, DOI 10.5281/zenodo.23287286. The repository includes a NOTICE file and a BibTeX entry."}}]}]}</script>
+{"@type":"WebSite","@id":"https://razobill.github.io/razobill/#site","url":"https://razobill.github.io/razobill/","name":"Razobill","inLanguage":"en"},
+{"@type":"SoftwareApplication","@id":"https://razobill.github.io/razobill/#app","name":"Razobill","alternateName":["librazobill","pyrazobill"],"applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","softwareVersion":"1.0.1","description":"Open-source log parser that splits each line into a template and typed values, then rebuilds the exact original text. C++20 core with Python, DuckDB and C interfaces.","url":"https://razobill.github.io/razobill/","codeRepository":"https://github.com/razobill/razobill","downloadUrl":"https://pypi.org/project/pyrazobill/","programmingLanguage":["C++","Python"],"license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Moustafa Mahmoud Atta","url":"https://github.com/4t1a","identifier":"https://orcid.org/0009-0008-6724-4698"},"citation":"https://doi.org/10.5281/zenodo.23287286","datePublished":"2026-10-07","dateModified":"2026-10-13","image":"https://razobill.github.io/razobill/assets/og-image.png"},
+{"@type": "FAQPage", "@id": "https://razobill.github.io/razobill/#faq", "mainEntity": [{"@type": "Question", "name": "What is Razobill?", "acceptedAnswer": {"@type": "Answer", "text": "Razobill is an open-source log parser written in C++20. It splits each log line into a template and typed values (integers and strings), stores them as columns, and rebuilds the exact original line on demand. It ships as a Python package called pyrazobill, a DuckDB extension and a C API."}}, {"@type": "Question", "name": "Is it really lossless?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.0.1."}}, {"@type": "Question", "name": "How is Razobill different from Drain3?", "acceptedAnswer": {"@type": "Answer", "text": "Drain3 clusters similar lines and replaces changing parts with a wildcard, so the original values are gone. Razobill uses a deterministic scanner and keeps the values, so you can rebuild every line. In the project's benchmarks it is faster, but Drain3 scored higher on median grouping accuracy."}}, {"@type": "Question", "name": "Do I need DuckDB to use it?", "acceptedAnswer": {"@type": "Answer", "text": "No. You can use pyrazobill from Python alone, link the C++ library, or call the C API from another language. DuckDB is one of several integrations."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Run pip install pyrazobill. Wheels are published for Python 3.9 to 3.13 on Windows, Linux and macOS, and a pure-Python fallback is included."}}, {"@type": "Question", "name": "What license is it under, and how do I cite it?", "acceptedAnswer": {"@type": "Answer", "text": "Apache License 2.0. If you use it in research, cite Atta (2026), Latitude and Doubt, Zenodo, DOI 10.5281/zenodo.23287286. The repository includes a NOTICE file and a BibTeX entry."}}]}]}</script>
 <style>
 :root{--ink:#171A24;--deep:#232A3D;--soft:#4A5370;--tide:#5F96AB;--tideDk:#2B6F86;--peri:#A9AEE0;--mist:#E7EAF6;--chalk:#F6F7FB;--lamp:#F2B544;--r:14px;color-scheme:light}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:72px}
@@ -74,7 +74,7 @@ footer{border-top:1px solid #D9DDEE;padding:40px 0;color:var(--soft);font-size:.
 </head>
 <body>
 <nav aria-label="Main"><div class="wrap"><a href="#top"><img src="assets/razobill-logo.webp" alt="Razobill" width="144" height="26"></a>
-<ul><li><a href="#demo">Demo</a></li><li><a href="#install">Install</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#faq">FAQ</a></li><li><a href="https://github.com/4t1a/razobill">GitHub</a></li></ul></div></nav>
+<ul><li><a href="#demo">Demo</a></li><li><a href="#install">Install</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#faq">FAQ</a></li><li><a href="https://github.com/razobill/razobill">GitHub</a></li></ul></div></nav>
 <main id="top">
 <div class="wrap">
 <header class="hero">
@@ -82,7 +82,7 @@ footer{border-top:1px solid #D9DDEE;padding:40px 0;color:var(--soft);font-size:.
 <h1>Logs are born structured. Razobill keeps them that way.</h1>
 <p class="lead">Your code already knows which part of a log line is fixed and which part is a value. Razobill takes the line apart along that seam, stores the values as plain columns, and gives you the original text back, byte for byte.</p>
 <p class="def"><strong>Razobill</strong> is an open-source log parser. It splits each line into a template and typed values, and rebuilds the exact line from them. C++20 core, with a Python package, a DuckDB extension and a C API. Version 1.0.1, Apache 2.0.</p>
-<div class="cta"><a class="btn go" href="#install">Install pyrazobill</a><a class="btn" href="https://github.com/4t1a/razobill">View on GitHub</a></div>
+<div class="cta"><a class="btn go" href="#install">Install pyrazobill</a><a class="btn" href="https://github.com/razobill/razobill">View on GitHub</a></div>
 </div>
 <div class="mascot"><div class="bird"><img src="assets/razobill-char.webp" width="534" height="900" alt="Razobill's mascot, a razorbill seabird standing upright"><span class="lid"></span></div><div class="tide"></div></div>
 </header>
@@ -161,18 +161,18 @@ if (parse("Worker 42 timeout", slots, ScanMode::Exact) == razobill::Status::Ok) 
 <tr><td>On disk in DuckDB</td><td>6.29 MB to 2.88 MB</td><td>134,815 events, 0.46× the raw table</td></tr>
 <tr><td>Parquet on S3</td><td>93.8% smaller than raw text</td><td>20,000 events. 27.3% smaller than plain Parquet.</td></tr>
 </tbody></table></div>
-<p style="margin-top:18px"><a href="https://github.com/4t1a/razobill/blob/main/docs/benchmarks/DrainComparison.md">Read the Drain3 comparison</a> or <a href="https://github.com/4t1a/razobill/blob/main/evidence/README.md">see how each experiment is reproduced</a>.</p>
+<p style="margin-top:18px"><a href="https://github.com/razobill/razobill/blob/main/docs/benchmarks/DrainComparison.md">Read the Drain3 comparison</a> or <a href="https://github.com/razobill/razobill/blob/main/evidence/README.md">see how each experiment is reproduced</a>.</p>
 </div></section>
 
 <section><div class="wrap two"><div>
 <h2>Where it plugs in</h2>
 <dl>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md">DuckDB</a></dt><dd>Scalar functions such as rbDecompose and rbReconstruct, right inside SQL.</dd>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/guides/ClickHouseChdbGuide.md">ClickHouse and chDB</a></dt><dd>The template hash matches ClickHouse xxHash64, so keys agree across engines.</dd>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/guides/AwsS3Integration.md">S3 and Parquet</a></dt><dd>Stream the columns to Parquet. Tested on LocalStack and a mock S3 server.</dd>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/guides/OpenTelemetryIntegration.md">OpenTelemetry</a></dt><dd>A Go collector processor that compacts logs before they leave the host.</dd>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/guides/VectorIntegration.md">Vector</a></dt><dd>A Rust and VRL transform for edge agents.</dd>
-<dt><a href="https://github.com/4t1a/razobill/blob/main/docs/reference/UniversalCApiReference.md">C API</a></dt><dd>A plain extern "C" layer for Rust, Go, Zig, C# and Java.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md">DuckDB</a></dt><dd>Scalar functions such as rbDecompose and rbReconstruct, right inside SQL.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/guides/ClickHouseChdbGuide.md">ClickHouse and chDB</a></dt><dd>The template hash matches ClickHouse xxHash64, so keys agree across engines.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/guides/AwsS3Integration.md">S3 and Parquet</a></dt><dd>Stream the columns to Parquet. Tested on LocalStack and a mock S3 server.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/guides/OpenTelemetryIntegration.md">OpenTelemetry</a></dt><dd>A Go collector processor that compacts logs before they leave the host.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/guides/VectorIntegration.md">Vector</a></dt><dd>A Rust and VRL transform for edge agents.</dd>
+<dt><a href="https://github.com/razobill/razobill/blob/main/docs/reference/UniversalCApiReference.md">C API</a></dt><dd>A plain extern "C" layer for Rust, Go, Zig, C# and Java.</dd>
 </dl></div>
 <div id="limits"><h2>Where it falls short</h2>
 <div class="lim"><ul style="margin:0;padding-left:1.1em">
@@ -192,7 +192,7 @@ if (parse("Worker 42 timeout", slots, ScanMode::Exact) == razobill::Status::Ok) 
 </div></section>
 </main>
 <footer><div class="wrap"><div>Razobill 1.0.1 · Apache 2.0 · updated <time datetime="2026-10-13">13 October 2026</time></div>
-<div><a href="https://github.com/4t1a/razobill">GitHub</a> · <a href="https://pypi.org/project/pyrazobill/">PyPI</a> · <a href="https://github.com/4t1a/razobill/blob/main/docs/Index.md">Docs</a> · <a href="https://github.com/4t1a/razobill/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://doi.org/10.5281/zenodo.23287286">Paper</a> · <a href="llms.txt">llms.txt</a></div></div></footer>
+<div><a href="https://github.com/razobill/razobill">GitHub</a> · <a href="https://pypi.org/project/pyrazobill/">PyPI</a> · <a href="https://github.com/razobill/razobill/blob/main/docs/Index.md">Docs</a> · <a href="https://github.com/razobill/razobill/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://doi.org/10.5281/zenodo.23287286">Paper</a> · <a href="llms.txt">llms.txt</a></div></div></footer>
 <div class="run" aria-hidden="true"><i></i><span></span></div>
 <script>
 const EX=[{"raw":"Accepted publickey for ubuntu from 192.168.1.100 port 54322 ssh2","tpl":"Accepted publickey for <*> from <*> port <*> <*>","ints":[54322],"strs":["ubuntu","192.168.1.100","ssh2"],"types":"SSIS"},{"raw":"2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries","tpl":"<*> <*>:<*>:<*> [WARN] Connection to <*>:<*> timed out after <*> retries","ints":[14,11,5432,3],"strs":["2026-10-07","02","10.0.0.1"],"types":"SISISII"},{"raw":"2026-10-10 12:00:00 [INFO] Worker 42 finished job in 150ms","tpl":"<*> <*>:<*>:<*> [INFO] Worker <*> finished job in <*>","ints":[12,42],"strs":["2026-10-10","00","00","150ms"],"types":"SISSIS"},{"raw":"GET /api/v2/orders/8841 200 17ms user=maya","tpl":"GET /api/<*>/orders/<*> <*> <*> user=<*>","ints":[8841,200],"strs":["v2","17ms","maya"],"types":"SIISS"}];

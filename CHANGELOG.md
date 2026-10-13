@@ -81,4 +81,4 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ---
 
-[1.0.0]: https://github.com/4t1a/razobill/releases/tag/v1.0.0
+[1.0.0]: https://github.com/razobill/razobill/releases/tag/v1.0.0

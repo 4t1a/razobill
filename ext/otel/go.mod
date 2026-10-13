@@ -1,4 +1,4 @@
-module github.com/4t1a/razobill/ext/otel
+module github.com/razobill/razobill/ext/otel
 
 go 1.23.0
 

@@ -13,4 +13,4 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://4t1a.github.io/razobill/sitemap.xml
+Sitemap: https://razobill.github.io/razobill/sitemap.xml

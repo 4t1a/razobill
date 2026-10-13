@@ -39,11 +39,11 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/4t1a/razobill"
-Documentation = "https://github.com/4t1a/razobill/blob/main/docs/Index.md"
-Repository = "https://github.com/4t1a/razobill.git"
-Issues = "https://github.com/4t1a/razobill/issues"
-Changelog = "https://github.com/4t1a/razobill/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/razobill/razobill"
+Documentation = "https://github.com/razobill/razobill/blob/main/docs/Index.md"
+Repository = "https://github.com/razobill/razobill.git"
+Issues = "https://github.com/razobill/razobill/issues"
+Changelog = "https://github.com/razobill/razobill/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

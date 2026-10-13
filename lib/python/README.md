@@ -9,7 +9,7 @@ High-performance, lossless log parsing and information-theoretic semantic accoun
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python: 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![SemVer: 2.0.0](https://img.shields.io/badge/SemVer-2.0.0-green.svg)](https://semver.org/)
-[![Lossless: 100%](https://img.shields.io/badge/Lossless-100%25-brightgreen.svg)](https://github.com/4t1a/razobill)
+[![Lossless: 100%](https://img.shields.io/badge/Lossless-100%25-brightgreen.svg)](https://github.com/razobill/razobill)
 
 ---
 
@@ -55,7 +55,7 @@ High-performance, lossless log parsing and information-theoretic semantic accoun
 
 ### From Source
 ```bash
-git clone https://github.com/4t1a/razobill.git
+git clone https://github.com/razobill/razobill.git
 cd razobill/lib/python
 pip install .
 ```

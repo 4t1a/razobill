@@ -29,7 +29,7 @@ Instead of requiring authors to compile and distribute binaries for every operat
 
 1. **Zenodo Priority & Public Research Repository**:
    - The foundational scientific paper is officially registered on **Zenodo**: DOI [10.5281/zenodo.23287286](https://doi.org/10.5281/zenodo.23287286) ([zenodo.org/records/23287286](https://zenodo.org/records/23287286)) with research code at [github.com/4t1a/Latitude-Doubt](https://github.com/4t1a/Latitude-Doubt).
-   - Publish your `razobill` repository publicly on GitHub (e.g. `https://github.com/4t1a/razobill`).
+   - Publish your `razobill` repository publicly on GitHub (e.g. `https://github.com/razobill/razobill`).
 2. **Release Tag**:
    - Tag the release commit (e.g. `v1.0.0`) and push the tag to GitHub:
      ```bash
@@ -70,7 +70,7 @@ extension:
   maintainers:
     - 4t1a
   repo:
-    github: 4t1a/razobill
+    github: razobill/razobill
   ref: v1.0.0
 ```
 
@@ -92,7 +92,7 @@ Description:
 ### Summary
 Submitting `razobill` - a high-performance C++20 extension for lossless log parsing, analytical database compaction (45%+ storage savings), and information-theoretic semantic accounting.
 
-- Repository: https://github.com/4t1a/razobill
+- Repository: https://github.com/razobill/razobill
 - License: Apache-2.0
 - ABI Type: C_STRUCT (DuckDB C API)
 ```
@@ -103,7 +103,7 @@ Submitting `razobill` - a high-performance C++20 extension for lossless log pars
 
 1. **Automated CI Validation**:
    - DuckDB's GitHub Actions CI will automatically trigger on your Pull Request.
-   - It will clone `4t1a/razobill`, run CMake, compile the C API extension across Linux, macOS, and Windows, and test loading.
+   - It will clone `razobill/razobill`, run CMake, compile the C API extension across Linux, macOS, and Windows, and test loading.
 2. **Review & Merge**:
    - A DuckDB core team member will review the descriptor and merge the PR.
 3. **Availability**:

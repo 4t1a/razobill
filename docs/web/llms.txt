@@ -13,12 +13,12 @@ The name is spelled "Razobill". Its mascot is a razorbill, a seabird.
 - Known limits: benchmarks are author-run; S3 results use LocalStack; the DuckDB community listing is a pending pull request (duckdb/community-extensions #3023).
 
 ## Links
-- Home: https://4t1a.github.io/razobill/
-- Source: https://github.com/4t1a/razobill
+- Home: https://razobill.github.io/razobill/
+- Source: https://github.com/razobill/razobill
 - PyPI: https://pypi.org/project/pyrazobill/
-- Docs index: https://github.com/4t1a/razobill/blob/main/docs/Index.md
-- Drain3 comparison: https://github.com/4t1a/razobill/blob/main/docs/benchmarks/DrainComparison.md
-- Evidence and reproduction: https://github.com/4t1a/razobill/blob/main/evidence/README.md
-- DuckDB guide: https://github.com/4t1a/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md
-- Changelog: https://github.com/4t1a/razobill/blob/main/CHANGELOG.md
-- License: https://github.com/4t1a/razobill/blob/main/LICENSE
+- Docs index: https://github.com/razobill/razobill/blob/main/docs/Index.md
+- Drain3 comparison: https://github.com/razobill/razobill/blob/main/docs/benchmarks/DrainComparison.md
+- Evidence and reproduction: https://github.com/razobill/razobill/blob/main/evidence/README.md
+- DuckDB guide: https://github.com/razobill/razobill/blob/main/docs/guides/DuckDbExtensionGuide.md
+- Changelog: https://github.com/razobill/razobill/blob/main/CHANGELOG.md
+- License: https://github.com/razobill/razobill/blob/main/LICENSE
