@@ -38,6 +38,8 @@ def _scan(msg: str, mode: ScanMode = ScanMode.Semantic):
     p = 0
     gap = 0
     last_word = ""
+    unclosed_dquote_end = -1
+    unclosed_squote_end = -1
 
     while p < n:
         d_start = p
@@ -52,22 +54,29 @@ def _scan(msg: str, mode: ScanMode = ScanMode.Semantic):
         # Quoted strings in Semantic mode
         if mode == ScanMode.Semantic and msg[p] in ('"', "'"):
             q = msg[p]
-            q_start = p
-            p += 1
-            while p < n and msg[p] != q and msg[p] != '\n':
-                if msg[p] == '\\' and p + 1 < n:
-                    p += 2
-                else:
-                    p += 1
-            if p < n and msg[p] == q:
-                p += 1
-                tok = msg[q_start:p]
-                yield msg[gap:q_start], tok
-                gap = p
-                last_word = ""
-                continue
+            if (q == '"' and p < unclosed_dquote_end) or (q == "'" and p < unclosed_squote_end):
+                pass
             else:
-                p = q_start + 1
+                q_start = p
+                p += 1
+                while p < n and msg[p] != q and msg[p] != '\n':
+                    if msg[p] == '\\' and p + 1 < n:
+                        p += 2
+                    else:
+                        p += 1
+                if p < n and msg[p] == q:
+                    p += 1
+                    tok = msg[q_start:p]
+                    yield msg[gap:q_start], tok
+                    gap = p
+                    last_word = ""
+                    continue
+                else:
+                    if q == '"':
+                        unclosed_dquote_end = p
+                    else:
+                        unclosed_squote_end = p
+                    p = q_start + 1
 
         start = p
         seen_digit = False
@@ -150,18 +159,20 @@ def parse(msg: str, mode: ScanMode = ScanMode.Semantic) -> SlotRecord:
         return rec
 
     skel_parts = []
+    types_parts = []
     for gap, tok in _scan(msg, mode):
         skel_parts.append(gap)
         if tok is not None:
             skel_parts.append(chr(kPlaceholder))
             if isIntToken(tok):
                 rec.ints.append(int(tok))
-                rec.types += "I"
+                types_parts.append("I")
             else:
                 rec.strs.append(tok)
-                rec.types += "S"
+                types_parts.append("S")
 
     rec.skeleton = "".join(skel_parts)
+    rec.types = "".join(types_parts)
     return rec
 
 def parseBatch(msgs: List[str], mode: ScanMode = ScanMode.Semantic) -> List[SlotRecord]:
@@ -619,17 +630,113 @@ def channelExactFailureProbability(sequence: Any, payloadBits: int) -> float:
             for opt in opts:
                 if opt.probability > 0.0:
                     next_probs.append(prev_p * (opt.probability / sum_p))
+        if len(next_probs) > 4096:
+            next_probs = [p for p in next_probs if p >= 1e-12]
+            if len(next_probs) > 4096:
+                next_probs.sort(reverse=True)
+                next_probs = next_probs[:4096]
         probs = next_probs
     multiplier = float(1 << int(payloadBits))
     return sum(p * min(1.0, multiplier * p) for p in probs)
 
 def channelEmbed(sequence: Any, message: int, payloadBits: int, sharedKey: float, dither: float = 0.5) -> EmbedResult:
-    forms = []
+    if payloadBits == 0 or not sequence:
+        return EmbedResult(success=False, payloadBits=payloadBits, embeddedMessage=message, chosenForms=[])
+    numCells = float(1 << int(payloadBits))
+    if float(message) >= numCells:
+        return EmbedResult(success=False, payloadBits=payloadBits, embeddedMessage=message, chosenForms=[])
+
+    clampedDither = min(0.9999, max(0.0001, float(dither)))
+    z = (float(message) + clampedDither) / numCells
+    u = (z + float(sharedKey)) % 1.0
+    if u < 0.0:
+        u += 1.0
+
+    curL = 0.0
+    curR = 1.0
+    chosenForms = []
+
     for step in sequence:
         opts = step.options if hasattr(step, "options") else []
-        forms.append(opts[0].formIndex if opts else 0)
-    return EmbedResult(success=True, payloadBits=payloadBits, embeddedMessage=message, chosenForms=forms)
+        if not opts:
+            return EmbedResult(success=False, payloadBits=payloadBits, embeddedMessage=message, chosenForms=[])
+        sumP = sum(opt.probability for opt in opts)
+        if sumP <= 0.0:
+            return EmbedResult(success=False, payloadBits=payloadBits, embeddedMessage=message, chosenForms=[])
+
+        curWidth = curR - curL
+        subL = curL
+        found = False
+        for opt in opts:
+            p = opt.probability / sumP
+            subR = subL + curWidth * p
+            if u >= subL and (u < subR or opt is opts[-1]):
+                chosenForms.append(opt.formIndex)
+                curL = subL
+                curR = subR
+                found = True
+                break
+            subL = subR
+        if not found:
+            chosenForms.append(opts[-1].formIndex)
+
+    return EmbedResult(success=(len(chosenForms) == len(sequence)), payloadBits=payloadBits, embeddedMessage=message, chosenForms=chosenForms)
 
 def channelDecode(sequence: Any, observedForms: Any, payloadBits: int, sharedKey: float) -> DecodeResult:
-    return DecodeResult(success=True, payloadBits=payloadBits, message=0xABCD)
+    if payloadBits == 0 or not sequence or len(observedForms) != len(sequence):
+        return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+
+    curL = 0.0
+    curR = 1.0
+
+    for i in range(len(sequence)):
+        step = sequence[i]
+        observedForm = observedForms[i]
+        opts = step.options if hasattr(step, "options") else []
+        if not opts:
+            return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+        sumP = sum(opt.probability for opt in opts)
+        if sumP <= 0.0:
+            return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+
+        curWidth = curR - curL
+        subL = curL
+        match = False
+        for opt in opts:
+            p = opt.probability / sumP
+            subR = subL + curWidth * p
+            if opt.formIndex == observedForm:
+                curL = subL
+                curR = subR
+                match = True
+                break
+            subL = subR
+        if not match:
+            return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+
+    q = curR - curL
+    numCells = float(1 << int(payloadBits))
+    cellWidth = 1.0 / numCells
+
+    if q >= cellWidth:
+        return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+
+    center = (curL + curR) * 0.5
+    centerZ = (center - float(sharedKey)) % 1.0
+    if centerZ < 0.0:
+        centerZ += 1.0
+
+    halfQ = q * 0.5
+    leftZ = centerZ - halfQ
+    rightZ = centerZ + halfQ
+
+    if leftZ < 0.0 or rightZ >= 1.0:
+        return DecodeResult(success=False, payloadBits=payloadBits, message=0)
+
+    cellLeft = int(math.floor(leftZ * numCells))
+    cellRight = int(math.floor(rightZ * numCells))
+
+    if cellLeft == cellRight and cellLeft < int(numCells):
+        return DecodeResult(success=True, payloadBits=payloadBits, message=cellLeft)
+    return DecodeResult(success=False, payloadBits=payloadBits, message=0)
 

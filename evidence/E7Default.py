@@ -47,52 +47,37 @@ def measureDuckDbStorage(tablesDict, variantName, blockSize=262144):
     Creates a physical DuckDB database file, populates tables, forces a WAL checkpoint,
     and queries pragma_database_size() to obtain exact committed block bytes.
     """
-    tmpDir = tempfile.gettempdir()
-    dbFile = os.path.join(tmpDir, f"e7_{variantName}.db")
-    for path in (dbFile, dbFile + ".wal"):
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except OSError:
-                # File may already have been removed or temporarily held by OS
-                pass
+    with tempfile.TemporaryDirectory() as tmpDir:
+        dbFile = os.path.join(tmpDir, f"e7_{variantName}.db")
+        con = duckdb.connect()
+        # Normalize path with forward slashes for DuckDB ATTACH
+        cleanDbPath = dbFile.replace("\\", "/")
+        con.execute(f"ATTACH '{cleanDbPath}' AS targetDb (BLOCK_SIZE {blockSize})")
+        con.execute("USE targetDb")
 
-    con = duckdb.connect()
-    # Normalize path with forward slashes for DuckDB ATTACH
-    cleanDbPath = dbFile.replace("\\", "/")
-    con.execute(f"ATTACH '{cleanDbPath}' AS targetDb (BLOCK_SIZE {blockSize})")
-    con.execute("USE targetDb")
+        for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
+            con.register("stagedSource", pyarrowTbl)
+            orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
+            con.execute(
+                f"CREATE TABLE {tableName} AS SELECT * FROM stagedSource{orderClause}"
+            )
 
-    for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
-        con.register("stagedSource", pyarrowTbl)
-        orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
-        con.execute(
-            f"CREATE TABLE {tableName} AS SELECT * FROM stagedSource{orderClause}"
-        )
+        con.execute("CHECKPOINT")
+        usedBlocks, sizePerBlock = con.execute(
+            "SELECT used_blocks, block_size FROM pragma_database_size() WHERE database_name = 'targetDb'"
+        ).fetchone()
 
-    con.execute("CHECKPOINT")
-    usedBlocks, sizePerBlock = con.execute(
-        "SELECT used_blocks, block_size FROM pragma_database_size() WHERE database_name = 'targetDb'"
-    ).fetchone()
+        # Query internal DuckDB column compression encodings (BitPacking, RLE, Dictionary, FSST)
+        encodings = con.execute(
+            "SELECT compression, count(*) FROM ("
+            + " UNION ALL ".join(
+                f"SELECT compression FROM pragma_storage_info('{t}')" for t in tablesDict
+            )
+            + ") GROUP BY 1 ORDER BY 2 DESC"
+        ).fetchall()
 
-    # Query internal DuckDB column compression encodings (BitPacking, RLE, Dictionary, FSST)
-    encodings = con.execute(
-        "SELECT compression, count(*) FROM ("
-        + " UNION ALL ".join(
-            f"SELECT compression FROM pragma_storage_info('{t}')" for t in tablesDict
-        )
-        + ") GROUP BY 1 ORDER BY 2 DESC"
-    ).fetchall()
-
-    con.close()
-    if os.path.exists(dbFile):
-        try:
-            os.remove(dbFile)
-        except OSError:
-            # Database file may already have been removed or closed
-            pass
-
-    return usedBlocks * sizePerBlock, encodings
+        con.close()
+        return usedBlocks * sizePerBlock, encodings
 
 
 def measureParquetStorage(tablesDict, variantName, useV2=False):
@@ -101,27 +86,21 @@ def measureParquetStorage(tablesDict, variantName, useV2=False):
     to compare against industry columnar standards.
     """
     totalBytes = 0
-    con = duckdb.connect()
-    tmpDir = tempfile.gettempdir()
-    for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
-        con.register("stagedSource", pyarrowTbl)
-        parquetFile = os.path.join(
-            tmpDir, f"e7_{variantName}_{tableName}.parquet"
-        ).replace("\\", "/")
-        orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
-        v2Clause = ", PARQUET_VERSION 'V2'" if useV2 else ""
-        con.execute(
-            f"COPY (SELECT * FROM stagedSource{orderClause}) TO '{parquetFile}' "
-            f"(FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 19{v2Clause})"
-        )
-        totalBytes += os.path.getsize(parquetFile)
-        if os.path.exists(parquetFile):
-            try:
-                os.remove(parquetFile)
-            except OSError:
-                # Temporary parquet file may already have been unlinked
-                pass
-    con.close()
+    with tempfile.TemporaryDirectory() as tmpDir:
+        con = duckdb.connect()
+        for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
+            con.register("stagedSource", pyarrowTbl)
+            parquetFile = os.path.join(
+                tmpDir, f"e7_{variantName}_{tableName}.parquet"
+            ).replace("\\", "/")
+            orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
+            v2Clause = ", PARQUET_VERSION 'V2'" if useV2 else ""
+            con.execute(
+                f"COPY (SELECT * FROM stagedSource{orderClause}) TO '{parquetFile}' "
+                f"(FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 19{v2Clause})"
+            )
+            totalBytes += os.path.getsize(parquetFile)
+        con.close()
     return totalBytes
 
 

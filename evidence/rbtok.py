@@ -41,8 +41,8 @@ from typing import Tuple, List
 # Standard delimiters: whitespace, structural punctuation, brackets, quotes, slashes
 DELIMITERS = r'\s=,;:()\[\]{}"\'<>|/'
 
-# Token regex: any sequence of non-delimiter characters containing at least one digit
-TOKEN_PATTERN = re.compile(rf"[^{DELIMITERS}]*\d[^{DELIMITERS}]*")
+# Token regex: sequence of non-delimiter characters
+TOKEN_PATTERN = re.compile(rf"[^{DELIMITERS}]+")
 
 # Pure integer regex: up to 18 digits (fits comfortably in signed 64-bit int without overflow)
 INT_PATTERN = re.compile(r"0|[1-9][0-9]{0,17}")
@@ -72,9 +72,13 @@ def split(msg: str) -> Tuple[str, List[int], List[str]]:
     lastOffset = 0
 
     for match in TOKEN_PATTERN.finditer(msg):
+        token = match.group()
+        if not any('0' <= c <= '9' for c in token):
+            continue
+
         # Append literal static text prior to the variable token
         skeletonParts.append(msg[lastOffset : match.start()])
-        token = match.group()
+        lastOffset = match.end()
 
         # Classify variable token
         if INT_PATTERN.fullmatch(token):
@@ -83,8 +87,6 @@ def split(msg: str) -> Tuple[str, List[int], List[str]]:
         else:
             skeletonParts.append(SLOT_STR)
             strSlots.append(token)
-
-        lastOffset = match.end()
 
     # Append remaining trailing static text
     skeletonParts.append(msg[lastOffset:])

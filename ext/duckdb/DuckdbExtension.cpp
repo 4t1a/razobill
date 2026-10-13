@@ -334,6 +334,13 @@ template <Shape S>
     if (numCols < 1) return;
 
     auto formVec = duckdb_data_chunk_get_vector(in, 0);
+    auto formType = duckdb_vector_get_column_type(formVec);
+    auto formTypeId = duckdb_get_type_id(formType);
+    duckdb_destroy_logical_type(&formType);
+    if (formTypeId != DUCKDB_TYPE_VARCHAR) {
+        duckdb_scalar_function_set_error(info, "razobill: template parameter must be VARCHAR");
+        return;
+    }
     auto* formData = static_cast<duckdb_string_t*>(duckdb_vector_get_data(formVec));
     auto* formVv = duckdb_vector_get_validity(formVec);
 

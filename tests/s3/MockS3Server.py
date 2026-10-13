@@ -16,6 +16,7 @@ class MockS3Storage:
     def __init__(self):
         self.lock = threading.Lock()
         self.buckets = {"telemetry": {}, "test-bucket": {}}
+        self.etags = {"telemetry": {}, "test-bucket": {}}
         self.multipart_uploads = (
             {}
         )  # upload_id -> {"bucket": b, "key": k, "parts": {part_num: data}}
@@ -24,17 +25,33 @@ class MockS3Storage:
         with self.lock:
             if bucket not in self.buckets:
                 self.buckets[bucket] = {}
+                self.etags[bucket] = {}
 
     def put_object(self, bucket, key, data):
         with self.lock:
             if bucket not in self.buckets:
                 self.buckets[bucket] = {}
+                self.etags[bucket] = {}
             self.buckets[bucket][key] = data
+            etag = hashlib.md5(data).hexdigest()
+            self.etags[bucket][key] = etag
+            return etag
 
     def get_object(self, bucket, key):
         with self.lock:
             if bucket in self.buckets and key in self.buckets[bucket]:
                 return self.buckets[bucket][key]
+            return None
+
+    def get_etag(self, bucket, key):
+        with self.lock:
+            if bucket in self.etags and key in self.etags[bucket]:
+                return self.etags[bucket][key]
+            data = self.buckets.get(bucket, {}).get(key)
+            if data is not None:
+                etag = hashlib.md5(data).hexdigest()
+                self.etags[bucket][key] = etag
+                return etag
             return None
 
     def has_object(self, bucket, key):
@@ -49,6 +66,8 @@ class MockS3Storage:
         with self.lock:
             if bucket in self.buckets and key in self.buckets[bucket]:
                 del self.buckets[bucket][key]
+            if bucket in self.etags and key in self.etags[bucket]:
+                del self.etags[bucket][key]
 
     def init_multipart(self, bucket, key):
         upload_id = str(uuid.uuid4())
@@ -79,9 +98,12 @@ class MockS3Storage:
             combined = b"".join(parts[n] for n in sorted_part_nums)
             if bucket not in self.buckets:
                 self.buckets[bucket] = {}
+                self.etags[bucket] = {}
             self.buckets[bucket][key] = combined
+            etag = hashlib.md5(combined).hexdigest()
+            self.etags[bucket][key] = etag
             del self.multipart_uploads[upload_id]
-            return bucket, key, combined
+            return bucket, key, combined, etag
 
     def abort_multipart(self, upload_id):
         with self.lock:
@@ -91,6 +113,14 @@ class MockS3Storage:
 
 class MockS3Handler(BaseHTTPRequestHandler):
     storage = MockS3Storage()
+
+    def setup(self):
+        super().setup()
+        if hasattr(self, "connection") and self.connection:
+            try:
+                self.connection.settimeout(5.0)
+            except (OSError, AttributeError):
+                pass
 
     def log_message(self, format, *args):
         # Silence default request logging to keep test output clean
@@ -109,22 +139,25 @@ class MockS3Handler(BaseHTTPRequestHandler):
         content_length = self.headers.get("Content-Length")
         transfer_encoding = self.headers.get("Transfer-Encoding", "")
 
-        if content_length:
-            length = int(content_length)
-            return self.rfile.read(length)
-        elif "chunked" in transfer_encoding.lower():
-            chunks = []
-            while True:
-                line = self.rfile.readline().strip()
-                if not line:
-                    break
-                chunk_len = int(line, 16)
-                if chunk_len == 0:
+        try:
+            if content_length:
+                length = int(content_length)
+                return self.rfile.read(length)
+            elif "chunked" in transfer_encoding.lower():
+                chunks = []
+                while True:
+                    line = self.rfile.readline().strip()
+                    if not line:
+                        break
+                    chunk_len = int(line, 16)
+                    if chunk_len == 0:
+                        self.rfile.readline()  # trailing CRLF
+                        break
+                    chunks.append(self.rfile.read(chunk_len))
                     self.rfile.readline()  # trailing CRLF
-                    break
-                chunks.append(self.rfile.read(chunk_len))
-                self.rfile.readline()  # trailing CRLF
-            return b"".join(chunks)
+                return b"".join(chunks)
+        except (TimeoutError, OSError):
+            return b""
         return b""
 
     def do_HEAD(self):
@@ -144,7 +177,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
 
         data = self.storage.get_object(bucket, key)
         if data is not None:
-            etag = hashlib.md5(data).hexdigest()
+            etag = self.storage.get_etag(bucket, key) or hashlib.md5(data).hexdigest()
             self.send_response(200)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("ETag", f'"{etag}"')
@@ -176,7 +209,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        etag = hashlib.md5(data).hexdigest()
+        etag = self.storage.get_etag(bucket, key) or hashlib.md5(data).hexdigest()
         total_len = len(data)
 
         range_header = self.headers.get("Range")
@@ -228,8 +261,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
             return
 
         # Single part PUT
-        etag = hashlib.md5(body).hexdigest()
-        self.storage.put_object(bucket, key, body)
+        etag = self.storage.put_object(bucket, key, body)
         self.send_response(200)
         self.send_header("ETag", f'"{etag}"')
         self.end_headers()
@@ -261,8 +293,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
             upload_id = query["uploadId"][0]
             res = self.storage.complete_multipart(upload_id)
             if res:
-                b, k, data = res
-                etag = hashlib.md5(data).hexdigest()
+                b, k, data, etag = res
                 xml_resp = f"""<?xml version="1.0" encoding="UTF-8"?>
 <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
     <Location>http://localhost:9000/{b}/{k}</Location>

@@ -18,18 +18,22 @@ namespace {
 constexpr std::string_view kTokenRegex = R"([^\s=,;:()\[\]{}"'<>|/]*[0-9][^\s=,;:()\[\]{}"'<>|/]*)";
 constexpr std::string_view kIntRegex = "^(0|[1-9][0-9]{0,17})$";
 
-std::string replaceAll(std::string s, std::string_view from, std::string_view to) {
-    for (std::size_t p = 0; (p = s.find(from, p)) != std::string::npos; p += to.size())
-        s.replace(p, from.size(), to);
-    return s;
-}
-
 class DuckDialect final : public Dialect {
 public:
     Flavor flavor() const noexcept override { return Flavor::DuckDB; }
     bool supportsCompact() const noexcept override { return true; }
     bool denseFormKey() const noexcept override { return true; }
-    std::string quote(std::string_view s) const override { return "'" + replaceAll(std::string(s), "'", "''") + "'"; }
+    std::string quote(std::string_view s) const override {
+        std::string o;
+        o.reserve(s.size() + 16);
+        o.push_back('\'');
+        for (char c : s) {
+            if (c == '\'') o.push_back('\'');
+            o.push_back(c);
+        }
+        o.push_back('\'');
+        return o;
+    }
     std::string tU64() const override { return "UBIGINT"; }
     std::string tI32() const override { return "INTEGER"; }
     std::string tF64() const override { return "DOUBLE"; }

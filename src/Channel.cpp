@@ -117,6 +117,13 @@ double exactFailureProbability(std::span<const MeaningChoice> sequence, std::siz
                 nextDist[bin + shift] += prob * p;
             }
         }
+        constexpr std::size_t kMaxDistStates = 4096;
+        if (nextDist.size() > kMaxDistStates) {
+            for (auto it = nextDist.begin(); it != nextDist.end(); ) {
+                if (it->second < 1e-12) it = nextDist.erase(it);
+                else ++it;
+            }
+        }
         dist = std::move(nextDist);
     }
 

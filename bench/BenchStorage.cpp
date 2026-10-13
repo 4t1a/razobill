@@ -94,14 +94,14 @@ int main(int argc, char** argv) {
         // Run 1: Raw Unstructured VARCHAR Layout
         {
             auto backend = openDatabaseFile("/tmp/bs_raw.db");
-            backend->exec(std::string("CREATE TABLE logs AS SELECT * FROM read_parquet('") + corpusParquet + "')");
+            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
             rawBytesRuns.push_back(static_cast<double>(measureDatabaseBytes(*backend)));
         }
 
         // Run 2: Additive Indexing Layout (Raw string + 64-bit form hash)
         {
             auto backend = openDatabaseFile("/tmp/bs_add.db");
-            backend->exec(std::string("CREATE TABLE logs AS SELECT * FROM read_parquet('") + corpusParquet + "')");
+            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
             RazobillEngine engine(*backend, {.table = "logs", .purpose = "level"});
             const double t0 = timestampNow();
             engine.refresh();
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         // Run 3: Full Razobill Columnar Compact Decomposed Layout
         {
             auto backend = openDatabaseFile("/tmp/bs_cmp.db");
-            backend->exec(std::string("CREATE TEMP TABLE src AS SELECT * FROM read_parquet('") + corpusParquet + "')");
+            backend->exec("CREATE TEMP TABLE src AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
             RazobillEngine engine(*backend, {.table = "logs", .purpose = "level"});
             const double t0 = timestampNow();
             engine.compact("src");
@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
     std::printf("========================================================================================\n");
 
     auto timeBackend = openDatabaseFile("/tmp/bs_time.db");
-    timeBackend->exec(std::string("CREATE TABLE one AS SELECT * FROM read_parquet('") + corpusParquet + "')");
+    timeBackend->exec("CREATE TABLE one AS SELECT * FROM read_parquet(" + timeBackend->dialect().quote(corpusParquet) + ")");
     timeBackend->exec("CREATE TEMP TABLE src AS SELECT o.* FROM one o, range(8)");
     timeBackend->exec("CREATE TABLE raw AS SELECT * FROM src");
 

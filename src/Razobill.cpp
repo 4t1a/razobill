@@ -52,6 +52,18 @@ void requireIdentifier(const std::string& s, const char* what) {
     if (!ok) throw std::invalid_argument(std::string(what) + " must match [A-Za-z_][A-Za-z0-9_]{0,63}: '" + s + "'");
 }
 
+std::string quoteIdentifier(std::string_view name) {
+    std::string s;
+    s.reserve(name.size() + 4);
+    s.push_back('"');
+    for (char ch : name) {
+        if (ch == '"') s.push_back('"');
+        s.push_back(ch);
+    }
+    s.push_back('"');
+    return s;
+}
+
 void requireName(const std::string& s) {
     if (s.empty() || s.size() > 128 || !std::all_of(s.begin(), s.end(), [](unsigned char c) {
             return std::isalnum(c) || c == '_' || c == '.' || c == '-';
@@ -213,7 +225,7 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
     auto list = [&](const std::string& prefix) {
         std::string s;
         for (const auto& c : oth)
-            s += prefix + "\"" + c + "\", ";
+            s += prefix + quoteIdentifier(c) + ", ";
         return s;
     };
 
@@ -225,13 +237,14 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
     db_.exec("CREATE TABLE IF NOT EXISTS rb_str(id INTEGER, s VARCHAR)");
     db_.exec("CREATE TABLE IF NOT EXISTS rb_layout(ki INTEGER, ks INTEGER)");
     if (db_.query("SELECT count(*) FROM rb_layout").i64(0, 0) == 0)
-        db_.exec("INSERT INTO rb_layout SELECT CAST(coalesce(quantile_disc(len(rbi), 0.99), 0) AS INTEGER), "
-                 "CAST(coalesce(quantile_disc(len(rbs), 0.99), 0) AS INTEGER) FROM rb_s");
+        db_.exec("INSERT INTO rb_layout SELECT CAST(least(coalesce(quantile_disc(len(rbi), 0.99), 0), 32) AS INTEGER), "
+                 "CAST(least(coalesce(quantile_disc(len(rbs), 0.99), 0), 32) AS INTEGER) FROM rb_s");
     const auto lay = db_.query("SELECT ki, ks FROM rb_layout");
-    const auto ki = lay.i64(0, 0), ks = lay.i64(0, 1);
+    const auto ki = std::clamp(lay.i64(0, 0), 0LL, 32LL);
+    const auto ks = std::clamp(lay.i64(0, 1), 0LL, 32LL);
 
     registerFormsLocked("SELECT rbf AS form FROM rb_s");
-    db_.exec("INSERT INTO rb_str SELECT CAST((SELECT count(*) FROM rb_str) + row_number() OVER () - 1 AS INTEGER), s "
+    db_.exec("INSERT INTO rb_str SELECT CAST(coalesce((SELECT max(id) + 1 FROM rb_str), 0) + row_number() OVER () - 1 AS INTEGER), s "
              "FROM (SELECT DISTINCT unnest(rbs[1:" +
              std::to_string(ks) + "]) AS s FROM rb_s) WHERE s NOT IN (SELECT s FROM rb_str)");
 
@@ -277,7 +290,7 @@ std::uint64_t RazobillEngine::verify(const std::string& src) {
     const auto cols = db_.query("DESCRIBE " + src);
     std::string sel;
     for (std::size_t r = 0; r < cols.rows.size(); ++r)
-        sel += (r ? ", \"" : "\"") + cols.str(r, 0) + "\"";
+        sel += (r ? ", " : "") + quoteIdentifier(cols.str(r, 0));
     const std::string a = "SELECT " + sel + " FROM " + src, b = "SELECT " + sel + " FROM " + view_;
     return static_cast<std::uint64_t>(db_.query("SELECT (SELECT count(*) FROM (" + a + " EXCEPT ALL " + b +
                                                 ")) + (SELECT count(*) FROM (" + b + " EXCEPT ALL " + a + "))")

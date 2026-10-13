@@ -100,6 +100,9 @@ template <class OnToken>
     unsigned char all = 0;
     std::string_view lastWord;
 
+    const auto* unclosedDoubleQuoteEnd = nullptr;
+    const auto* unclosedSingleQuoteEnd = nullptr;
+
     while (p < end) {
         const auto* const dStart = p;
         while (p < end && (detail::kClass[*p] & detail::kDelim) &&
@@ -114,6 +117,11 @@ template <class OnToken>
         // Quoted string literal handling in Semantic mode
         if (mode == ScanMode::Semantic && (*p == '"' || *p == '\'')) {
             const unsigned char quote = *p;
+            if ((quote == '"' && p < unclosedDoubleQuoteEnd) ||
+                (quote == '\'' && p < unclosedSingleQuoteEnd)) {
+                // Suffix already confirmed to have no matching unescaped closing quote
+                goto regular_scan;
+            }
             const auto* const qStart = p;
             ++p;
             while (p < end && *p != quote && *p != '\n') {
@@ -133,9 +141,12 @@ template <class OnToken>
                 lastWord = {};
                 continue;
             } else {
+                if (quote == '"') unclosedDoubleQuoteEnd = p;
+                else unclosedSingleQuoteEnd = p;
                 p = qStart + 1; // Unclosed quote: proceed
             }
         }
+regular_scan:
 
         const auto* const start = p;
         unsigned char seen = 0;

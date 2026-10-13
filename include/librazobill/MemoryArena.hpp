@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <new>
 #include <utility>
@@ -73,10 +74,15 @@ public:
             const std::size_t alignedAddr = (currentAddr + alignment - 1) & ~(alignment - 1);
             const std::size_t padding = alignedAddr - currentAddr;
 
-            if (padding + bytes <= cur.capacity) {
+            if (padding <= cur.capacity && bytes <= cur.capacity - padding) {
                 offset_ = padding + bytes;
                 return reinterpret_cast<void*>(alignedAddr);
             }
+        }
+
+        // Prevent integer overflow when computing block capacity
+        if (bytes > std::numeric_limits<std::size_t>::max() - alignment - 64) [[unlikely]] {
+            throw std::bad_alloc();
         }
 
         // Allocate a new OS block with 64-byte cache line alignment
