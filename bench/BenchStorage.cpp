@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "librazobill/Razobill.hpp"
+#include "librazobill/Dialect.hpp"
 #include "Support.hpp"
 
 using namespace razobill;
@@ -82,6 +83,9 @@ int main(int argc, char** argv) {
                     corpusParquet);
     }
 
+    const auto dialect = makeDialect(Flavor::DuckDB);
+    const std::string quotedParquet = dialect->quote(corpusParquet);
+
     std::vector<double> rawBytesRuns, additiveBytesRuns, compactBytesRuns;
     double compactLoadSeconds = 0.0, additiveLoadSeconds = 0.0;
 
@@ -94,14 +98,14 @@ int main(int argc, char** argv) {
         // Run 1: Raw Unstructured VARCHAR Layout
         {
             auto backend = openDatabaseFile("/tmp/bs_raw.db");
-            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
+            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + quotedParquet + ")");
             rawBytesRuns.push_back(static_cast<double>(measureDatabaseBytes(*backend)));
         }
 
         // Run 2: Additive Indexing Layout (Raw string + 64-bit form hash)
         {
             auto backend = openDatabaseFile("/tmp/bs_add.db");
-            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
+            backend->exec("CREATE TABLE logs AS SELECT * FROM read_parquet(" + quotedParquet + ")");
             RazobillEngine engine(*backend, {.table = "logs", .purpose = "level"});
             const double t0 = timestampNow();
             engine.refresh();
@@ -112,7 +116,7 @@ int main(int argc, char** argv) {
         // Run 3: Full Razobill Columnar Compact Decomposed Layout
         {
             auto backend = openDatabaseFile("/tmp/bs_cmp.db");
-            backend->exec("CREATE TEMP TABLE src AS SELECT * FROM read_parquet(" + backend->dialect().quote(corpusParquet) + ")");
+            backend->exec("CREATE TEMP TABLE src AS SELECT * FROM read_parquet(" + quotedParquet + ")");
             RazobillEngine engine(*backend, {.table = "logs", .purpose = "level"});
             const double t0 = timestampNow();
             engine.compact("src");
@@ -164,7 +168,7 @@ int main(int argc, char** argv) {
     std::printf("========================================================================================\n");
 
     auto timeBackend = openDatabaseFile("/tmp/bs_time.db");
-    timeBackend->exec("CREATE TABLE one AS SELECT * FROM read_parquet(" + timeBackend->dialect().quote(corpusParquet) + ")");
+    timeBackend->exec("CREATE TABLE one AS SELECT * FROM read_parquet(" + quotedParquet + ")");
     timeBackend->exec("CREATE TEMP TABLE src AS SELECT o.* FROM one o, range(8)");
     timeBackend->exec("CREATE TABLE raw AS SELECT * FROM src");
 
