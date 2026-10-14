@@ -21,7 +21,7 @@ import time
 import hashlib
 import platform
 import subprocess
-from statistics import median, stdev
+from statistics import median
 from pathlib import Path
 
 try:
@@ -116,8 +116,8 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
     n = len(lines)
 
     stages = [
-        ("parse_exact", pyrazobill.ScanMode.Exact),
-        ("parse_semantic", pyrazobill.ScanMode.Semantic),
+        ("parse_exact", "exact"),
+        ("parse_semantic", "semantic"),
     ]
 
     results = {}
@@ -127,7 +127,7 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
         for r in range(runs):
             t0 = time.perf_counter()
             for l in lines:
-                rec = pyrazobill.parse(l, mode=mode)
+                pyrazobill.RzSplit(l, mode=mode)
             durations.append(time.perf_counter() - t0)
 
         med_sec = median(durations)
@@ -141,11 +141,11 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
 
     # Breakdown: parse + formKey vs reconstruct
     reconstruct_durations = []
-    records = [pyrazobill.parse(l) for l in lines]
+    records = [pyrazobill.RzSplit(l) for l in lines]
     for r in range(runs):
         t0 = time.perf_counter()
         for rec in records:
-            _ = rec.reconstruct()
+            _ = pyrazobill.RzJoin(rec.template, rec.ints, rec.strs)
         reconstruct_durations.append(time.perf_counter() - t0)
 
     med_rec = median(reconstruct_durations)
@@ -162,8 +162,8 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
     for r in range(runs):
         t0 = time.perf_counter()
         for l in lines:
-            rec = pyrazobill.parse(l)
-            _ = rec.reconstruct()
+            rec = pyrazobill.RzSplit(l)
+            _ = pyrazobill.RzJoin(rec.template, rec.ints, rec.strs)
         rt_durations.append(time.perf_counter() - t0)
 
     med_rt = median(rt_durations)
@@ -180,21 +180,29 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
 
 
 def benchmark_multicore_scaling(lines: list[str], thread_counts: list[int], runs: int = 5) -> dict:
-    """Measures multi-core scaling efficiency using C++ auditParallel."""
+    """Measures multi-core scaling efficiency using parallel chunks."""
     unpin_cores()
-    total_bytes = sum(len(l) for l in lines)
-    n = len(lines)
-
     scaling_results = {}
     baseline_throughput = 0.0
 
     for t in thread_counts:
         run_rates = []
         run_mb = []
+        chunk_size = (len(lines) + t - 1) // t
+        chunks = [lines[i * chunk_size : min((i + 1) * chunk_size, len(lines))] for i in range(t)]
+        chunks = [c for c in chunks if c]
+        total_bytes = sum(len(l) for l in lines)
+        n = len(lines)
+
+        from concurrent.futures import ThreadPoolExecutor
+
         for r in range(runs):
-            res = pyrazobill.auditParallel(lines, numThreads=t)
-            run_rates.append(res.msgsPerSec)
-            run_mb.append(res.mbPerSec)
+            t0 = time.perf_counter()
+            with ThreadPoolExecutor(max_workers=t) as pool:
+                list(pool.map(pyrazobill.RzSplitMany, chunks))
+            elapsed = time.perf_counter() - t0
+            run_rates.append(n / elapsed if elapsed > 0 else 0.0)
+            run_mb.append((total_bytes / elapsed) / 1e6 if elapsed > 0 else 0.0)
 
         med_msgs_per_sec = median(run_rates)
         med_mb_per_sec = median(run_mb)
@@ -210,7 +218,7 @@ def benchmark_multicore_scaling(lines: list[str], thread_counts: list[int], runs
             "median_mb_per_sec": med_mb_per_sec,
             "min_msgs_per_sec": min(run_rates),
             "max_msgs_per_sec": max(run_rates),
-            "spread_pct": ((max(run_rates) - min(run_rates)) / med_msgs_per_sec) * 100.0,
+            "spread_pct": ((max(run_rates) - min(run_rates)) / med_msgs_per_sec) * 100.0 if med_msgs_per_sec > 0 else 0.0,
             "speedup": speedup,
             "efficiency_pct": efficiency,
         }
@@ -330,14 +338,14 @@ def main():
         pin_to_core(0)
         t_cold_start = time.perf_counter()
         for l in lines:
-            _ = pyrazobill.parse(l)
+            _ = pyrazobill.RzSplit(l)
         cold_sec = time.perf_counter() - t_cold_start
 
         warm_durations = []
         for _ in range(5):
             t_w = time.perf_counter()
             for l in lines:
-                _ = pyrazobill.parse(l)
+                _ = pyrazobill.RzSplit(l)
             warm_durations.append(time.perf_counter() - t_w)
         warm_sec = median(warm_durations)
         unpin_cores()

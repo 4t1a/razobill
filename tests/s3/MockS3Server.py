@@ -120,6 +120,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
             try:
                 self.connection.settimeout(5.0)
             except (OSError, AttributeError):
+                # Socket connection may not support timeout or already be closed
                 pass
 
     def log_message(self, format, *args):

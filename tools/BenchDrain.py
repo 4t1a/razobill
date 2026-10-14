@@ -106,7 +106,7 @@ def runRazobillDecomposeBatchThreads(lines, numThreads):
     chunks = [c for c in chunks if c]
     total = 0
     with ThreadPoolExecutor(max_workers=numThreads) as pool:
-        for batchRes in pool.map(lambda c: pyrazobill.RzSplitMany(c), chunks):
+        for batchRes in pool.map(pyrazobill.RzSplitMany, chunks):
             total += len(batchRes)
     elapsed = time.perf_counter() - t0
     return elapsed, total

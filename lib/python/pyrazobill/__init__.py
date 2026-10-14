@@ -20,6 +20,7 @@ Quick Start:
 True
 """
 
+import importlib
 import os
 import sys
 from pathlib import Path
@@ -31,12 +32,14 @@ if sys.platform == "win32":
     try:
         os.add_dll_directory(str(_pkg_dir))
     except (AttributeError, OSError, ValueError):
+        # Ignore unsupported directories or platforms without add_dll_directory
         pass
     for _p in os.environ.get("PATH", "").split(os.pathsep):
         if _p and os.path.isdir(_p):
             try:
                 os.add_dll_directory(_p)
             except (AttributeError, OSError, ValueError):
+                # Ignore invalid or inaccessible PATH entries
                 pass
 
 
@@ -61,10 +64,9 @@ class RzRecord(NamedTuple):
 
 
 try:
-    from . import Core as _core
-
+    _core = importlib.import_module(".Core", package=__name__)
     _NATIVE = True
-except ImportError:
+except (ImportError, AttributeError):
     from . import _fallback as _core
 
     _NATIVE = False
@@ -267,6 +269,13 @@ __all__ = [
     "RzSplitMany",
     "RzRecord",
     "RzError",
+    "split",
+    "join",
+    "template",
+    "split_many",
+    "Record",
+    "Error",
+    "isNative",
     "__version__",
 ]
 

@@ -13,7 +13,7 @@ require razobill
 
 # Confirm extension decomposition and reconstruction
 query T
-SELECT RzJoin(template, ints, strs) FROM (SELECT (RzSplit('User 1042 authenticated')).*);
+SELECT RzJoin(d.template, d.ints, d.strs) FROM (SELECT RzSplit('User 1042 authenticated') AS d);
 ----
 User 1042 authenticated
 

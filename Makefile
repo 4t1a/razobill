@@ -29,8 +29,8 @@ endif
 
 # Multi-config fallback copy step for Windows MSVC if needed
 ifeq ($(OS),Windows_NT)
-EXTRA_COPY_STEP_RELEASE?=@if exist cmake_build\release\Release\$(EXTENSION_LIB_FILENAME) copy /Y cmake_build\release\Release\$(EXTENSION_LIB_FILENAME) cmake_build\release\$(EXTENSION_LIB_FILENAME) >nul 2>&1 || true
-EXTRA_COPY_STEP_DEBUG?=@if exist cmake_build\debug\Debug\$(EXTENSION_LIB_FILENAME) copy /Y cmake_build\debug\Debug\$(EXTENSION_LIB_FILENAME) cmake_build\debug\$(EXTENSION_LIB_FILENAME) >nul 2>&1 || true
+EXTRA_COPY_STEP_RELEASE?=$(PYTHON_VENV_BIN) -c "import os, shutil; src = 'cmake_build/release/Release/$(EXTENSION_LIB_FILENAME)'; dst = '$(OUTPUT_LIB_PATH_RELEASE)'; os.path.exists(src) and shutil.copyfile(src, dst)"
+EXTRA_COPY_STEP_DEBUG?=$(PYTHON_VENV_BIN) -c "import os, shutil; src = 'cmake_build/debug/Debug/$(EXTENSION_LIB_FILENAME)'; dst = '$(OUTPUT_LIB_PATH_DEBUG)'; os.path.exists(src) and shutil.copyfile(src, dst)"
 endif
 
 configure: venv platform extension_version

@@ -109,9 +109,9 @@ public:
         entry.strSlots = numStrs;
 
         hashToKeys_[explicitHash].push_back(entry.key);
-        auto [insertedIt, _] = formsByKey_.emplace(entry.key, std::move(entry));
-        formsById_.push_back(&insertedIt->second);
-        return insertedIt->second.id;
+        auto inserted = formsByKey_.emplace(entry.key, std::move(entry));
+        formsById_.push_back(&inserted.first->second);
+        return inserted.first->second.id;
     }
 
     [[nodiscard]] bool contains(std::string_view key) const {
