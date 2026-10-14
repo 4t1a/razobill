@@ -1,17 +1,4 @@
-// Data Plane: message <-> (form, integer slots, string slots). Pure, reentrant, exact.
-//
-// ARCHITECTURE: Structure-of-Arrays (SoA) Log Decomposition
-// Most log parsers treat a parsed line as an object with dynamic attribute dictionaries
-// (e.g. `{"ip": "1.2.3.4", "port": 8080}`). That allocates dozens of tiny heap objects per log!
-//
-// librazobill decomposes every log into two orthogonal planes:
-// 1. Structural Form: An immutable skeleton string with ASCII placeholders + a type signature string.
-// 2. Variable Slots: Contiguous vectors of primitive numbers (`ints`) and zero-copy string views (`strs`).
-//
-// This maps directly to columnar database engines (DuckDB / ClickHouse / Parquet):
-// - `ints` compress with frame-of-reference (FOR) bitpacking.
-// - `strs` compress with dictionary or Snappy block encoding.
-// - `skeleton` compresses to near zero because duplicate logs share identical forms.
+// Data Plane: message <-> (template, integer slots, string slots). Pure, reentrant, exact.
 #pragma once
 
 #include <cstdint>
@@ -33,26 +20,25 @@ namespace razobill::core {
 // As long as the source message string is alive during batch processing, no string
 // copies occur during parsing.
 struct SlotRecord {
-    std::string skeleton;               // constant text, one kPlaceholder per slot
-    std::string types;                  // one 'I' or 'S' per slot, in order
-    std::vector<std::int64_t> ints;     // values of the 'I' slots
-    std::vector<std::string_view> strs; // values of the 'S' slots; zero-copy views into the message
+    std::string templateStr;            // human-readable format string with {i} and {s} placeholders
+    std::vector<std::int64_t> ints;     // values of the '{i}' slots
+    std::vector<std::string_view> strs; // values of the '{s}' slots; zero-copy views into the message
 
-    // Bulk clear for thread-local scratch recycling.
-    // Capacity is preserved so subsequent lines don't trigger re-allocations!
+    // Legacy fields for internal backward compatibility
+    std::string skeleton;
+    std::string types;
+
+    // Bulk clear for scratch recycling
     void clear() noexcept {
-        skeleton.clear();
-        types.clear();
+        templateStr.clear();
         ints.clear();
         strs.clear();
+        skeleton.clear();
+        types.clear();
     }
 
-    // Combines skeleton and type signatures into a canonical form key.
-    // Format: "<skeleton>\x13<types>"
     void formKey(std::string& out) const {
-        out.assign(skeleton);
-        out.push_back(static_cast<char>(kTypeSeparator));
-        out.append(types);
+        out.assign(templateStr);
     }
 
     [[nodiscard]] std::string formKey() const {
@@ -62,33 +48,31 @@ struct SlotRecord {
     }
 
     [[nodiscard]] std::uint64_t formKeyHash() const noexcept {
-        std::string key = formKey();
-        return xxh64(key);
+        return xxh64(formKey());
     }
 
-    // Legacy compatibility methods
     void form_key(std::string& out) const { formKey(out); }
 };
 
 using Slots = SlotRecord;
 
-// Splits msg into form and slots. out.strs borrows from msg.
+// Splits msg into template and slots. out.strs borrows from msg.
 [[nodiscard]] Status parse(std::string_view msg, SlotRecord& out, ScanMode mode = ScanMode::Semantic);
 
-// Reconstructs the original message from a form key and slots with 100% byte-for-byte fidelity.
-[[nodiscard]] Status reconstruct(std::string_view form, std::span<const std::int64_t> ints,
+// Reconstructs the original message from a template and slots with 100% byte-for-byte fidelity.
+[[nodiscard]] Status reconstruct(std::string_view tmpl, std::span<const std::int64_t> ints,
                                  std::span<const std::string_view> strs, std::string& out);
 
-// Legacy alias for reconstruct
-[[nodiscard]] inline Status join(std::string_view form, std::span<const std::int64_t> ints,
+// Alias for reconstruct
+[[nodiscard]] inline Status join(std::string_view tmpl, std::span<const std::int64_t> ints,
                                  std::span<const std::string_view> strs, std::string& out) {
-    return reconstruct(form, ints, strs, out);
+    return reconstruct(tmpl, ints, strs, out);
 }
 
-// Generates human-readable template representation with "<*>" placeholders.
+// Generates template representation directly from input message or form
 [[nodiscard]] Status templateOf(std::string_view form, std::string& out);
 
-// Legacy alias for templateOf
+// Alias for templateOf
 [[nodiscard]] inline Status template_of(std::string_view form, std::string& out) {
     return templateOf(form, out);
 }

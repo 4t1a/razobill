@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "librazobill/Hash.hpp"
-#include "librazobill/RazobillC.h"
+#include "razobill.h"
 #include "librazobill/SimdScanner.hpp"
 #include "librazobill/Slots.hpp"
 #include "librazobill/ThreadPool.hpp"
@@ -175,42 +175,29 @@ int main(int argc, char** argv) {
         return reconstructed.size();
     });
 
-    // 5. Universal C ABI: RzParse
-    timeOperation("C ABI RzParse", [&](const std::string& m) {
-        RzSlotRecord r{};
-        (void)RzParse(m.data(), m.size(), RZ_SCAN_SEMANTIC, &r);
-        std::size_t count = r.intCount + r.strCount;
-        RzFreeRecord(&r);
+    // 5. Universal C ABI: razobill_split
+    timeOperation("C ABI razobill_split", [&](const std::string& m) {
+        razobill_record_t r{};
+        (void)razobill_split(m.data(), m.size(), &r);
+        std::size_t count = r.int_count + r.str_count;
+        razobill_free(&r);
         return count;
     });
 
-    // 6. Universal C ABI: RzDecompose (Zero-Copy Tuple Extraction)
-    timeOperation("C ABI RzDecompose (zero-copy)", [&](const std::string& m) {
-        RzSlotRecord r{};
-        (void)RzDecompose(m.data(), m.size(), RZ_SCAN_SEMANTIC, &r);
-        std::size_t res = r.formKeyLength + r.intCount;
-        RzFreeRecord(&r);
-        return res;
-    });
-
-    // 7. Universal C ABI: RzReconstruct
-    timeOperation("C ABI RzReconstruct", [&](const std::string& m) {
-        RzSlotRecord r{};
-        (void)RzParse(m.data(), m.size(), RZ_SCAN_SEMANTIC, &r);
+    // 6. Universal C ABI: razobill_split + razobill_join (round-trip)
+    timeOperation("C ABI split + join (round-trip)", [&](const std::string& m) {
+        razobill_record_t r{};
+        (void)razobill_split(m.data(), m.size(), &r);
         std::size_t outLen = 0;
-        (void)RzReconstruct(&r, buffer, sizeof(buffer), &outLen);
-        RzFreeRecord(&r);
+        (void)razobill_join(&r, buffer, sizeof(buffer), &outLen);
+        razobill_free(&r);
         return outLen;
     });
 
-    // 8. Universal C ABI: RzReconstructSlots (Direct Arrays)
-    timeOperation("C ABI RzReconstructSlots", [&](const std::string& m) {
-        RzSlotRecord r{};
-        (void)RzDecompose(m.data(), m.size(), RZ_SCAN_SEMANTIC, &r);
+    // 7. Universal C ABI: razobill_template
+    timeOperation("C ABI razobill_template", [&](const std::string& m) {
         std::size_t outLen = 0;
-        (void)RzReconstructSlots(r.formKey, r.formKeyLength, r.intValues, r.intCount, r.strValues, r.strLengths,
-                                 r.strCount, buffer, sizeof(buffer), &outLen);
-        RzFreeRecord(&r);
+        (void)razobill_template(m.data(), m.size(), buffer, sizeof(buffer), &outLen);
         return outLen;
     });
 

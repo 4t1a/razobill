@@ -1,13 +1,6 @@
 // ==============================================================================
 // Razobill libFuzzer Harness: Continuous Invariant & Memory Safety Verification
 // ==============================================================================
-// Grounded in Proposition 1 & 2 of "Latitude and Doubt" (M. M. Atta, 2026).
-// Verifies:
-// 1. Lossless Invertibility Invariant: reconstruct(decompose(x)) == x for any byte sequence.
-// 2. Zero-crash tolerance against pathological inputs, unterminated strings, null bytes,
-//    and malformed control codes.
-// 3. Complete memory safety and leak-free execution across C++ and Universal C ABIs.
-// ==============================================================================
 
 #include <cassert>
 #include <cstddef>
@@ -18,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-#include "librazobill/RazobillC.h"
+#include "razobill.h"
 #include "librazobill/Slots.hpp"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -47,7 +40,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                       << static_cast<int>(recStatus) << "\n";
             std::abort();
         }
-        // Invariant: Reconstructed message must match input byte-for-byte
         if (rebuilt != input) {
             std::cerr << "FUZZ INVARIANT VIOLATION (Exact mode):\n"
                       << "Original:      " << input << "\n"
@@ -84,40 +76,50 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
 
     // -------------------------------------------------------------------------
-    // 3. Universal C ABI Verification: RzParse / RzReconstruct / RzFreeRecord
+    // 3. Universal C ABI Verification: razobill_split / razobill_join / razobill_free
     // -------------------------------------------------------------------------
     {
-        RzSlotRecord crec{};
-        const RzStatusCode parseCode = RzParse(reinterpret_cast<const char*>(data), size, RZ_SCAN_EXACT, &crec);
-        if (parseCode != RZ_SUCCESS) {
-            std::cerr << "FUZZ ERROR: C-ABI RzParse failed with status " << parseCode << "\n";
+        razobill_record_t crec{};
+        const razobill_status_t splitCode = razobill_split(reinterpret_cast<const char*>(data), size, &crec);
+        if (splitCode != RAZOBILL_OK) {
+            std::cerr << "FUZZ ERROR: C-ABI razobill_split failed with status " << splitCode << "\n";
             std::abort();
         }
-        // Allocate sufficient buffer for reconstruction
-        std::vector<char> buffer(size + 512);
+
+        // Buffer probing
+        size_t requiredLen = 0;
+        const razobill_status_t probeCode = razobill_join(&crec, nullptr, 0, &requiredLen);
+        if (probeCode != RAZOBILL_ERR_BUFFER_TOO_SMALL || requiredLen != size) {
+            std::cerr << "FUZZ ERROR: C-ABI razobill_join probing failed\n";
+            razobill_free(&crec);
+            std::abort();
+        }
+
+        // Allocate exact buffer
+        std::vector<char> buffer(size);
         size_t outLength = 0;
-        const RzStatusCode recCode = RzReconstruct(&crec, buffer.data(), buffer.size(), &outLength);
-        if (recCode != RZ_SUCCESS) {
-            std::cerr << "FUZZ ERROR: C-ABI RzReconstruct failed with status " << recCode << "\n";
-            RzFreeRecord(&crec);
+        const razobill_status_t joinCode = razobill_join(&crec, buffer.data(), buffer.size(), &outLength);
+        if (joinCode != RAZOBILL_OK) {
+            std::cerr << "FUZZ ERROR: C-ABI razobill_join failed with status " << joinCode << "\n";
+            razobill_free(&crec);
             std::abort();
         }
+
         const std::string_view rebuiltView(buffer.data(), outLength);
         if (rebuiltView != input) {
             std::cerr << "FUZZ C-ABI INVARIANT VIOLATION:\n"
                       << "Original:      " << input << "\n"
                       << "Reconstructed: " << rebuiltView << "\n";
-            RzFreeRecord(&crec);
+            razobill_free(&crec);
             std::abort();
         }
-        RzFreeRecord(&crec);
+        razobill_free(&crec);
     }
 
     return 0;
 }
 
 #if !defined(LIBRAZOBILL_USE_LIBFUZZER) && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-// Standalone harness when built without libFuzzer engine (e.g. local verification or MSVC)
 int main(int /*argc*/, char** /*argv*/) {
     const std::vector<std::string> testCases = {
         "Simple log line without digits",

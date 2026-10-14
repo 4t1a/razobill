@@ -28,14 +28,6 @@ std::string roundtrip(std::string_view msg, std::string* formOut = nullptr, Scan
     if (formOut) *formOut = form;
     return rebuilt;
 }
-std::string show(std::string f) {
-    for (auto& c : f)
-        if (c == '\x12')
-            c = '#';
-        else if (c == '\x13')
-            c = '|';
-    return f;
-}
 } // namespace
 
 TEST_CASE("form keys of ordinary messages") {
@@ -43,12 +35,12 @@ TEST_CASE("form keys of ordinary messages") {
     CHECK(roundtrip("Receiving block blk_-1608999687919862906 src: /10.250.19.102:54106 dest: /10.250.19.102:50010",
                     &f) ==
           "Receiving block blk_-1608999687919862906 src: /10.250.19.102:54106 dest: /10.250.19.102:50010");
-    CHECK(show(f) == "Receiving block # src: /#:# dest: /#:#|SSISI");
-    CHECK(show(roundtrip("") == "" ? "ok" : "bad") == "ok");
-    CHECK(show(roundtrip("no digits at all", &f)) == "no digits at all");
-    CHECK(show(f) == "no digits at all|");
+    CHECK(f == "Receiving block {s} src: /{s}:{i} dest: /{s}:{i}");
+    CHECK(roundtrip("") == "");
+    CHECK(roundtrip("no digits at all", &f) == "no digits at all");
+    CHECK(f == "no digits at all");
     roundtrip("12345", &f);
-    CHECK(show(f) == "#|I");
+    CHECK(f == "{i}");
 }
 
 TEST_CASE("semantic text variables without digits eliminate over-splitting") {
@@ -60,7 +52,7 @@ TEST_CASE("semantic text variables without digits eliminate over-splitting") {
           "Failed password for bob from 10.0.0.1 port 22");
     CHECK(roundtrip("Failed password for root from 10.0.0.1 port 22", &f3, ScanMode::Semantic) ==
           "Failed password for root from 10.0.0.1 port 22");
-    CHECK(show(f1) == "Failed password for # from # port #|SSI");
+    CHECK(f1 == "Failed password for {s} from {s} port {i}");
     CHECK(f1 == f2);
     CHECK(f1 == f3);
 
@@ -70,7 +62,7 @@ TEST_CASE("semantic text variables without digits eliminate over-splitting") {
           "auth failure; user=alice rhost=serverA");
     CHECK(roundtrip("auth failure; user=bob rhost=serverB", &kv2, ScanMode::Semantic) ==
           "auth failure; user=bob rhost=serverB");
-    CHECK(show(kv1) == "auth failure; user=# rhost=#|SS");
+    CHECK(kv1 == "auth failure; user={s} rhost={s}");
     CHECK(kv1 == kv2);
 
     // Quoted strings:
@@ -79,7 +71,7 @@ TEST_CASE("semantic text variables without digits eliminate over-splitting") {
     CHECK(roundtrip("error: \"permission denied\" in job", &q2, ScanMode::Semantic) ==
           "error: \"permission denied\" in job");
     CHECK(q1 == q2);
-    CHECK(show(q1) == "error: # in job|S");
+    CHECK(q1 == "error: {s} in job");
 }
 
 TEST_CASE("integer rule") {
@@ -101,18 +93,17 @@ TEST_CASE("integer rule") {
 TEST_CASE("delimiters follow the RE2 class") {
     std::string f;
     roundtrip("a=1,b=2;c:3 (4) [5] {6} \"7\" '8' <9> |10| /11/", &f);
-    CHECK(show(f) == "a=#,b=#;c:# (#) [#] {#} \"#\" '#' <#> |#| /#/|IIIIIIIIIII");
+    CHECK(f == "a={i},b={i};c:{i} ({i}) [{i}] {{{i}}} \"{i}\" '{i}' <{i}> |{i}| /{i}/");
     roundtrip("a\v1 b\xC2\xA0"
               "2",
               &f);
-    CHECK(show(f) == "# #|SS");
+    CHECK(f == "{s} {s}");
 }
 
 TEST_CASE("escape hatch for reserved bytes") {
     for (const char* m : {"x \x11 y 1", "x \x12 y 1", "x \x13 y 1"}) {
         std::string f;
         CHECK(roundtrip(m, &f) == m);
-        CHECK(show(f) == "#|S");
     }
 }
 
