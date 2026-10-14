@@ -123,7 +123,7 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
     if (nInt == 0 && nStr == 0 && (!ints.empty() || !strs.empty())) {
         return Status::Malformed;
     }
-    if (ints.size() < nInt || strs.size() < nStr) {
+    if (ints.size() != nInt || strs.size() != nStr) {
         return Status::SlotUnderflow;
     }
     if (estSize > kMaxMessageBytes) return Status::TooLarge;

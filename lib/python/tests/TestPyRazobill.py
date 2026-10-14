@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Test Suite for pyrazobill Python bindings.
-================================================================
+Unit and Integration Test Suite for pyrazobill Python library.
+==============================================================
 
 Verifies:
-1. Zero-allocation parsing: parse()
-2. Exact lossless reconstruction: reconstruct(record) == msg
-3. High-throughput batch processing: parseBatch()
-4. Multi-core audit without GIL contention: auditParallel()
-5. Canonical hashing: hash64() matching ClickHouse xxHash64
-6. Information-theoretic entropy calculation: entropy()
-7. Native DuckDB extension loading via extensionPath()
-8. Semantic mode variable token isolation without template explosion
+1. Exact lossless invertibility: RzJoin(*RzSplit(x)) == x for str and bytes.
+2. Direct container join: RzJoin(rec) == x.
+3. Fast template extraction: RzTemplate(x).
+4. Multi-line batch processing: RzSplitMany(lines).
+5. Comprehensive edge case resilience:
+   - Empty string and bytes
+   - Invalid UTF-8 bytes and NUL characters
+   - Leading zeros and oversized integers
+   - Literal braces {{ and }}
+6. Actionable error model: RzError with explanatory guidance.
+7. Public surface compliance: <= 8 names in __all__, zero banned terms.
 """
 
 import sys
@@ -22,351 +25,171 @@ from pathlib import Path
 pkg_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(pkg_dir))
 
-import pyrazobill
+import pyrazobill as rz
 
 
 class TestPyRazobill(unittest.TestCase):
-    def test_parse_and_reconstruct(self):
-        # The bedrock assertion: variable parameters are safely quarantined into slots,
-        # while reconstruct() rebuilds the exact message down to the bit.
+    def test_split_and_join_str(self):
         msg = "Failed password for root from 192.168.1.100 port 22 ssh2"
-        rec = pyrazobill.parse(msg, pyrazobill.ScanMode.Semantic)
+        rec = rz.RzSplit(msg)
 
-        self.assertIsNotNone(rec.formKey)
-        self.assertGreater(rec.formKeyHash, 0)
+        self.assertIsInstance(rec, rz.RzRecord)
+        self.assertIsInstance(rec.template, str)
+        self.assertEqual(rec.template, "Failed password for {s} from {s} port {i} {s}")
         self.assertEqual(rec.ints, [22])
-        self.assertIn("root", rec.strs)
-        self.assertIn("192.168.1.100", rec.strs)
+        self.assertEqual(rec.strs, ["root", "192.168.1.100", "ssh2"])
 
-        rebuilt = pyrazobill.reconstruct(rec)
-        self.assertEqual(rebuilt, msg)
-        self.assertEqual(rec.reconstruct(), msg)
+        # Invertibility via tuple unpacking and direct record pass
+        self.assertEqual(rz.RzJoin(*rec), msg)
+        self.assertEqual(rz.RzJoin(rec), msg)
 
-    def test_semantic_mode_collapses_usernames(self):
-        # PROOF OF MITIGATION:
-        # In Drain3, changing username from 'root' to 'admin' creates 2 separate templates
-        # if the token similarity heuristic misses.
-        # In librazobill, Semantic mode recognizes 'for <user>' and extracts both as identical forms!
-        msg1 = "Failed password for root from 10.0.0.1 port 22"
-        msg2 = "Failed password for admin from 10.0.0.1 port 22"
-        rec1 = pyrazobill.parse(msg1, pyrazobill.ScanMode.Semantic)
-        rec2 = pyrazobill.parse(msg2, pyrazobill.ScanMode.Semantic)
-        self.assertEqual(rec1.formKey, rec2.formKey)
+    def test_split_and_join_bytes(self):
+        b_msg = b"Failed password for admin from 10.0.0.1 port 2222"
+        rec = rz.RzSplit(b_msg)
 
-    def test_parse_batch(self):
-        # Multi-line batch parsing with GIL release
+        self.assertIsInstance(rec.template, bytes)
+        self.assertEqual(rec.template, b"Failed password for {s} from {s} port {i}")
+        self.assertEqual(rec.ints, [2222])
+        self.assertEqual(rec.strs, [b"admin", b"10.0.0.1"])
+
+        self.assertEqual(rz.RzJoin(*rec), b_msg)
+        self.assertEqual(rz.RzJoin(rec), b_msg)
+
+    def test_template_fast_path(self):
+        msg = "Accepted publickey for ubuntu from 10.1.2.3 port 54322 ssh2"
+        tmpl_str = rz.RzTemplate(msg)
+        self.assertEqual(tmpl_str, "Accepted publickey for {s} from {s} port {i} {s}")
+
+        b_msg = b"Accepted publickey for ubuntu from 10.1.2.3 port 54322 ssh2"
+        tmpl_bytes = rz.RzTemplate(b_msg)
+        self.assertEqual(tmpl_bytes, b"Accepted publickey for {s} from {s} port {i} {s}")
+
+    def test_split_many_batch(self):
         lines = [
             f"Receiving block blk_{i} src: /10.0.0.1:{50000 + i} dest: /10.0.0.2:50010"
-            for i in range(100)
+            for i in range(500)
         ]
-        records = pyrazobill.parseBatch(lines, pyrazobill.ScanMode.Semantic)
-        self.assertEqual(len(records), 100)
+        records = rz.RzSplitMany(lines)
+        self.assertEqual(len(records), 500)
         for i, rec in enumerate(records):
-            self.assertEqual(rec.reconstruct(), lines[i])
+            self.assertEqual(rz.RzJoin(rec), lines[i])
 
-    def test_audit_parallel(self):
-        # Multi-core audit across 4 threads
-        lines = [
-            f"Jan 12 06:14:{i % 60:02d} server sshd[{1000 + i}]: Accepted publickey for user{i} from 192.168.1.{i % 250} port {2000 + i} ssh2"
-            for i in range(5000)
+    def test_modes_semantic_vs_exact(self):
+        line1 = "Failed password for root from 10.0.0.1 port 22"
+        line2 = "Failed password for admin from 10.0.0.1 port 22"
+
+        rec1_sem = rz.RzSplit(line1, mode="semantic")
+        rec2_sem = rz.RzSplit(line2, mode="semantic")
+        self.assertEqual(rec1_sem.template, rec2_sem.template)
+        self.assertEqual(rz.RzJoin(rec1_sem), line1)
+        self.assertEqual(rz.RzJoin(rec2_sem), line2)
+
+        rec1_ex = rz.RzSplit(line1, mode="exact")
+        self.assertEqual(rz.RzJoin(rec1_ex), line1)
+
+    def test_edge_cases_empty(self):
+        rec_str = rz.RzSplit("")
+        self.assertEqual(rec_str.template, "")
+        self.assertEqual(rec_str.ints, [])
+        self.assertEqual(rec_str.strs, [])
+        self.assertEqual(rz.RzJoin(rec_str), "")
+
+        rec_bytes = rz.RzSplit(b"")
+        self.assertEqual(rec_bytes.template, b"")
+        self.assertEqual(rec_bytes.ints, [])
+        self.assertEqual(rec_bytes.strs, [])
+        self.assertEqual(rz.RzJoin(rec_bytes), b"")
+
+    def test_edge_cases_invalid_utf8_and_nul(self):
+        # Arbitrary raw byte strings with invalid UTF-8 and NUL bytes
+        raw = b"Log \xff\xfe with \x00 NUL and 12345 value \x80\x81\x82"
+        rec = rz.RzSplit(raw)
+        self.assertIsInstance(rec.template, bytes)
+        self.assertEqual(rz.RzJoin(*rec), raw)
+        self.assertEqual(rz.RzJoin(rec), raw)
+
+    def test_edge_cases_leading_zeros(self):
+        msg = "Padded IDs: 00123, 000, 0, and 456"
+        rec = rz.RzSplit(msg)
+        # Leading zeros are preserved as strings to prevent precision distortion
+        self.assertEqual(rz.RzJoin(rec), msg)
+
+    def test_edge_cases_oversized_integers(self):
+        msg = "Large token 9999999999999999999999999999999999999999 end"
+        rec = rz.RzSplit(msg)
+        self.assertEqual(rz.RzJoin(rec), msg)
+
+    def test_edge_cases_literal_braces(self):
+        msg = "Payload: {json_key: 123} and {{escaped}} braces {single"
+        rec = rz.RzSplit(msg)
+        self.assertEqual(rz.RzJoin(rec), msg)
+
+    def test_error_handling(self):
+        # Unsupported type
+        with self.assertRaises(rz.RzError) as ctx:
+            rz.RzSplit(12345)
+        self.assertIn("Unsupported input type", str(ctx.exception))
+        self.assertIn("What to do", str(ctx.exception))
+
+        # Invalid mode
+        with self.assertRaises(rz.RzError) as ctx:
+            rz.RzSplit("test", mode="unsupported")
+        self.assertIn("Invalid scan mode", str(ctx.exception))
+
+        # Join count mismatch: too few ints
+        with self.assertRaises(rz.RzError) as ctx:
+            rz.RzJoin("Port {i} and {i}", [80], [])
+        self.assertIn("Count mismatch", str(ctx.exception))
+        self.assertIn("Offending template", str(ctx.exception))
+
+        # Join count mismatch: too many strs
+        with self.assertRaises(rz.RzError) as ctx:
+            rz.RzJoin("User {s}", [], ["root", "extra"])
+        self.assertIn("Count mismatch", str(ctx.exception))
+
+        # Malformed template: unclosed brace
+        with self.assertRaises(rz.RzError) as ctx:
+            rz.RzJoin("Unclosed { brace", [], [])
+        self.assertIn("Malformed template syntax", str(ctx.exception))
+
+    def test_surface_budget(self):
+        # Surface budget hard cap: <= 8 names in __all__
+        self.assertLessEqual(len(rz.__all__), 8)
+        expected_names = {
+            "RzSplit",
+            "RzJoin",
+            "RzTemplate",
+            "RzSplitMany",
+            "RzRecord",
+            "RzError",
+            "__version__",
+        }
+        self.assertEqual(set(rz.__all__), expected_names)
+
+        # Ergonomic aliases available
+        self.assertIs(rz.split, rz.RzSplit)
+        self.assertIs(rz.join, rz.RzJoin)
+        self.assertIs(rz.template, rz.RzTemplate)
+        self.assertIs(rz.split_many, rz.RzSplitMany)
+        self.assertIs(rz.Record, rz.RzRecord)
+        self.assertIs(rz.Error, rz.RzError)
+
+    def test_zero_banned_terms(self):
+        banned = [
+            "entropy", "ledger", "latitude", "doubt", "conveyance",
+            "leakage", "channel capacity", "miller-madow", "certified interval",
+            "shannon", "arena", "slot", "form key"
         ]
-        audit = pyrazobill.auditParallel(
-            lines, pyrazobill.ScanMode.Semantic, numThreads=4
-        )
-        self.assertEqual(audit.totalLines, 5000)
-        self.assertEqual(audit.mismatches, 0)
-        expectedRate = 10000 if getattr(pyrazobill, "_NATIVE", True) else 1000
-        self.assertGreater(audit.msgsPerSec, expectedRate)
-        self.assertGreater(audit.uniqueFormsCount, 0)
+        doc = (rz.__doc__ or "").lower()
+        for term in banned:
+            self.assertNotIn(term, doc, f"Banned term '{term}' found in module docstring")
 
-    def test_hash64_test_vectors(self):
-        # Canonical test vectors for xxHash64 seed 0
-        self.assertEqual(pyrazobill.hash64(""), 0xEF46DB3751D8E999)
-        self.assertEqual(pyrazobill.hash64("a"), 0xD24EC4F1A98C6E5B)
-        self.assertEqual(pyrazobill.hash64("abc"), 0x44BC2CF5AD770999)
-
-    def test_template_of(self):
-        form = "Failed password for \x12 from \x12 port \x12\x13SSI"
-        tmpl = pyrazobill.templateOf(form)
-        self.assertEqual(tmpl, "Failed password for <*> from <*> port <*>")
-
-    def test_entropy(self):
-        # Shannon entropy calculation in bits with Neumaier compensation
-        h = pyrazobill.entropy([1.0, 1.0, 1.0, 1.0])
-        self.assertAlmostEqual(h, 2.0, places=6)
-        h_single = pyrazobill.entropy([10.0])
-        self.assertAlmostEqual(h_single, 0.0, places=6)
-
-    def test_decompose_and_tuple_reconstruct(self):
-        # High-speed tuple decomposition and free-standing reconstruct
-        msg = "Accepted publickey for ubuntu from 192.168.1.100 port 54322 ssh2"
-        formKey, ints, strs = pyrazobill.decompose(msg, pyrazobill.ScanMode.Semantic)
-        self.assertIsInstance(formKey, str)
-        self.assertEqual(ints, [54322])
-        self.assertIn("ubuntu", strs)
-        self.assertIn("192.168.1.100", strs)
-
-        # Exact byte-for-byte lossless reconstruction directly from tuple elements
-        rebuilt = pyrazobill.reconstruct(formKey, ints, strs)
-        self.assertEqual(rebuilt, msg)
-
-    def test_decompose_batch_and_threadpool(self):
-        import concurrent.futures
-
-        lines = [
-            f"Failed password for user{i} from 10.0.0.{i % 250} port {2000 + i} ssh2"
-            for i in range(1000)
-        ]
-        # Direct batch decomposition with GIL release
-        results = pyrazobill.decomposeBatch(lines, pyrazobill.ScanMode.Semantic)
-        self.assertEqual(len(results), 1000)
-        for i, (formKey, ints, strs) in enumerate(results):
-            self.assertEqual(pyrazobill.reconstruct(formKey, ints, strs), lines[i])
-
-        # Concurrent ThreadPool execution
-        chunkSize = 250
-        chunks = [lines[i : i + chunkSize] for i in range(0, len(lines), chunkSize)]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            batchFutures = list(
-                executor.map(
-                    lambda c: pyrazobill.decomposeBatch(
-                        c, pyrazobill.ScanMode.Semantic
-                    ),
-                    chunks,
-                )
-            )
-
-        flat = [item for sub in batchFutures for item in sub]
-        self.assertEqual(len(flat), 1000)
-        for i, (formKey, ints, strs) in enumerate(flat):
-            self.assertEqual(pyrazobill.reconstruct(formKey, ints, strs), lines[i])
-
-    def test_version_and_abi_contract(self):
-        # SemVer 2.0.0 contract
-        self.assertEqual(pyrazobill.__version__, "1.0.1")
-        self.assertEqual(pyrazobill.__version_info__, (1, 0, 1))
-        self.assertEqual(pyrazobill.version(), "1.0.1")
-        self.assertEqual(pyrazobill.abiVersion(), 1)
-        self.assertEqual(pyrazobill.versionInfo(), (1, 0, 1))
-
-    def test_ledger_and_vocabulary_law(self):
-        # Figure 1 toy lexicon from Atta (2026)
-        cells = [
-            pyrazobill.Cell(0, 0, 0.25),
-            pyrazobill.Cell(1, 0, 0.25),
-            pyrazobill.Cell(1, 1, 0.125),
-            pyrazobill.Cell(1, 2, 0.25),
-            pyrazobill.Cell(2, 2, 0.125),
-        ]
-        ledger = pyrazobill.computeLedger(cells, 1.0, 0.05)
-        self.assertAlmostEqual(ledger.coverage, 1.0, places=5)
-        self.assertAlmostEqual(ledger.content, 1.406, places=2)
-        self.assertAlmostEqual(ledger.expression, 1.299, places=2)
-        self.assertAlmostEqual(ledger.latitude, 0.844, places=2)
-        self.assertAlmostEqual(ledger.doubt, 0.951, places=2)
-        self.assertAlmostEqual(ledger.conveyance, 0.454, places=2)
-        self.assertTrue(ledger.satisfiesLedgerIdentities(1e-6))
-        self.assertTrue(ledger.satisfiesVocabularyLaw(3, 1e-5))
-        self.assertGreater(ledger.effectiveVocabulary, 0.0)
-        self.assertGreater(ledger.effectiveContent, 0.0)
-        self.assertAlmostEqual(
-            ledger.distance, ledger.latitude + ledger.doubt, places=6
-        )
-
-    def test_consequence_decomposition(self):
-        xy = [
-            pyrazobill.XY(0, 0, 40.0),
-            pyrazobill.XY(1, 0, 60.0),
-            pyrazobill.XY(2, 1, 30.0),
-            pyrazobill.XY(3, 1, 70.0),
-        ]
-        fmap = [
-            pyrazobill.FormMeaning(0, 0, 1.0),
-            pyrazobill.FormMeaning(1, 0, 1.0),
-            pyrazobill.FormMeaning(2, 1, 1.0),
-            pyrazobill.FormMeaning(3, 1, 1.0),
-        ]
-        decomp = pyrazobill.consequenceDecomposition(xy, fmap)
-        self.assertTrue(decomp.satisfiesIdentity(1e-9))
-        self.assertGreater(decomp.expression, 0.0)
-        self.assertGreater(decomp.consequence, 0.0)
-        self.assertGreater(decomp.latitude, 0.0)
-
-    def test_miller_madow_and_certified_interval(self):
-        corrected = pyrazobill.millerMadow(1.5, 4, 1000.0)
-        self.assertGreater(corrected, 1.5)
-
-        eps, hw = pyrazobill.certifiedInterval(25, 10000.0, 0.05)
-        self.assertGreater(eps, 0.0)
-        self.assertGreater(hw, 0.0)
-
-    def test_latitude_steganographic_channel(self):
-        seq = []
-        for i in range(16):
-            opts = [
-                pyrazobill.SynonymousOption(0, 0.25),
-                pyrazobill.SynonymousOption(1, 0.25),
-                pyrazobill.SynonymousOption(2, 0.25),
-                pyrazobill.SynonymousOption(3, 0.25),
-            ]
-            seq.append(pyrazobill.MeaningChoice(i, opts))
-
-        cap = pyrazobill.channelAnalyzeCapacity(seq)
-        self.assertAlmostEqual(cap.meanCapacityBits, 32.0, places=2)
-
-        originalMsg = 0xABCD
-        embedRes = pyrazobill.channelEmbed(seq, originalMsg, 16, 0.38196601125, 0.5)
-        self.assertTrue(embedRes.success)
-        self.assertEqual(len(embedRes.chosenForms), 16)
-
-        decRes = pyrazobill.channelDecode(seq, embedRes.chosenForms, 16, 0.38196601125)
-        self.assertTrue(decRes.success)
-        self.assertEqual(decRes.message, originalMsg)
-
-    def test_price_of_saying(self):
-        cells = [
-            pyrazobill.Cell(0, 0, 0.25),
-            pyrazobill.Cell(1, 0, 0.25),
-            pyrazobill.Cell(1, 1, 0.125),
-            pyrazobill.Cell(1, 2, 0.25),
-            pyrazobill.Cell(2, 2, 0.125),
-        ]
-        ledger = pyrazobill.computeLedger(cells, 1.0, 0.05)
-        price = pyrazobill.priceOfSaying(ledger, 500.0)
-        self.assertTrue(price.satisfiesIdentity(1e-9))
-        self.assertAlmostEqual(
-            price.expectedMeaningBits, 500.0 * ledger.content, places=6
-        )
-        self.assertAlmostEqual(price.sayingCostBits, 500.0 * ledger.latitude, places=6)
-        self.assertAlmostEqual(
-            price.totalSayingBits,
-            price.expectedMeaningBits + price.sayingCostBits,
-            places=6,
-        )
-        self.assertEqual(price.lowerBoundBits, price.totalSayingBits)
-        self.assertEqual(price.upperBoundBits, price.totalSayingBits + 2.0)
-
-    def test_depth_ledger(self):
-        steps = [
-            pyrazobill.HierarchicalStep(0, [0, 0], 0, 40.0),
-            pyrazobill.HierarchicalStep(1, [0, 0], 0, 60.0),
-            pyrazobill.HierarchicalStep(2, [1, 0], 1, 30.0),
-            pyrazobill.HierarchicalStep(3, [1, 0], 1, 70.0),
-        ]
-        dl = pyrazobill.computeDepthLedger(steps)
-        self.assertTrue(dl.satisfiesIdentity(1e-9))
-        self.assertEqual(len(dl.entropyLevels), 2)
-        self.assertEqual(len(dl.relevanceLevels), 2)
-        self.assertGreater(dl.totalEntropy, 0.0)
-        self.assertGreater(dl.totalRelevance, 0.0)
-        self.assertAlmostEqual(dl.coarsestEntropy, 0.0, places=6)
-        self.assertAlmostEqual(
-            dl.entropyLevels[0] + dl.entropyLevels[1] + dl.coarsestEntropy,
-            dl.totalEntropy,
-            places=6,
-        )
-
-    def test_channel_bounds_and_failure_probability(self):
-        seq = [
-            pyrazobill.MeaningChoice(
-                i,
-                [
-                    pyrazobill.SynonymousOption(0, 0.5),
-                    pyrazobill.SynonymousOption(1, 0.5),
-                ],
-            )
-            for i in range(10)
-        ]
-        # Proposition 9 required key bits: 10 * 1.0 + 64 + 1 = 75
-        reqBits = pyrazobill.channelRequiredKeyBits(seq, 64)
-        self.assertEqual(reqBits, 75)
-
-        cap = pyrazobill.channelAnalyzeCapacity(seq)
-        bound = pyrazobill.channelFailureProbabilityBound(cap, 5, 10.0)
-        self.assertGreaterEqual(bound, 0.0)
-        self.assertLessEqual(bound, 1.0)
-
-        # Exact failure probability on 2 choices
-        toySeq = [
-            pyrazobill.MeaningChoice(
-                0,
-                [
-                    pyrazobill.SynonymousOption(0, 0.5),
-                    pyrazobill.SynonymousOption(1, 0.5),
-                ],
-            ),
-            pyrazobill.MeaningChoice(
-                1,
-                [
-                    pyrazobill.SynonymousOption(0, 0.5),
-                    pyrazobill.SynonymousOption(1, 0.5),
-                ],
-            ),
-        ]
-        self.assertAlmostEqual(
-            pyrazobill.channelExactFailureProbability(toySeq, 1), 0.5, places=5
-        )
-        self.assertAlmostEqual(
-            pyrazobill.channelExactFailureProbability(toySeq, 0), 0.25, places=5
-        )
-        self.assertAlmostEqual(
-            pyrazobill.channelExactFailureProbability(toySeq, 2), 1.0, places=5
-        )
-
-    def test_non_utf8_binary_payload_safety(self):
-        # Protected Invariant: reconstruct(parse(m)) == m byte-for-byte for arbitrary byte strings
-        raw_bytes = b"kernel: [1234.56] usb 1-1: \xff\xfe non-utf8 token \x80\x90 id=42"
-        rec = pyrazobill.parse(raw_bytes, pyrazobill.ScanMode.Exact)
-
-        # Binary accessors must return exact bytes
-        self.assertEqual(rec.reconstructBytes(), raw_bytes)
-        self.assertEqual(pyrazobill.reconstructBytes(rec), raw_bytes)
-        self.assertIsInstance(rec.formKeyBytes, bytes)
-        self.assertIsInstance(rec.skeletonBytes, bytes)
-        self.assertIsInstance(rec.strsBytes, list)
-        for s in rec.strsBytes:
-            self.assertIsInstance(s, bytes)
-
-        # String accessors must not crash with UnicodeDecodeError (surrogateescape)
-        form_key_str = rec.formKey
-        self.assertIsInstance(form_key_str, str)
-        rebuilt_str = rec.reconstruct()
-        self.assertIsInstance(rebuilt_str, str)
-        self.assertEqual(rebuilt_str.encode("utf-8", "surrogateescape"), raw_bytes)
-
-        # Decompose -> Reconstruct via tuple API
-        fk, ints, strs = pyrazobill.decompose(raw_bytes, pyrazobill.ScanMode.Exact)
-        rebuilt_from_tuple = pyrazobill.reconstruct(fk, ints, strs)
-        self.assertEqual(rebuilt_from_tuple.encode("utf-8", "surrogateescape"), raw_bytes)
-
-        fk_b, ints_b, strs_b = pyrazobill.decomposeBytes(raw_bytes, pyrazobill.ScanMode.Exact)
-        rebuilt_from_bytes_tuple = pyrazobill.reconstructBytes(fk_b, ints_b, strs_b)
-        self.assertEqual(rebuilt_from_bytes_tuple, raw_bytes)
-
-    def test_reconstruct_error_handling(self):
-        # Malformed form key with missing slots must raise ValueError
-        with self.assertRaises(ValueError):
-            pyrazobill.reconstruct("invalid_key\x13I\x13S", [], [])
-
-        with self.assertRaises(ValueError):
-            pyrazobill.reconstructBytes("invalid_key\x13I", [], [])
-
-    def test_batch_bytes_and_surrogates(self):
-        raw_msgs = [b"user=alice id=100 status=\xff\xfe", b"user=bob id=200 status=\xaa\xbb"]
-        # Batch decompose with bytes
-        batch = pyrazobill.decomposeBatch(raw_msgs)
-        self.assertEqual(len(batch), 2)
-
-        batch_b = pyrazobill.decomposeBatchBytes(raw_msgs)
-        self.assertEqual(len(batch_b), 2)
-        self.assertIsInstance(batch_b[0][0], bytes)
-
-        # Audit parallel with bytes
-        res = pyrazobill.auditParallel(raw_msgs, pyrazobill.ScanMode.Exact, numThreads=2)
-        self.assertEqual(res.totalLines, 2)
-        self.assertEqual(res.mismatches, 0)
+        for name in rz.__all__:
+            obj = getattr(rz, name)
+            obj_doc = (getattr(obj, "__doc__", "") or "").lower()
+            for term in banned:
+                self.assertNotIn(term, obj_doc, f"Banned term '{term}' found in docstring of {name}")
 
 
 if __name__ == "__main__":
     unittest.main()
-

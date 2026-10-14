@@ -58,6 +58,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyd
+*.old*
 *.egg-info/
 .eggs/
 dist/

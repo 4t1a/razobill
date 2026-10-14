@@ -1,716 +1,395 @@
-// High-Performance Pybind11 Python Bindings for librazobill.
-// Exposes pyrazobill module with zero-underscore ergonomic naming and memory-safe slot record lifetime.
-//
-// ARCHITECTURE: Memory Lifetime Safety in Python
-// In C++, zero-copy parsing uses `std::string_view` into an existing buffer.
-// In Python, string objects are transient and managed by CPython's reference-counting GC.
-// If Python code executes:
-//     rec = pyrazobill.parse("some log line")
-// the Python string might be garbage collected immediately after the function returns!
-//
-// To guarantee 100% safety with zero dangling pointers, `PySlotRecord` takes ownership of the
-// underlying string in a `std::shared_ptr<std::string>`.
-// Even if the caller discards their original Python string, the record keeps the memory alive.
-// Zero crashes. Zero segfaults. Absolute memory safety.
+// PyRazobill: Pybind11 Python bindings for librazobill.
+// Provides zero-allocation C++20 parsing, exact lossless joining, and multi-core batch processing.
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <chrono>
-#include <filesystem>
+#include <cstdint>
 #include <memory>
+#include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "librazobill/Channel.hpp"
-#include "librazobill/Hash.hpp"
 #include "librazobill/Slots.hpp"
-#include "librazobill/Stats.hpp"
 #include "librazobill/ThreadPool.hpp"
 #include "librazobill/Version.hpp"
 
 namespace py = pybind11;
 using namespace razobill;
 
-inline py::object toPyStrSafe(std::string_view sv) {
-    PyObject* u = PyUnicode_DecodeUTF8(sv.data(), static_cast<Py_ssize_t>(sv.size()), "surrogateescape");
-    if (!u) {
-        throw py::error_already_set();
-    }
-    return py::reinterpret_steal<py::object>(u);
+namespace {
+
+core::ScanMode parseMode(const std::string& mode) {
+    if (mode == "semantic") return core::ScanMode::Semantic;
+    if (mode == "exact") return core::ScanMode::Exact;
+    throw py::value_error(
+        "[razobill] What happened: Invalid scan mode. "
+        "Why: Expected 'semantic' or 'exact', got '" + mode + "'. "
+        "What to do: Pass mode='semantic' (default) or mode='exact'."
+    );
 }
 
-inline std::string toCppBytesSafe(const py::handle& obj) {
-    if (py::isinstance<py::bytes>(obj)) {
-        return obj.cast<std::string>();
+std::string truncateOffending(std::string_view sv, size_t maxLen = 80) {
+    if (sv.size() <= maxLen) return std::string(sv);
+    return std::string(sv.substr(0, maxLen - 3)) + "...";
+}
+
+std::string formatJoinError(Status st, std::string_view tmpl) {
+    std::string why;
+    switch (st) {
+    case Status::SlotUnderflow:
+        why = "Count mismatch (template has more or fewer placeholders than provided values)";
+        break;
+    case Status::Malformed:
+        why = "Malformed template syntax or unclosed brace";
+        break;
+    case Status::TooLarge:
+        why = "Reconstructed message exceeds maximum permitted size (16 MB)";
+        break;
+    default:
+        why = std::string(razobill::describe(st));
+        break;
     }
-    if (py::isinstance<py::str>(obj)) {
-        PyObject* encoded = PyUnicode_AsEncodedString(obj.ptr(), "utf-8", "surrogateescape");
-        if (!encoded) {
+    return "[razobill] What happened: Failed to join log components. "
+           "Why: " + why + ". "
+           "What to do: Verify that {i} and {s} placeholders match the provided integers and strings. "
+           "Offending template: '" + truncateOffending(tmpl) + "'.";
+}
+
+py::tuple splitOne(const py::object& input, const std::string& modeStr) {
+    const core::ScanMode mode = parseMode(modeStr);
+
+    if (py::isinstance<py::bytes>(input)) {
+        py::bytes b = input.cast<py::bytes>();
+        char* buf = nullptr;
+        Py_ssize_t len = 0;
+        PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
+        std::string_view sv(buf, static_cast<size_t>(len));
+
+        if (sv.empty()) {
+            return py::make_tuple(py::bytes(""), py::list(), py::list());
+        }
+
+        core::SlotRecord slots;
+        Status st = core::parse(sv, slots, mode);
+        if (st != Status::Ok) {
+            throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
+                                  std::string(razobill::describe(st)) +
+                                  ". What to do: Check input data integrity.");
+        }
+
+        py::bytes tmpl(slots.templateStr.data(), slots.templateStr.size());
+        py::list intList;
+        for (int64_t v : slots.ints) intList.append(v);
+        py::list strList;
+        for (const auto& s : slots.strs) strList.append(py::bytes(s.data(), s.size()));
+
+        return py::make_tuple(tmpl, intList, strList);
+    }
+
+    if (py::isinstance<py::str>(input)) {
+        PyObject* encoded = PyUnicode_AsEncodedString(input.ptr(), "utf-8", "surrogateescape");
+        if (!encoded) throw py::error_already_set();
+
+        char* buf = PyBytes_AS_STRING(encoded);
+        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
+        std::string_view sv(buf, static_cast<size_t>(len));
+
+        if (sv.empty()) {
+            Py_DECREF(encoded);
+            return py::make_tuple(py::str(""), py::list(), py::list());
+        }
+
+        core::SlotRecord slots;
+        Status st = core::parse(sv, slots, mode);
+        if (st != Status::Ok) {
+            Py_DECREF(encoded);
+            throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
+                                  std::string(razobill::describe(st)) +
+                                  ". What to do: Check input data integrity.");
+        }
+
+        PyObject* pyTmpl = PyUnicode_DecodeUTF8(slots.templateStr.data(),
+                                                static_cast<Py_ssize_t>(slots.templateStr.size()),
+                                                "surrogateescape");
+        if (!pyTmpl) {
+            Py_DECREF(encoded);
             throw py::error_already_set();
         }
-        const char* buf = PyBytes_AS_STRING(encoded);
-        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
-        std::string res(buf, static_cast<std::size_t>(len));
+        py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
+
+        py::list intList;
+        for (int64_t v : slots.ints) intList.append(v);
+
+        py::list strList;
+        for (const auto& s : slots.strs) {
+            PyObject* pyS = PyUnicode_DecodeUTF8(s.data(), static_cast<Py_ssize_t>(s.size()), "surrogateescape");
+            if (!pyS) {
+                Py_DECREF(encoded);
+                throw py::error_already_set();
+            }
+            strList.append(py::reinterpret_steal<py::object>(pyS));
+        }
+
         Py_DECREF(encoded);
-        return res;
+        return py::make_tuple(tmplObj, intList, strList);
     }
-    throw py::type_error("Expected str or bytes");
+
+    std::string typeName = py::str(input.get_type());
+    throw py::type_error("[razobill] What happened: Unsupported input type. "
+                         "Why: Expected str or bytes, got " + typeName + ". "
+                         "What to do: Pass a str or bytes object.");
 }
 
-// Python-facing SlotRecord: owns its underlying message buffer to prevent dangling string views.
-struct PySlotRecord {
-    std::shared_ptr<std::string> msgBuffer;
-    core::SlotRecord slots;
+py::object templateOne(const py::object& input, const std::string& modeStr) {
+    const core::ScanMode mode = parseMode(modeStr);
 
-    PySlotRecord() = default;
+    if (py::isinstance<py::bytes>(input)) {
+        py::bytes b = input.cast<py::bytes>();
+        char* buf = nullptr;
+        Py_ssize_t len = 0;
+        PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
+        std::string_view sv(buf, static_cast<size_t>(len));
 
-    explicit PySlotRecord(std::string msg, core::ScanMode mode = core::ScanMode::Semantic)
-        : msgBuffer(std::make_shared<std::string>(std::move(msg))) {
-        (void)core::parse(*msgBuffer, slots, mode);
-    }
+        if (sv.empty()) return py::bytes("");
 
-    [[nodiscard]] py::object formKey() const { return toPyStrSafe(slots.formKey()); }
-    [[nodiscard]] py::bytes formKeyBytes() const {
-        std::string k = slots.formKey();
-        return py::bytes(k);
-    }
-    [[nodiscard]] std::uint64_t formKeyHash() const noexcept { return slots.formKeyHash(); }
-    [[nodiscard]] const std::vector<std::int64_t>& ints() const noexcept { return slots.ints; }
-    [[nodiscard]] py::list strs() const {
-        py::list v;
-        for (const auto& sv : slots.strs)
-            v.append(toPyStrSafe(sv));
-        return v;
-    }
-    [[nodiscard]] py::list strsBytes() const {
-        py::list v;
-        for (const auto& sv : slots.strs)
-            v.append(py::bytes(sv.data(), sv.size()));
-        return v;
-    }
-    [[nodiscard]] py::object skeleton() const { return toPyStrSafe(slots.skeleton); }
-    [[nodiscard]] py::bytes skeletonBytes() const { return py::bytes(slots.skeleton); }
-    [[nodiscard]] const std::string& types() const noexcept { return slots.types; }
-
-    [[nodiscard]] py::object reconstruct() const {
-        std::string out;
-        std::string key = slots.formKey();
-        auto s = core::reconstruct(key, slots.ints, slots.strs, out);
-        if (s != Status::Ok) {
-            throw py::value_error(std::string("reconstruct failed: ") + razobill::describe(s));
+        core::SlotRecord slots;
+        Status st = core::parse(sv, slots, mode);
+        if (st != Status::Ok) {
+            throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
+                                  std::string(razobill::describe(st)) +
+                                  ". What to do: Check input data integrity.");
         }
-        return toPyStrSafe(out);
+        return py::bytes(slots.templateStr.data(), slots.templateStr.size());
     }
 
-    [[nodiscard]] py::bytes reconstructBytes() const {
-        std::string out;
-        std::string key = slots.formKey();
-        auto s = core::reconstruct(key, slots.ints, slots.strs, out);
-        if (s != Status::Ok) {
-            throw py::value_error(std::string("reconstructBytes failed: ") + razobill::describe(s));
+    if (py::isinstance<py::str>(input)) {
+        PyObject* encoded = PyUnicode_AsEncodedString(input.ptr(), "utf-8", "surrogateescape");
+        if (!encoded) throw py::error_already_set();
+
+        char* buf = PyBytes_AS_STRING(encoded);
+        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
+        std::string_view sv(buf, static_cast<size_t>(len));
+
+        if (sv.empty()) {
+            Py_DECREF(encoded);
+            return py::str("");
         }
-        return py::bytes(out);
-    }
-};
 
-struct AuditResult {
-    std::size_t totalLines = 0;
-    std::size_t totalBytes = 0;
-    double elapsedSec = 0.0;
-    std::size_t uniqueFormsCount = 0;
-    double msgsPerSec = 0.0;
-    double mbPerSec = 0.0;
-    std::size_t mismatches = 0;
-};
-
-// Multi-threaded audit with zero GIL contention
-AuditResult auditBatchParallel(const std::vector<std::string>& lines, core::ScanMode mode = core::ScanMode::Semantic,
-                               std::size_t numThreads = 0) {
-    if (numThreads == 0) numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) numThreads = 1;
-
-    AuditResult result;
-    result.totalLines = lines.size();
-    for (const auto& l : lines)
-        result.totalBytes += l.size();
-
-    const auto t0 = std::chrono::steady_clock::now();
-
-    core::ThreadPool pool(numThreads);
-    const std::size_t chunkSize = std::max<std::size_t>(1000, (lines.size() + numThreads - 1) / numThreads);
-
-    std::vector<std::size_t> localMismatches(numThreads, 0);
-    std::vector<std::unordered_set<std::uint64_t>> localForms(numThreads);
-
-    pool.parallelFor(lines.size(), chunkSize, [&](std::size_t start, std::size_t end) {
-        std::size_t workerId = (start / chunkSize) % numThreads;
-        core::SlotRecord localSlots;
-        std::string localRebuilt;
-        std::string localKey;
-
-        for (std::size_t i = start; i < end; ++i) {
-            const auto& line = lines[i];
-            if (core::parse(line, localSlots, mode) != Status::Ok) continue;
-            localSlots.formKey(localKey);
-            localForms[workerId].insert(core::xxh64(localKey));
-
-            if (core::reconstruct(localKey, localSlots.ints, localSlots.strs, localRebuilt) != Status::Ok ||
-                localRebuilt != line) {
-                localMismatches[workerId]++;
-            }
+        core::SlotRecord slots;
+        Status st = core::parse(sv, slots, mode);
+        if (st != Status::Ok) {
+            Py_DECREF(encoded);
+            throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
+                                  std::string(razobill::describe(st)) +
+                                  ". What to do: Check input data integrity.");
         }
-    });
 
-    const auto t1 = std::chrono::steady_clock::now();
-    result.elapsedSec = std::chrono::duration<double>(t1 - t0).count();
-
-    std::unordered_set<std::uint64_t> combinedForms;
-    for (std::size_t t = 0; t < numThreads; ++t) {
-        result.mismatches += localMismatches[t];
-        combinedForms.insert(localForms[t].begin(), localForms[t].end());
-    }
-    result.uniqueFormsCount = combinedForms.size();
-
-    if (result.elapsedSec > 0) {
-        result.msgsPerSec = static_cast<double>(result.totalLines) / result.elapsedSec;
-        result.mbPerSec = (static_cast<double>(result.totalBytes) / (1024.0 * 1024.0)) / result.elapsedSec;
+        PyObject* pyTmpl = PyUnicode_DecodeUTF8(slots.templateStr.data(),
+                                                static_cast<Py_ssize_t>(slots.templateStr.size()),
+                                                "surrogateescape");
+        Py_DECREF(encoded);
+        if (!pyTmpl) throw py::error_already_set();
+        return py::reinterpret_steal<py::object>(pyTmpl);
     }
 
-    return result;
+    std::string typeName = py::str(input.get_type());
+    throw py::type_error("[razobill] What happened: Unsupported input type. "
+                         "Why: Expected str or bytes, got " + typeName + ". "
+                         "What to do: Pass a str or bytes object.");
 }
 
-/**
- * @brief PyBind11 Python module initialization for the pyrazobill C++20 engine.
- *
- * Exposes zero-copy log tokenization, structural slot extraction, bit-level
- * lossless reconstruction, Shannon entropy computation, and dual-key information
- * channel ledger analysis to Python runtimes.
- *
- * @param Core Target Python module handle.
- * @param m Module builder reference.
- */
-PYBIND11_MODULE(Core, m) {
-    m.doc() = "pyrazobill: High-performance log parsing and information-theoretic analysis engine";
+py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const py::sequence& strsSeq) {
+    const bool isBytes = py::isinstance<py::bytes>(tmplObj);
+    const bool isStr = py::isinstance<py::str>(tmplObj);
 
-    // -------------------------------------------------------------------------
-    // 1. Scan Mode Enumeration & Core Slot Record Structures
-    // -------------------------------------------------------------------------
-    py::enum_<core::ScanMode>(m, "ScanMode")
-        .value("Exact", core::ScanMode::Exact)
-        .value("DigitOnly", core::ScanMode::DigitOnly)
-        .value("Semantic", core::ScanMode::Semantic)
-        .export_values();
+    if (!isBytes && !isStr) {
+        std::string typeName = py::str(tmplObj.get_type());
+        throw py::type_error("[razobill] What happened: Unsupported template type. "
+                             "Why: Expected str or bytes, got " + typeName + ". "
+                             "What to do: Pass a str or bytes template.");
+    }
 
-    // PySlotRecord: Python wrapper over core::Slots for zero-copy field access.
-    py::class_<PySlotRecord>(m, "SlotRecord")
-        .def(py::init<>())
-        .def_property_readonly("formKey", &PySlotRecord::formKey)
-        .def_property_readonly("formKeyBytes", &PySlotRecord::formKeyBytes)
-        .def_property_readonly("formKeyHash", &PySlotRecord::formKeyHash)
-        .def_property_readonly("ints", &PySlotRecord::ints)
-        .def_property_readonly("strs", &PySlotRecord::strs)
-        .def_property_readonly("strsBytes", &PySlotRecord::strsBytes)
-        .def_property_readonly("skeleton", &PySlotRecord::skeleton)
-        .def_property_readonly("skeletonBytes", &PySlotRecord::skeletonBytes)
-        .def_property_readonly("types", &PySlotRecord::types)
-        .def("reconstruct", &PySlotRecord::reconstruct)
-        .def("reconstructBytes", &PySlotRecord::reconstructBytes)
-        .def("__repr__", [](const PySlotRecord& s) {
-            return "<pyrazobill.SlotRecord ints=" + std::to_string(s.ints().size()) +
-                   " strs=" + std::to_string(s.slots.strs.size()) + ">";
-        });
+    std::string tmplStorage;
+    std::string_view tmplView;
 
-    py::class_<AuditResult>(m, "AuditResult")
-        .def_readonly("totalLines", &AuditResult::totalLines)
-        .def_readonly("totalBytes", &AuditResult::totalBytes)
-        .def_readonly("elapsedSec", &AuditResult::elapsedSec)
-        .def_readonly("uniqueFormsCount", &AuditResult::uniqueFormsCount)
-        .def_readonly("msgsPerSec", &AuditResult::msgsPerSec)
-        .def_readonly("mbPerSec", &AuditResult::mbPerSec)
-        .def_readonly("mismatches", &AuditResult::mismatches)
-        .def("__repr__", [](const AuditResult& a) {
-            return "<AuditResult lines=" + std::to_string(a.totalLines) +
-                   " msgsPerSec=" + std::to_string(static_cast<long long>(a.msgsPerSec)) +
-                   " mismatches=" + std::to_string(a.mismatches) + ">";
-        });
+    PyObject* encodedTmpl = nullptr;
+    if (isBytes) {
+        char* buf = nullptr;
+        Py_ssize_t len = 0;
+        PYBIND11_BYTES_AS_STRING_AND_SIZE(tmplObj.ptr(), &buf, &len);
+        tmplView = std::string_view(buf, static_cast<size_t>(len));
+    } else {
+        encodedTmpl = PyUnicode_AsEncodedString(tmplObj.ptr(), "utf-8", "surrogateescape");
+        if (!encodedTmpl) throw py::error_already_set();
+        tmplView = std::string_view(PyBytes_AS_STRING(encodedTmpl), static_cast<size_t>(PyBytes_GET_SIZE(encodedTmpl)));
+    }
 
-    m.def(
-        "parse", [](const py::object& msgObj, core::ScanMode mode) {
-            return PySlotRecord(toCppBytesSafe(msgObj), mode);
-        },
-        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Parses a single log line into a SlotRecord");
+    std::vector<int64_t> ints;
+    ints.reserve(py::len(intsSeq));
+    for (auto item : intsSeq) {
+        ints.push_back(item.cast<int64_t>());
+    }
 
-    m.def(
-        "parseBatch",
-        [](const py::iterable& msgsObj, core::ScanMode mode) {
-            std::vector<std::string> rawMsgs;
-            for (auto item : msgsObj) {
-                rawMsgs.push_back(toCppBytesSafe(item));
-            }
-            std::vector<PySlotRecord> records;
-            records.reserve(rawMsgs.size());
-            {
-                py::gil_scoped_release release;
-                for (auto& msg : rawMsgs) {
-                    records.emplace_back(std::move(msg), mode);
-                }
-            }
-            return records;
-        },
-        py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic, "Parses a batch of log lines releasing GIL");
+    std::vector<PyObject*> encodedStrs;
+    std::vector<std::string_view> strViews;
+    strViews.reserve(py::len(strsSeq));
 
-    m.def(
-        "reconstruct", [](const PySlotRecord& record) { return record.reconstruct(); }, py::arg("record"),
-        "Reconstructs the original log line with 100% exact fidelity");
-
-    m.def(
-        "reconstruct",
-        [](const py::object& formKeyObj, const std::vector<std::int64_t>& ints, const py::iterable& strsObj) {
-            std::string formKey = toCppBytesSafe(formKeyObj);
-            std::vector<std::string> strs;
-            for (auto item : strsObj) {
-                strs.push_back(toCppBytesSafe(item));
-            }
-            std::vector<std::string_view> strViews;
-            strViews.reserve(strs.size());
-            for (const auto& s : strs)
-                strViews.emplace_back(s);
-            std::string out;
-            auto s = core::reconstruct(formKey, ints, strViews, out);
-            if (s != Status::Ok) {
-                throw py::value_error(std::string("reconstruct failed: ") + razobill::describe(s));
-            }
-            return toPyStrSafe(out);
-        },
-        py::arg("formKey"), py::arg("ints"), py::arg("strs"),
-        "Reconstructs the original log line from decomposed slots");
-
-    m.def(
-        "reconstructBytes", [](const PySlotRecord& record) { return record.reconstructBytes(); }, py::arg("record"),
-        "Reconstructs the original log line as exact bytes with 100% fidelity");
-
-    m.def(
-        "reconstructBytes",
-        [](const py::object& formKeyObj, const std::vector<std::int64_t>& ints, const py::iterable& strsObj) {
-            std::string formKey = toCppBytesSafe(formKeyObj);
-            std::vector<std::string> strs;
-            for (auto item : strsObj) {
-                strs.push_back(toCppBytesSafe(item));
-            }
-            std::vector<std::string_view> strViews;
-            strViews.reserve(strs.size());
-            for (const auto& s : strs)
-                strViews.emplace_back(s);
-            std::string out;
-            auto s = core::reconstruct(formKey, ints, strViews, out);
-            if (s != Status::Ok) {
-                throw py::value_error(std::string("reconstructBytes failed: ") + razobill::describe(s));
-            }
-            return py::bytes(out);
-        },
-        py::arg("formKey"), py::arg("ints"), py::arg("strs"),
-        "Reconstructs the original log line as raw bytes from decomposed slots");
-
-    m.def(
-        "decompose",
-        [](const py::object& msgObj, core::ScanMode mode) {
-            std::string msg = toCppBytesSafe(msgObj);
-            core::SlotRecord slots;
-            (void)core::parse(msg, slots, mode);
-            py::list pyStrs;
-            for (const auto& sv : slots.strs)
-                pyStrs.append(toPyStrSafe(sv));
-            return py::make_tuple(toPyStrSafe(slots.formKey()), slots.ints, std::move(pyStrs));
-        },
-        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic,
-        "Decomposes a message into (formKey, ints, strs) tuple");
-
-    m.def(
-        "decomposeBytes",
-        [](const py::object& msgObj, core::ScanMode mode) {
-            std::string msg = toCppBytesSafe(msgObj);
-            core::SlotRecord slots;
-            (void)core::parse(msg, slots, mode);
-            py::list pyStrs;
-            for (const auto& sv : slots.strs)
-                pyStrs.append(py::bytes(sv.data(), sv.size()));
-            std::string k = slots.formKey();
-            return py::make_tuple(py::bytes(k), slots.ints, std::move(pyStrs));
-        },
-        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic,
-        "Decomposes a message into (formKeyBytes, ints, strsBytes) tuple");
-
-    struct DecomposedBatchItem {
-        std::string formKey;
-        std::vector<std::int64_t> ints;
-        std::vector<std::string> strs;
+    auto cleanup = [&]() {
+        if (encodedTmpl) Py_DECREF(encodedTmpl);
+        for (PyObject* obj : encodedStrs) {
+            Py_DECREF(obj);
+        }
     };
 
-    m.def(
-        "decomposeBatch",
-        [](const py::iterable& msgsObj, core::ScanMode mode) {
-            std::vector<std::string> rawMsgs;
-            for (auto item : msgsObj) {
-                rawMsgs.push_back(toCppBytesSafe(item));
+    for (auto item : strsSeq) {
+        if (py::isinstance<py::bytes>(item)) {
+            char* buf = nullptr;
+            Py_ssize_t len = 0;
+            PYBIND11_BYTES_AS_STRING_AND_SIZE(item.ptr(), &buf, &len);
+            strViews.emplace_back(buf, static_cast<size_t>(len));
+        } else if (py::isinstance<py::str>(item)) {
+            PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
+            if (!enc) {
+                cleanup();
+                throw py::error_already_set();
             }
-            std::vector<DecomposedBatchItem> batch;
-            batch.reserve(rawMsgs.size());
-            {
-                py::gil_scoped_release release;
-                for (const auto& msg : rawMsgs) {
-                    core::SlotRecord slots;
-                    (void)core::parse(msg, slots, mode);
-                    DecomposedBatchItem item;
-                    item.formKey = slots.formKey();
-                    item.ints = std::move(slots.ints);
-                    item.strs.reserve(slots.strs.size());
-                    for (const auto& sv : slots.strs) {
-                        item.strs.emplace_back(sv);
+            encodedStrs.push_back(enc);
+            strViews.emplace_back(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc)));
+        } else {
+            cleanup();
+            std::string tn = py::str(item.get_type());
+            throw py::type_error("[razobill] What happened: Unsupported string slot element type. "
+                                 "Why: Expected str or bytes in strs list, got " + tn + ". "
+                                 "What to do: Ensure all elements in strs are str or bytes.");
+        }
+    }
+
+    std::string result;
+    Status st = core::reconstruct(tmplView, ints, strViews, result);
+    if (st != Status::Ok) {
+        std::string err = formatJoinError(st, tmplView);
+        cleanup();
+        throw py::value_error(err);
+    }
+
+    if (isBytes) {
+        cleanup();
+        return py::bytes(result.data(), result.size());
+    } else {
+        PyObject* pyRes = PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
+        cleanup();
+        if (!pyRes) throw py::error_already_set();
+        return py::reinterpret_steal<py::object>(pyRes);
+    }
+}
+
+py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
+    const core::ScanMode mode = parseMode(modeStr);
+    const size_t total = py::len(inputs);
+
+    struct InputItem {
+        std::string bytes;
+        bool isBytes;
+    };
+
+    std::vector<InputItem> rawInputs;
+    rawInputs.reserve(total);
+
+    for (size_t i = 0; i < total; ++i) {
+        py::object item = inputs[i];
+        if (py::isinstance<py::bytes>(item)) {
+            char* buf = nullptr;
+            Py_ssize_t len = 0;
+            PYBIND11_BYTES_AS_STRING_AND_SIZE(item.ptr(), &buf, &len);
+            rawInputs.push_back(InputItem{std::string(buf, static_cast<size_t>(len)), true});
+        } else if (py::isinstance<py::str>(item)) {
+            PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
+            if (!enc) throw py::error_already_set();
+            rawInputs.push_back(InputItem{std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))), false});
+            Py_DECREF(enc);
+        } else {
+            std::string tn = py::str(item.get_type());
+            throw py::type_error("[razobill] What happened: Unsupported item type in split_many at index " +
+                                 std::to_string(i) + ". Why: Expected str or bytes, got " + tn + ". "
+                                 "What to do: Pass an iterable of str or bytes.");
+        }
+    }
+
+    std::vector<core::SlotRecord> records(total);
+
+    // Release GIL for multi-threaded parsing
+    {
+        py::gil_scoped_release release;
+        if (total > 128) {
+            static core::ThreadPool pool;
+            pool.parallelFor(total, 256, [&](size_t start, size_t end) {
+                for (size_t idx = start; idx < end; ++idx) {
+                    if (!rawInputs[idx].bytes.empty()) {
+                        (void)core::parse(rawInputs[idx].bytes, records[idx], mode);
                     }
-                    batch.push_back(std::move(item));
+                }
+            });
+        } else {
+            for (size_t idx = 0; idx < total; ++idx) {
+                if (!rawInputs[idx].bytes.empty()) {
+                    (void)core::parse(rawInputs[idx].bytes, records[idx], mode);
                 }
             }
-            std::vector<std::tuple<py::object, std::vector<std::int64_t>, py::list>> results;
-            results.reserve(batch.size());
-            for (auto& item : batch) {
-                py::list pyStrs;
-                for (const auto& s : item.strs)
-                    pyStrs.append(toPyStrSafe(s));
-                results.emplace_back(toPyStrSafe(item.formKey), std::move(item.ints), std::move(pyStrs));
+        }
+    }
+
+    // Build Python return list with GIL reacquired
+    py::list outList;
+    for (size_t i = 0; i < total; ++i) {
+        const auto& rec = records[i];
+        const bool itemIsBytes = rawInputs[i].isBytes;
+
+        py::list intList;
+        for (int64_t v : rec.ints) intList.append(v);
+
+        if (itemIsBytes) {
+            py::bytes tmpl(rec.templateStr.data(), rec.templateStr.size());
+            py::list strList;
+            for (const auto& s : rec.strs) {
+                strList.append(py::bytes(s.data(), s.size()));
             }
-            return results;
-        },
-        py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
-        "High-speed batch decomposition into (formKey, ints, strs) tuples releasing GIL during parsing");
+            outList.append(py::make_tuple(tmpl, intList, strList));
+        } else {
+            PyObject* pyTmpl = PyUnicode_DecodeUTF8(rec.templateStr.data(),
+                                                    static_cast<Py_ssize_t>(rec.templateStr.size()),
+                                                    "surrogateescape");
+            if (!pyTmpl) throw py::error_already_set();
+            py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
 
-    m.def(
-        "decomposeBatchBytes",
-        [](const py::iterable& msgsObj, core::ScanMode mode) {
-            std::vector<std::string> rawMsgs;
-            for (auto item : msgsObj) {
-                rawMsgs.push_back(toCppBytesSafe(item));
+            py::list strList;
+            for (const auto& s : rec.strs) {
+                PyObject* pyS = PyUnicode_DecodeUTF8(s.data(), static_cast<Py_ssize_t>(s.size()), "surrogateescape");
+                if (!pyS) throw py::error_already_set();
+                strList.append(py::reinterpret_steal<py::object>(pyS));
             }
-            std::vector<DecomposedBatchItem> batch;
-            batch.reserve(rawMsgs.size());
-            {
-                py::gil_scoped_release release;
-                for (const auto& msg : rawMsgs) {
-                    core::SlotRecord slots;
-                    (void)core::parse(msg, slots, mode);
-                    DecomposedBatchItem item;
-                    item.formKey = slots.formKey();
-                    item.ints = std::move(slots.ints);
-                    item.strs.reserve(slots.strs.size());
-                    for (const auto& sv : slots.strs) {
-                        item.strs.emplace_back(sv);
-                    }
-                    batch.push_back(std::move(item));
-                }
-            }
-            std::vector<std::tuple<py::bytes, std::vector<std::int64_t>, py::list>> results;
-            results.reserve(batch.size());
-            for (auto& item : batch) {
-                py::list pyStrs;
-                for (const auto& s : item.strs)
-                    pyStrs.append(py::bytes(s.data(), s.size()));
-                results.emplace_back(py::bytes(item.formKey.data(), item.formKey.size()), std::move(item.ints), std::move(pyStrs));
-            }
-            return results;
-        },
-        py::arg("msgs"), py::arg("mode") = core::ScanMode::Semantic,
-        "High-speed batch decomposition into (formKeyBytes, ints, strsBytes) tuples releasing GIL during parsing");
+            outList.append(py::make_tuple(tmplObj, intList, strList));
+        }
+    }
 
-    m.def(
-        "formKey",
-        [](const py::object& msgObj, core::ScanMode mode) {
-            std::string msg = toCppBytesSafe(msgObj);
-            core::SlotRecord slots;
-            (void)core::parse(msg, slots, mode);
-            return toPyStrSafe(slots.formKey());
-        },
-        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Extracts the canonical form key");
+    return outList;
+}
 
-    m.def(
-        "formKeyBytes",
-        [](const py::object& msgObj, core::ScanMode mode) {
-            std::string msg = toCppBytesSafe(msgObj);
-            core::SlotRecord slots;
-            (void)core::parse(msg, slots, mode);
-            return py::bytes(slots.formKey());
-        },
-        py::arg("msg"), py::arg("mode") = core::ScanMode::Semantic, "Extracts the canonical form key as raw bytes");
+} // namespace
 
-    m.def(
-        "templateOf",
-        [](const py::object& formObj) {
-            std::string form = toCppBytesSafe(formObj);
-            std::string tmpl;
-            (void)core::templateOf(form, tmpl);
-            return toPyStrSafe(tmpl);
-        },
-        py::arg("form"), "Converts form key to human-readable <*> template");
+PYBIND11_MODULE(Core, m) {
+    m.doc() = "Razobill native C++20 SIMD core module";
 
-    m.def(
-        "templateOfBytes",
-        [](const py::object& formObj) {
-            std::string form = toCppBytesSafe(formObj);
-            std::string tmpl;
-            (void)core::templateOf(form, tmpl);
-            return py::bytes(tmpl);
-        },
-        py::arg("form"), "Converts form key to human-readable <*> template byte string");
-
-    m.def(
-        "hash64", [](const py::object& sObj) { return core::xxh64(toCppBytesSafe(sObj)); }, py::arg("s"),
-        "Computes 64-bit XXH64 hash matching ClickHouse xxHash64");
-
-    m.def(
-        "entropy", [](const std::vector<double>& counts) { return stats::entropyOfCounts(counts); }, py::arg("counts"),
-        "Calculates Shannon entropy in bits with Neumaier compensation");
-
-    m.def(
-        "auditParallel",
-        [](const py::iterable& linesObj, core::ScanMode mode, std::size_t numThreads) {
-            std::vector<std::string> lines;
-            for (auto item : linesObj) {
-                lines.push_back(toCppBytesSafe(item));
-            }
-            AuditResult res;
-            {
-                py::gil_scoped_release release;
-                res = auditBatchParallel(lines, mode, numThreads);
-            }
-            return res;
-        },
-        py::arg("lines"), py::arg("mode") = core::ScanMode::Semantic, py::arg("numThreads") = 0,
-        "High-performance parallel audit verifying 100% byte-for-byte lossless invertibility");
-
-    m.def(
-        "extensionPath", []() { return std::filesystem::absolute("build/librazobill.duckdb_extension").string(); },
-        "Returns the absolute path to the DuckDB loadable extension");
-
-    m.def(
-        "version", []() { return std::string(razobill::versionString()); },
-        "Returns the SemVer 2.0.0 release version string");
-
-    m.def("abiVersion", []() { return razobill::abiVersion(); }, "Returns the binary ABI contract version");
-
-    m.def(
-        "versionInfo",
-        []() {
-            auto v = razobill::version();
-            return py::make_tuple(v.major, v.minor, v.patch);
-        },
-        "Returns the version tuple (major, minor, patch)");
-
-    // Information Theory & Ledger (Theorems 1, 4, Corollary 2, Proposition 3, 10)
-    py::class_<stats::Cell>(m, "Cell")
-        .def(py::init([](std::uint64_t form, std::uint32_t meaning, double mass) {
-                 return stats::Cell{form, meaning, mass};
-             }),
-             py::arg("form"), py::arg("meaning"), py::arg("mass"))
-        .def_readwrite("form", &stats::Cell::form)
-        .def_readwrite("meaning", &stats::Cell::meaning)
-        .def_readwrite("mass", &stats::Cell::mass)
-        .def("__repr__", [](const stats::Cell& c) {
-            return "<pyrazobill.Cell form=" + std::to_string(c.form) + " meaning=" + std::to_string(c.meaning) +
-                   " mass=" + std::to_string(c.mass) + ">";
-        });
-
-    py::class_<stats::XY>(m, "XY")
-        .def(py::init([](std::uint64_t form, std::uint32_t y, double n) { return stats::XY{form, y, n}; }),
-             py::arg("form"), py::arg("y"), py::arg("n"))
-        .def_readwrite("form", &stats::XY::form)
-        .def_readwrite("y", &stats::XY::y)
-        .def_readwrite("n", &stats::XY::n);
-
-    py::class_<stats::FormMeaning>(m, "FormMeaning")
-        .def(py::init([](std::uint64_t form, std::uint32_t meaning, double p) {
-                 return stats::FormMeaning{form, meaning, p};
-             }),
-             py::arg("form"), py::arg("meaning"), py::arg("p"))
-        .def_readwrite("form", &stats::FormMeaning::form)
-        .def_readwrite("meaning", &stats::FormMeaning::meaning)
-        .def_readwrite("p", &stats::FormMeaning::p);
-
-    py::class_<stats::Ledger>(m, "Ledger")
-        .def_readonly("coverage", &stats::Ledger::coverage)
-        .def_readonly("content", &stats::Ledger::content)
-        .def_readonly("expression", &stats::Ledger::expression)
-        .def_readonly("latitude", &stats::Ledger::latitude)
-        .def_readonly("doubt", &stats::Ledger::doubt)
-        .def_readonly("conveyance", &stats::Ledger::conveyance)
-        .def_readonly("distance", &stats::Ledger::distance)
-        .def_readonly("effectiveVocabulary", &stats::Ledger::effectiveVocabulary)
-        .def_readonly("effectiveContent", &stats::Ledger::effectiveContent)
-        .def_readonly("effectiveLatitude", &stats::Ledger::effectiveLatitude)
-        .def_readonly("effectiveDoubt", &stats::Ledger::effectiveDoubt)
-        .def_readonly("contentMm", &stats::Ledger::contentMm)
-        .def_readonly("expressionMm", &stats::Ledger::expressionMm)
-        .def_readonly("latitudeMm", &stats::Ledger::latitudeMm)
-        .def_readonly("doubtMm", &stats::Ledger::doubtMm)
-        .def_readonly("conveyanceMm", &stats::Ledger::conveyanceMm)
-        .def_readonly("contentEpsilon", &stats::Ledger::contentEpsilon)
-        .def_readonly("contentHalfWidth", &stats::Ledger::contentHalfWidth)
-        .def("satisfiesLedgerIdentities", &stats::Ledger::satisfiesLedgerIdentities, py::arg("tol") = 1e-9)
-        .def("satisfiesVocabularyLaw", &stats::Ledger::satisfiesVocabularyLaw, py::arg("nDistinctForms"),
-             py::arg("tol") = 1e-9)
-        .def("__repr__", [](const stats::Ledger& l) {
-            return "<pyrazobill.Ledger C=" + std::to_string(l.content) + " E=" + std::to_string(l.expression) +
-                   " Lambda=" + std::to_string(l.latitude) + " Delta=" + std::to_string(l.doubt) +
-                   " I=" + std::to_string(l.conveyance) + ">";
-        });
-
-    py::class_<stats::ConsequenceDecomposition>(m, "ConsequenceDecomposition")
-        .def_readonly("expression", &stats::ConsequenceDecomposition::expression)
-        .def_readonly("consequence", &stats::ConsequenceDecomposition::consequence)
-        .def_readonly("hedge", &stats::ConsequenceDecomposition::hedge)
-        .def_readonly("latitude", &stats::ConsequenceDecomposition::latitude)
-        .def("satisfiesIdentity", &stats::ConsequenceDecomposition::satisfiesIdentity, py::arg("tol") = 1e-9);
-
-    py::class_<stats::PriceOfSaying>(m, "PriceOfSaying")
-        .def_readonly("expectedMeaningBits", &stats::PriceOfSaying::expectedMeaningBits)
-        .def_readonly("expectedExpressionBits", &stats::PriceOfSaying::expectedExpressionBits)
-        .def_readonly("expectedClarificationBits", &stats::PriceOfSaying::expectedClarificationBits)
-        .def_readonly("totalSayingBits", &stats::PriceOfSaying::totalSayingBits)
-        .def_readonly("sayingCostBits", &stats::PriceOfSaying::sayingCostBits)
-        .def_readonly("lowerBoundBits", &stats::PriceOfSaying::lowerBoundBits)
-        .def_readonly("upperBoundBits", &stats::PriceOfSaying::upperBoundBits)
-        .def("satisfiesIdentity", &stats::PriceOfSaying::satisfiesIdentity, py::arg("tol") = 1e-9)
-        .def("__repr__", [](const stats::PriceOfSaying& p) {
-            return "<pyrazobill.PriceOfSaying totalSaying=" + std::to_string(p.totalSayingBits) +
-                   " sayingCost=" + std::to_string(p.sayingCostBits) + ">";
-        });
-
-    py::class_<stats::HierarchicalStep>(m, "HierarchicalStep")
-        .def(py::init([](std::uint64_t form, std::vector<std::uint32_t> levels, std::uint32_t y, double mass) {
-                 return stats::HierarchicalStep{form, std::move(levels), y, mass};
-             }),
-             py::arg("form"), py::arg("levels"), py::arg("y"), py::arg("mass"))
-        .def_readwrite("form", &stats::HierarchicalStep::form)
-        .def_readwrite("levels", &stats::HierarchicalStep::levels)
-        .def_readwrite("y", &stats::HierarchicalStep::y)
-        .def_readwrite("mass", &stats::HierarchicalStep::mass);
-
-    py::class_<stats::DepthLedger>(m, "DepthLedger")
-        .def_readonly("entropyLevels", &stats::DepthLedger::entropyLevels)
-        .def_readonly("relevanceLevels", &stats::DepthLedger::relevanceLevels)
-        .def_readonly("totalEntropy", &stats::DepthLedger::totalEntropy)
-        .def_readonly("totalRelevance", &stats::DepthLedger::totalRelevance)
-        .def_readonly("coarsestEntropy", &stats::DepthLedger::coarsestEntropy)
-        .def_readonly("coarsestRelevance", &stats::DepthLedger::coarsestRelevance)
-        .def("satisfiesIdentity", &stats::DepthLedger::satisfiesIdentity, py::arg("tol") = 1e-9)
-        .def("__repr__", [](const stats::DepthLedger& d) {
-            return "<pyrazobill.DepthLedger totalH=" + std::to_string(d.totalEntropy) +
-                   " totalI=" + std::to_string(d.totalRelevance) + " levels=" + std::to_string(d.entropyLevels.size()) +
-                   ">";
-        });
-
-    m.def(
-        "computeLedger",
-        [](const std::vector<stats::Cell>& cells, double totalEvents, double alpha) {
-            return stats::ledger(cells, totalEvents, alpha);
-        },
-        py::arg("cells"), py::arg("totalEvents"), py::arg("confidenceAlpha") = 0.05,
-        "Computes exact information-theoretic ledger (Theorems 1 & 4, Atta 2026)");
-
-    m.def("priceOfSaying", &stats::priceOfSaying, py::arg("ledger"), py::arg("nMessages"),
-          "Calculates prefix code length bounds and wording premium (Theorem 7, Atta 2026)");
-
-    m.def(
-        "computeDepthLedger",
-        [](const std::vector<stats::HierarchicalStep>& steps) { return stats::computeDepthLedger(steps); },
-        py::arg("steps"), "Computes multi-level depth ledger across successive coarsenings (Proposition 6, Atta 2026)");
-
-    m.def(
-        "consequenceDecomposition",
-        [](const std::vector<stats::XY>& xy, const std::vector<stats::FormMeaning>& map) {
-            return stats::consequenceDecomposition(xy, map);
-        },
-        py::arg("xy"), py::arg("map"),
-        "Computes 3-way consequence decomposition E = I(X;Y) + H(M|Y) + H(X|M) (Theorem 4c)");
-
-    m.def("millerMadow", &stats::millerMadow, py::arg("pluginEntropy"), py::arg("observedCategories"),
-          py::arg("sampleSize"), "Calculates Miller-Madow bias-corrected entropy");
-
-    m.def(
-        "certifiedInterval",
-        [](std::size_t alphabetSize, double sampleSize, double alpha) {
-            auto ci = stats::certifiedInterval(alphabetSize, sampleSize, alpha);
-            return py::make_tuple(ci.epsilon, ci.halfWidth);
-        },
-        py::arg("alphabetSize"), py::arg("sampleSize"), py::arg("confidenceAlpha") = 0.05,
-        "Calculates Proposition 10 certified confidence interval (epsilon, halfWidth)");
-
-    // Latitude Steganographic / Provenance Channel (Theorem 8 & Proposition 9)
-    py::class_<channel::SynonymousOption>(m, "SynonymousOption")
-        .def(py::init([](std::size_t formIndex, double probability) {
-                 return channel::SynonymousOption{formIndex, probability};
-             }),
-             py::arg("formIndex"), py::arg("probability"))
-        .def_readwrite("formIndex", &channel::SynonymousOption::formIndex)
-        .def_readwrite("probability", &channel::SynonymousOption::probability);
-
-    py::class_<channel::MeaningChoice>(m, "MeaningChoice")
-        .def(py::init([](std::uint32_t meaning, std::vector<channel::SynonymousOption> options) {
-                 return channel::MeaningChoice{meaning, std::move(options)};
-             }),
-             py::arg("meaning"), py::arg("options"))
-        .def_readwrite("meaning", &channel::MeaningChoice::meaning)
-        .def_readwrite("options", &channel::MeaningChoice::options);
-
-    py::class_<channel::ChannelCapacity>(m, "ChannelCapacity")
-        .def_readonly("meanCapacityBits", &channel::ChannelCapacity::meanCapacityBits)
-        .def_readonly("variance", &channel::ChannelCapacity::variance)
-        .def_readonly("safePayloadBits", &channel::ChannelCapacity::safePayloadBits);
-
-    py::class_<channel::EmbedResult>(m, "EmbedResult")
-        .def_readonly("success", &channel::EmbedResult::success)
-        .def_readonly("payloadBits", &channel::EmbedResult::payloadBits)
-        .def_readonly("embeddedMessage", &channel::EmbedResult::embeddedMessage)
-        .def_readonly("chosenForms", &channel::EmbedResult::chosenForms);
-
-    py::class_<channel::DecodeResult>(m, "DecodeResult")
-        .def_readonly("success", &channel::DecodeResult::success)
-        .def_readonly("payloadBits", &channel::DecodeResult::payloadBits)
-        .def_readonly("message", &channel::DecodeResult::message);
-
-    m.def(
-        "channelAnalyzeCapacity",
-        [](const std::vector<channel::MeaningChoice>& seq) { return channel::analyzeCapacity(seq); },
-        py::arg("sequence"), "Analyzes safe payload and theoretical capacity for meaning sequence (Theorem 8)");
-
-    m.def(
-        "channelRequiredKeyBits",
-        [](const std::vector<channel::MeaningChoice>& seq, std::size_t s) { return channel::requiredKeyBits(seq, s); },
-        py::arg("sequence"), py::arg("s") = 64,
-        "Calculates Proposition 9 minimum key length in bits for dyadic precision");
-
-    m.def("channelFailureProbabilityBound", &channel::failureProbabilityBound, py::arg("capacity"),
-          py::arg("payloadBits"), py::arg("s") = 64.0,
-          "Calculates Theorem 8 Chebyshev upper bound on failure probability");
-
-    m.def(
-        "channelExactFailureProbability",
-        [](const std::vector<channel::MeaningChoice>& seq, std::size_t payloadBits) {
-            return channel::exactFailureProbability(seq, payloadBits);
-        },
-        py::arg("sequence"), py::arg("payloadBits"),
-        "Evaluates exact analytical failure probability delta via distribution convolution (Theorem 8)");
-
-    m.def(
-        "channelEmbed",
-        [](const std::vector<channel::MeaningChoice>& seq, std::uint64_t msg, std::size_t payloadBits, double sharedKey,
-           double dither) { return channel::embed(seq, msg, payloadBits, sharedKey, dither); },
-        py::arg("sequence"), py::arg("message"), py::arg("payloadBits"), py::arg("sharedKey"), py::arg("dither") = 0.5,
-        "Embeds integer message into synonymous forms via arithmetic cumulative interval coding");
-
-    m.def(
-        "channelDecode",
-        [](const std::vector<channel::MeaningChoice>& seq, const std::vector<std::size_t>& observedForms,
-           std::size_t payloadBits,
-           double sharedKey) { return channel::decode(seq, observedForms, payloadBits, sharedKey); },
-        py::arg("sequence"), py::arg("observedForms"), py::arg("payloadBits"), py::arg("sharedKey"),
-        "Decodes embedded message from observed synonymous forms");
+    m.def("split", &splitOne, py::arg("input"), py::arg("mode") = "semantic",
+          "Splits a single log line (str or bytes) into (template, ints, strs)");
+    m.def("template", &templateOne, py::arg("input"), py::arg("mode") = "semantic",
+          "Extracts template from a single log line (str or bytes) without allocating slot lists");
+    m.def("join", &joinOne, py::arg("template"), py::arg("ints"), py::arg("strs"),
+          "Reconstructs original log line from template, ints, and strs");
+    m.def("split_many", &splitMany, py::arg("inputs"), py::arg("mode") = "semantic",
+          "Splits an iterable of log lines with GIL release across worker threads");
+    m.def("version", []() { return std::string(LIBRAZOBILL_VERSION_STRING); },
+          "Returns semantic library version");
 }

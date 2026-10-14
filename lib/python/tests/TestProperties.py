@@ -2,20 +2,17 @@
 """
 Property-Based Testing Suite for pyrazobill (Hypothesis).
 =========================================================
-Grounded in Proposition 1 & 2 and Theorems 1-7 of "Latitude and Doubt" (M. M. Atta, 2026).
 
 Verifies fundamental mathematical and algorithmic invariants:
-1. Universal Lossless Roundtrip:
-   forall m in Sigma*, reconstruct(parse(m)) == m
-   forall m in Sigma*, reconstruct(*decompose(m)) == m
-2. Batch Invariant:
-   forall L in List[str], [r.reconstruct() for r in parseBatch(L)] == L
-3. Information-Theoretic Bounds:
-   - Latitude >= 0 and Doubt >= 0
-   - Conveyance <= Content + epsilon (Theorem 1)
-   - Effective Latitude <= Latitude + epsilon
-4. Template Extraction Safety:
-   templateOf(formKey(m)) never crashes and preserves constants
+1. Universal Lossless Roundtrip for arbitrary Unicode strings:
+   forall m in Sigma*, RzJoin(*RzSplit(m)) == m
+   forall m in Sigma*, RzJoin(RzSplit(m)) == m
+2. Universal Lossless Roundtrip for arbitrary byte sequences (including invalid UTF-8 and NUL):
+   forall b in Bytes*, RzJoin(*RzSplit(b)) == b
+3. Batch Invariant:
+   forall L in List[str], [RzJoin(r) for r in RzSplitMany(L)] == L
+4. Template Extraction Equivalence:
+   forall m in Sigma*, RzTemplate(m) == RzSplit(m).template
 """
 
 import sys
@@ -26,7 +23,7 @@ from pathlib import Path
 pkg_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(pkg_dir))
 
-import pyrazobill
+import pyrazobill as rz
 from hypothesis import given, settings, strategies as st, example
 
 
@@ -40,79 +37,53 @@ class TestHypothesisProperties(unittest.TestCase):
     @example("Special chars: \x12 \x13 \x00 \t \n \r \\ \" ' [ ] { } : =")
     @example("🚀🔥 Unicode emojis and accents: é à ö ü ñ 日本語 12345")
     def test_lossless_roundtrip_exact_mode(self, msg: str):
-        """Invariant: Exact mode must reconstruct the input string byte-for-byte."""
-        rec = pyrazobill.parse(msg, pyrazobill.ScanMode.Exact)
+        """Invariant: Exact mode must reconstruct any input string byte-for-byte."""
+        rec = rz.RzSplit(msg, mode="exact")
         self.assertIsNotNone(rec)
-        rebuilt = pyrazobill.reconstruct(rec)
-        self.assertEqual(rebuilt, msg)
-        self.assertEqual(rec.reconstruct(), msg)
+        self.assertEqual(rz.RzJoin(*rec), msg)
+        self.assertEqual(rz.RzJoin(rec), msg)
 
     @settings(max_examples=200, deadline=None)
     @given(st.text(min_size=0, max_size=10000))
+    @example("")
+    @example("0")
+    @example("Leading zeros 00123 000 0")
+    @example("Literal braces {{foo}} {bar} {")
     def test_lossless_roundtrip_semantic_mode(self, msg: str):
-        """Invariant: Semantic mode must reconstruct the input string byte-for-byte."""
-        rec = pyrazobill.parse(msg, pyrazobill.ScanMode.Semantic)
+        """Invariant: Semantic mode must reconstruct any input string byte-for-byte."""
+        rec = rz.RzSplit(msg, mode="semantic")
         self.assertIsNotNone(rec)
-        rebuilt = pyrazobill.reconstruct(rec)
-        self.assertEqual(rebuilt, msg)
-        self.assertEqual(rec.reconstruct(), msg)
+        self.assertEqual(rz.RzJoin(*rec), msg)
+        self.assertEqual(rz.RzJoin(rec), msg)
 
-    @settings(max_examples=150, deadline=None)
-    @given(st.text(min_size=0, max_size=5000))
-    def test_decompose_and_reconstruct_tuple(self, msg: str):
-        """Invariant: decompose() returning (form, ints, strs) must round-trip exactly."""
-        form, ints, strs = pyrazobill.decompose(msg)
-        rebuilt = pyrazobill.reconstruct(form, ints, strs)
-        self.assertEqual(rebuilt, msg)
-
-    @settings(max_examples=100, deadline=None)
-    @given(st.lists(st.text(min_size=0, max_size=2000), min_size=0, max_size=50))
-    def test_batch_roundtrip(self, lines: list):
-        """Invariant: Batch parsing preserves ordering and exact contents."""
-        recs = pyrazobill.parseBatch(lines)
-        self.assertEqual(len(recs), len(lines))
-        rebuilt_lines = [r.reconstruct() for r in recs]
-        self.assertEqual(rebuilt_lines, lines)
-
-    @settings(max_examples=150, deadline=None)
-    @given(st.text(min_size=0, max_size=5000))
-    def test_template_generation_safety(self, msg: str):
-        """Invariant: templateOf(formKey(msg)) produces a valid string template."""
-        f_key = pyrazobill.formKey(msg)
-        tpl = pyrazobill.templateOf(f_key)
-        self.assertIsInstance(tpl, str)
+    @settings(max_examples=200, deadline=None)
+    @given(st.binary(min_size=0, max_size=10000))
+    @example(b"")
+    @example(b"\x00")
+    @example(b"\xff\xfe\x00\x80 invalid utf8 with 123 numbers")
+    def test_lossless_roundtrip_bytes(self, b_msg: bytes):
+        """Invariant: Raw bytes must reconstruct byte-for-byte without distortion."""
+        rec = rz.RzSplit(b_msg)
+        self.assertIsInstance(rec.template, bytes)
+        self.assertEqual(rz.RzJoin(*rec), b_msg)
+        self.assertEqual(rz.RzJoin(rec), b_msg)
 
     @settings(max_examples=100, deadline=None)
-    @given(
-        st.lists(
-            st.tuples(
-                st.integers(min_value=0, max_value=1000),
-                st.integers(min_value=0, max_value=500),
-                st.floats(min_value=0.01, max_value=1000.0, allow_nan=False, allow_infinity=False),
-            ),
-            min_size=1,
-            max_size=30,
-        )
-    )
-    def test_information_theoretic_ledger_bounds(self, raw_cells):
-        """
-        Mathematical Invariant (Latitude and Doubt, 2026):
-        1. Latitude >= -1e-9 and Doubt >= -1e-9
-        2. Conveyance <= Content + 1e-9 (Conveyance Theorem)
-        3. Effective Latitude <= Latitude + 1e-9
-        """
-        cells = [pyrazobill.Cell(form=f, meaning=m, mass=w) for f, m, w in raw_cells]
-        total_events = sum(w for _, _, w in raw_cells)
-        ledger = pyrazobill.computeLedger(cells, total_events)
+    @given(st.lists(st.text(min_size=0, max_size=500), min_size=0, max_size=50))
+    def test_batch_reconstruct_invariant(self, lines: list):
+        """Invariant: Batch split and sequential join must match all original lines."""
+        records = rz.RzSplitMany(lines)
+        self.assertEqual(len(records), len(lines))
+        for original, rec in zip(lines, records):
+            self.assertEqual(rz.RzJoin(rec), original)
 
-        self.assertGreaterEqual(ledger.latitude, -1e-9)
-        self.assertGreaterEqual(ledger.doubt, -1e-9)
-        self.assertGreaterEqual(ledger.content, -1e-9)
-        self.assertGreaterEqual(ledger.conveyance, -1e-9)
-        self.assertLessEqual(ledger.conveyance, ledger.content + 1e-6)
-        self.assertGreaterEqual(ledger.effectiveLatitude, 1.0 - 1e-6)
-        self.assertGreaterEqual(ledger.effectiveDoubt, 1.0 - 1e-6)
-        self.assertAlmostEqual(ledger.distance, ledger.latitude + ledger.doubt, places=5)
+    @settings(max_examples=100, deadline=None)
+    @given(st.text(min_size=0, max_size=500))
+    def test_template_equivalence(self, msg: str):
+        """Invariant: RzTemplate(m) must return identical template as RzSplit(m).template."""
+        tmpl = rz.RzTemplate(msg)
+        rec = rz.RzSplit(msg)
+        self.assertEqual(tmpl, rec.template)
 
 
 if __name__ == "__main__":
