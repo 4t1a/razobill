@@ -84,7 +84,7 @@ add_library(librazobill
   src/RazobillC.cpp
 )
 add_library(librazobill::librazobill ALIAS librazobill)
-set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill_core ARCHIVE_OUTPUT_NAME razobill_core)
+set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill)
 
 target_include_directories(librazobill
   PUBLIC
@@ -96,19 +96,20 @@ target_include_directories(librazobill
 )
 target_link_libraries(librazobill PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 
-# DuckDB Native Loadable Extension (C API)
-add_library(RazobillDuckdb SHARED ext/duckdb/DuckdbExtension.cpp)
+add_library(RazobillDuckdb SHARED ext/duckdb/DuckdbExtension.cpp src/RazobillC.cpp)
 target_include_directories(RazobillDuckdb PRIVATE include thirdparty/duckdbcapi)
 if(DEFINED EXTENSION_NAME)
   target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=${EXTENSION_NAME})
 else()
-  target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=razobill)
+  target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=razobill LIBRAZOBILL_EXPORTS)
 endif()
+target_compile_definitions(librazobill PRIVATE LIBRAZOBILL_EXPORTS)
 if(NOT MSVC)
   target_compile_options(RazobillDuckdb PRIVATE -fvisibility=hidden -Wno-missing-field-initializers)
 endif()
 target_link_libraries(RazobillDuckdb PRIVATE librazobill)
 if(WIN32)
+  target_link_options(RazobillDuckdb PRIVATE "-Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/razobill.lib")
   set_target_properties(RazobillDuckdb PROPERTIES
     PREFIX ""
     OUTPUT_NAME razobill

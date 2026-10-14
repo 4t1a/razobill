@@ -12,6 +12,7 @@ import (
 	"context"
 	"unsafe"
 
+	"github.com/cespare/xxhash/v2"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -20,18 +21,12 @@ import (
 type razobillProcessor struct {
 	cfg          *Config
 	nextConsumer consumer.Logs
-	scanMode     C.RzScanMode
 }
 
 func newRazobillProcessor(cfg *Config, next consumer.Logs) (*razobillProcessor, error) {
-	var mode C.RzScanMode = C.RZ_SCAN_SEMANTIC
-	if cfg.Mode == "exact" {
-		mode = C.RZ_SCAN_EXACT
-	}
 	return &razobillProcessor{
 		cfg:          cfg,
 		nextConsumer: next,
-		scanMode:     mode,
 	}, nil
 }
 
@@ -60,28 +55,27 @@ func (p *razobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error
 					continue
 				}
 
-				var cRecord C.RzSlotRecord
+				var cRecord C.RzRecord
 				cMsg := C.CString(msg)
 
-				status := C.RzDecompose(
+				status := C.RzSplit(
 					cMsg,
 					C.size_t(len(msg)),
-					p.scanMode,
 					&cRecord,
 				)
 
-				if status == C.RZ_SUCCESS {
-					formKeyStr := C.GoStringN(cRecord.formKey, C.int(cRecord.formKeyLength))
+				if status == C.RZ_OK {
+					tmplStr := C.GoStringN(cRecord.templateStr, C.int(cRecord.templateLength))
 					attrs := rec.Attributes()
 
 					if p.cfg.DropRawBody {
-						rec.Body().SetStr(formKeyStr)
+						rec.Body().SetStr(tmplStr)
 					} else {
-						attrs.PutStr("razobill.formKey", formKeyStr)
+						attrs.PutStr("razobill.template", tmplStr)
 					}
 
 					if p.cfg.IncludeHash {
-						attrs.PutInt("razobill.formHash", int64(cRecord.formKeyHash))
+						attrs.PutInt("razobill.formHash", int64(xxhash.Sum64String(tmplStr)))
 					}
 
 					// Copy 64-bit integers
@@ -106,7 +100,7 @@ func (p *razobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error
 						}
 					}
 
-					C.RzFreeRecord(&cRecord)
+					C.RzFree(&cRecord)
 				}
 				C.free(unsafe.Pointer(cMsg))
 			}

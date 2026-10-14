@@ -1,6 +1,6 @@
 //! Native Vector Remap Language (VRL) function wrapping librazobill Universal C ABI.
 //!
-//! Provides zero-copy parsing of raw log strings into (form, ints, strs) structs.
+//! Provides zero-copy parsing of raw log strings into (template, ints, strs) structs.
 
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -8,10 +8,9 @@ use std::os::raw::c_char;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct RzSlotRecord {
-    pub form_key_hash: u64,
-    pub form_key: *const c_char,
-    pub form_key_length: usize,
+pub struct RzRecord {
+    pub template_str: *const c_char,
+    pub template_length: usize,
     pub int_values: *const i64,
     pub int_count: usize,
     pub str_values: *const *const c_char,
@@ -21,52 +20,47 @@ pub struct RzSlotRecord {
 }
 
 #[repr(C)]
-pub enum RzScanMode {
-    Exact = 0,
-    Semantic = 1,
-}
-
-#[repr(C)]
-pub enum RzStatusCode {
-    Success = 0,
-    ErrTooLarge = 1,
-    ErrMalformed = 2,
-    ErrSlotUnderflow = 3,
-    ErrBufferTooSmall = 4,
-    ErrInvalidParam = 5,
+#[derive(Debug, PartialEq, Eq)]
+pub enum RzStatus {
+    Ok = 0,
+    ErrInvalidArgument = 1,
+    ErrBufferTooSmall = 2,
+    ErrMalformedTemplate = 3,
+    ErrCountMismatch = 4,
+    ErrMessageTooLarge = 5,
+    ErrOutOfMemory = 6,
+    ErrInternal = 7,
 }
 
 extern "C" {
-    pub fn RzDecompose(
+    pub fn RzSplit(
         message: *const c_char,
         message_length: usize,
-        mode: RzScanMode,
-        out_record: *mut RzSlotRecord,
-    ) -> RzStatusCode;
+        out_record: *mut RzRecord,
+    ) -> RzStatus;
 
-    pub fn RzFreeRecord(record: *mut RzSlotRecord);
+    pub fn RzFree(record: *mut RzRecord);
 }
 
 /// Decomposes an input string into a structured JSON-compatible map.
 pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Value>, String> {
-    let mut record: RzSlotRecord = unsafe { std::mem::zeroed() };
+    let mut record: RzRecord = unsafe { std::mem::zeroed() };
     let c_str = CString::new(raw_msg).map_err(|e| e.to_string())?;
 
     let status = unsafe {
-        RzDecompose(
+        RzSplit(
             c_str.as_ptr(),
             raw_msg.len(),
-            RzScanMode::Semantic,
             &mut record,
         )
     };
 
-    if !matches!(status, RzStatusCode::Success) {
+    if !matches!(status, RzStatus::Ok) {
         return Err("Razobill decomposition failed".to_string());
     }
 
     let form_slice =
-        unsafe { std::slice::from_raw_parts(record.form_key as *const u8, record.form_key_length) };
+        unsafe { std::slice::from_raw_parts(record.template_str as *const u8, record.template_length) };
     let form_str = String::from_utf8_lossy(form_slice).to_string();
 
     let mut ints = Vec::with_capacity(record.int_count);
@@ -91,15 +85,11 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
     }
 
     unsafe {
-        RzFreeRecord(&mut record);
+        RzFree(&mut record);
     }
 
     let mut map = BTreeMap::new();
     map.insert("form".to_string(), serde_json::Value::from(form_str));
-    map.insert(
-        "hash".to_string(),
-        serde_json::Value::from(record.form_key_hash),
-    );
     map.insert("ints".to_string(), serde_json::Value::Array(ints));
     map.insert("strs".to_string(), serde_json::Value::Array(strs));
 
@@ -115,7 +105,6 @@ mod tests {
         let msg = "Accepted publickey for ubuntu from 192.168.1.100 port 54322 ssh2";
         let res = parse_razobill(msg).expect("Failed to parse log record");
         assert!(res.contains_key("form"));
-        assert!(res.contains_key("hash"));
         assert!(res.contains_key("ints"));
         assert!(res.contains_key("strs"));
 

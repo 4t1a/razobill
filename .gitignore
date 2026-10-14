@@ -127,3 +127,4 @@ perf.data
 perf.data.old
 gmon.out
 *.log
+target/
