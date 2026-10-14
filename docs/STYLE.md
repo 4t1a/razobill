@@ -114,11 +114,11 @@ Quantifies disk, bandwidth, or latency impact with verifiable production metrics
 
 ## 5. Visuals and diagrams
 
-1. **Wordmark**: Embed the SVG wordmark via `<picture>` with light and dark mode variants.
+1. **Wordmark / Logo**: Embed the logo via `<picture>` with light and dark mode variants using `assets/Logo.jpeg` and `assets/Logo-light.jpeg`.
    ```html
    <picture>
-     <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
-     <img src="assets/wordmark-light.svg" alt="Razobill Logo" width="320">
+     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo.jpeg">
+     <img src="assets/Logo-light.jpeg" alt="Razobill Logo" width="320">
    </picture>
    ```
 2. **Palette**: Constrain diagram and UI styling to four primary colors:

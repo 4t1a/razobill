@@ -20,6 +20,7 @@ Learning-oriented walk-throughs designed to get you running quickly.
 Task-oriented recipes for solving specific engineering problems.
 
 - [Compacting logs in DuckDB](how-to/duckdb.md): Load the DuckDB community extension, parse lines with `RzSplit`, and aggregate by template.
+- [Compacting logs in ClickHouse and chDB](how-to/chdb.md): Connect to embedded chDB, verify xxHash64 hash parity, and query additive log indices.
 - [Parsing logs in Python](how-to/python.md): Batch processing, multithreaded parsing releasing the GIL, and error handling with `pyrazobill`.
 - [Deploying OpenTelemetry processor](how-to/opentelemetry.md): Configure `razobillprocessor` inside the OTel Collector to strip raw log payloads at the edge.
 - [Transforming logs with Vector](how-to/vector.md): Embed the native Rust transform into your Vector pipeline.

@@ -2,8 +2,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
-    <img src="assets/wordmark-light.svg" alt="Razobill Logo" width="340">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/Logo.jpeg">
+    <img src="assets/Logo-light.jpeg" alt="Razobill Logo" width="340">
   </picture>
 </p>
 
@@ -108,6 +108,7 @@ Razobill provides a uniform data model across all supported environments.
 | :--- | :--- | :--- |
 | **Python** (`pyrazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzSplitMany` | High-throughput parsing releasing the Python GIL for multithreaded processing. |
 | **DuckDB** (`ext/duckdb`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzHash` | Vectorized SQL functions operating directly on database string pointers without copies. |
+| **ClickHouse & chDB** | `xxHash64`, Python ADBC | Bit-identical xxHash64 partition keys and additive MergeTree form indexing. |
 | **C ABI** (`include/librazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzFree` | Zero-allocation C ABI with stable binary layout and zero-copy string views. |
 | **OTel Collector** (`ext/otel`) | `razobillprocessor` | Edge processor replacing string bodies with templates and slice attributes. |
 | **Vector** (`ext/vector`) | `razobill-vector` | High-speed Rust crate transform streaming columnar stripes to object storage. |
@@ -136,6 +137,7 @@ Navigate the documentation system:
 - **Tutorials**: [Getting started in 5 minutes](docs/tutorials/getting-started.md)
 - **How-to guides**:
   - [DuckDB extension guide](docs/how-to/duckdb.md)
+  - [ClickHouse and chDB integration](docs/how-to/chdb.md)
   - [Python developer guide](docs/how-to/python.md)
   - [OpenTelemetry integration](docs/how-to/opentelemetry.md)
   - [Vector integration](docs/how-to/vector.md)

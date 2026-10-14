@@ -88,9 +88,10 @@ def lint_file(file_path: Path) -> list:
     ALLOWED_CAPS = {
         "A", "B", "C", "D",
         "C++", "C++20", "DuckDB", "Python", "SIMD", "OTel", "OpenTelemetry",
-        "Vector", "API", "ABI", "SQL", "CLI", "S3", "AWS", "JSD", "TL;DR",
+        "Vector", "API", "ABI", "ADBC", "SQL", "CLI", "S3", "AWS", "JSD", "TL;DR",
         "AVX-512", "AVX2", "NEON", "CPU", "RAM", "Parquet", "ZSTD", "JSON",
-        "Razobill", "I/O", "POSIX", "CMake", "PyPI", "SDK", "UBIGINT", "VARCHAR"
+        "Razobill", "I/O", "POSIX", "CMake", "PyPI", "SDK", "UBIGINT", "VARCHAR",
+        "ClickHouse", "chDB", "MergeTree"
     }
 
     heading_pattern = re.compile(r"^(#{1,6})\s+(.*)$")
@@ -104,7 +105,7 @@ def lint_file(file_path: Path) -> list:
         m = heading_pattern.match(line)
         if m:
             heading_text = m.group(2).strip()
-            clean_heading = re.sub(r"^(\d+(\.\d+)*\.?|[A-Za-z]\.)\s+", "", heading_text)
+            clean_heading = re.sub(r"^(Step\s+\d+:?|\d+(\.\d+)*\.?|[A-Za-z]\.)\s+", "", heading_text, flags=re.IGNORECASE)
             # Remove inline code blocks `...` completely
             clean_heading = re.sub(r"`[^`]*`", "", clean_heading).strip()
             words = clean_heading.split()

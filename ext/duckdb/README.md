@@ -2,8 +2,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../../assets/wordmark-dark.svg">
-    <img src="../../assets/wordmark-light.svg" alt="Razobill Logo" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="../../assets/Logo.jpeg">
+    <img src="../../assets/Logo-light.jpeg" alt="Razobill Logo" width="300">
   </picture>
 </p>
 

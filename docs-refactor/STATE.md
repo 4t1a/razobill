@@ -31,6 +31,11 @@
   - Added CI workflow `.github/workflows/docs-lint.yml`.
   - Updated `CONTRIBUTING.md` with documentation authoring guide pointing to `docs/STYLE.md`.
   - Updated `CHANGELOG.md` with version 1.1.1 release entry.
+- Completed User Refinement (Assets & ClickHouse/chDB):
+  - Removed temporary SVG wordmarks (`assets/wordmark-light.svg`, `assets/wordmark-dark.svg`).
+  - Switched all logo embeds (`README.md`, `docs/STYLE.md`, sub-package READMEs) to user assets (`assets/Logo.jpeg` dark, `assets/Logo-light.jpeg` light).
+  - Authored `docs/how-to/chdb.md` for ClickHouse & embedded chDB integration.
+  - Updated `README.md`, `docs/README.md`, `docs/explanation/architecture.md`, `docs/explanation/benchmarks.md`, and `tools/LintDocs.py`.
 
 ## Open
 - None. All deliverables and verification gates are satisfied.

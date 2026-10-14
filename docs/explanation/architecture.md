@@ -25,6 +25,7 @@ flowchart TD
     CoreEngine --> CABI["Universal C ABI (RazobillC.h)"]
     CABI --> Py["Python Client (pyrazobill)"]
     CABI --> Duck["DuckDB Extension (RzSplit / RzJoin)"]
+    CABI --> CH["ClickHouse / chDB (xxHash64 & ADBC)"]
     CABI --> OTel["OTel Processor (razobillprocessor)"]
     CABI --> Vec["Vector Rust Transform (razobill-vector)"]
 ```
@@ -69,3 +70,12 @@ All integrations communicate with the engine through the stable C ABI declared i
 - Zero C++ runtime leakage: No C++ exceptions or mangled symbols cross foreign language boundaries.
 - Error codes are communicated via standard integer enums (`RzStatus`).
 - Lifetimes are explicit: `RzFree` reclaims memory allocated for decomposed records.
+
+---
+
+## Analytical database adapters
+
+Razobill connects to columnar storage engines via two dedicated architectures:
+1. **Direct DuckDB scalar extension**: Compiled C++ scalar functions operating directly on `duckdb_string_t` vectors.
+2. **Arrow ADBC backend (`BackendAdbc.cpp`)**: Dynamic Arrow Database Connectivity driver connecting to in-process ClickHouse chDB with bit-identical `xxHash64` hash alignment across engines.
+

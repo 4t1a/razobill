@@ -57,3 +57,17 @@ Storage footprint after ingesting 100,000 lines of SSH authentication logs into 
 | **Razobill Parquet ZSTD** | **0.8 MB** | **12.2x** |
 
 By decomposing messages into typed columns, columnar compressors (Snappy, ZSTD) achieve superior dictionary encoding and run-length compression over homogeneous numerical and string vectors.
+
+---
+
+## ClickHouse MergeTree storage footprint
+
+Evaluated on a multi-system corpus of 134,815 log events inside embedded chDB (`evidence/ChStore.py`):
+
+| Layout | Compression Codec | Storage Ratio vs LZ4 Baseline | Notes |
+| :--- | :--- | :--- | :--- |
+| **Raw message text** | Default LZ4 | 1.00x | High disk usage, slow regex scanning. |
+| **Raw message text** | `CODEC(ZSTD(3))` | 0.53x | Standard production ClickHouse baseline. |
+| **Razobill Additive layout** | `form_id UInt64` + ZSTD text | 0.56x | Preserves raw text with +6% overhead for instant index lookups. |
+| **Razobill Compact layout** | Decomposed integer and string slots | **0.46x** | Maximum columnar compression on high-volume clusters. |
+
