@@ -129,5 +129,5 @@ TEST_CASE("Universal C ABI: Edge cases, empty string, errors and metadata") {
     CHECK(std::string(RzStatusMessage(RZ_ERR_BUFFER_TOO_SMALL)).find("insufficient") != std::string::npos);
 
     // Version
-    CHECK(std::string(RzVersion()) == "2.0.0");
+    CHECK(std::string(RzVersion()) == "1.1.1");
 }

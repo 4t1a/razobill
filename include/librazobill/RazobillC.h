@@ -34,6 +34,7 @@
 #else
 #define RZ_API __attribute__((visibility("default")))
 #endif
+#define RZ_ABI_VERSION 1
 
 #ifdef __cplusplus
 extern "C" {

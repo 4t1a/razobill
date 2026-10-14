@@ -186,12 +186,12 @@ TEST_CASE("property: forms are insensitive to slot values") {
 TEST_CASE("semantic versioning and ABI contract") {
     auto v = razobill::version();
     CHECK(v.major == 1);
-    CHECK(v.minor == 0);
+    CHECK(v.minor == 1);
     CHECK(v.patch == 1);
     CHECK(v.abi == 1);
-    CHECK(std::string_view(v.string) == "1.0.1");
+    CHECK(std::string_view(v.string) == "1.1.1");
     CHECK(razobill::abiVersion() == 1);
-    CHECK(razobill::versionString() == "1.0.1");
+    CHECK(razobill::versionString() == "1.1.1");
 }
 
 TEST_CASE("hardware vector SIMD scanner and dynamic CPUID dispatcher") {
