@@ -269,20 +269,26 @@ __all__ = [
     "RzSplitMany",
     "RzRecord",
     "RzError",
-    "split",
-    "join",
-    "template",
-    "split_many",
-    "Record",
-    "Error",
-    "isNative",
     "__version__",
 ]
 
-# Ergonomic aliases
-split = RzSplit
-join = RzJoin
-template = RzTemplate
-split_many = RzSplitMany
-Record = RzRecord
-Error = RzError
+# Ergonomic aliases resolved dynamically to maintain strict __all__ surface budget
+_ALIASES = {
+    "split": RzSplit,
+    "join": RzJoin,
+    "template": RzTemplate,
+    "split_many": RzSplitMany,
+    "Record": RzRecord,
+    "Error": RzError,
+    "isNative": isNative,
+}
+
+
+def __getattr__(name: str):
+    if name in _ALIASES:
+        return _ALIASES[name]
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+def __dir__():
+    return sorted(list(globals().keys()) + list(_ALIASES.keys()))
