@@ -54,7 +54,8 @@ inline razobill::AdbcOptions duckdbOptions() {
     o.driverPath = o.driver_path = normalizePath(chosenLib);
     o.entrypoint = "duckdb_adbc_init";
     o.databaseOptions = o.database_options = {{"path", ":memory:"}, {"allow_unsigned_extensions", "true"}};
-    o.initSql = o.init_sql = {std::string("LOAD '") + normalizePath(env("RZB_EXT", defExt)) + "'"};
+    o.initSql = o.init_sql = {std::string("LOAD '") + normalizePath(env("RZB_EXT", defExt)) + "'", "PRAGMA threads=4",
+                              "PRAGMA max_memory='2GB'", "PRAGMA temp_directory='build/tmp_duckdb'"};
     return o;
 }
 

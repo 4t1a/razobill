@@ -1,0 +1,29 @@
+# .markdownlint.yaml - Markdownlint configuration adhering to docs/STYLE.md
+default: true
+
+# MD013: Line length disabled to support "one sentence per line" Git diff rule and wide tables
+MD013: false
+
+# MD033: Allowed inline HTML elements for theme-aware logos and badges
+MD033:
+  allowed_elements:
+    - "picture"
+    - "source"
+    - "img"
+    - "p"
+    - "a"
+    - "details"
+    - "summary"
+    - "sub"
+    - "sup"
+    - "kbd"
+    - "br"
+    - "figure"
+    - "figcaption"
+
+# MD024: Multiple headings with the same content (allowed if in different sections)
+MD024:
+  siblings_only: true
+
+# MD041: First line should be a top-level heading (allow badges/pictures)
+MD041: false

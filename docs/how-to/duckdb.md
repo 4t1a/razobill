@@ -9,6 +9,7 @@ Skip this guide if you are writing application code in Python or C++.
 ## Problem
 
 Storing telemetry logs as raw string columns in DuckDB leads to performance issues:
+
 1. Regex queries (`regexp_extract`) scan entire strings repeatedly, consuming CPU cycles.
 2. High-cardinality numbers and identifiers prevent columnar compression algorithms (Snappy, ZSTD) from achieving optimal compression ratios.
 3. Discarding raw strings during parsing loses forensic detail needed for security audits.
@@ -29,6 +30,7 @@ LOAD razobill;
 ```
 
 For local development builds, specify the binary path:
+
 ```sql
 LOAD 'build/razobill.duckdb_extension';
 ```
@@ -55,6 +57,7 @@ FROM raw_logs;
 ```
 
 Output:
+
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                                 parsed                                 │
@@ -83,6 +86,7 @@ ORDER BY event_count DESC;
 ```
 
 Output:
+
 ```text
 ┌──────────────────────────────────────────────┬─────────────┐
 │                   pattern                    │ event_count │
@@ -110,6 +114,7 @@ GROUP BY parsed.template;
 ```
 
 Output:
+
 ```text
 ┌──────────────────────────────────────────┬────────────────┬─────────────┐
 │                 template                 │ total_failures │ avg_retries │
@@ -148,6 +153,7 @@ FROM (
 ```
 
 Output:
+
 ```text
 ┌──────────┐
 │ is_exact │

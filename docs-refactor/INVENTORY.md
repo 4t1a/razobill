@@ -94,7 +94,7 @@ An automated audit of C++ headers, Python exports, and DuckDB extension entrypoi
 | `docs/web/llms.txt` | 24L (1929B) | 2026-10-13 | Documentation | General Developers | None | None | None |
 | `docs/web/robots.txt` | 16L (308B) | 2026-10-13 | Documentation | General Developers | None | None | None |
 | `docs/web/SETUP.md` | 12L (1115B) | 2026-10-13 | Documentation | General Developers | None | None | None |
-| `docs-refactor/STATE.md` | 21L (889B) |  | Documentation | General Developers | None | None | None |
+| `docs-refactor/STATE.md` | 21L (889B) | | Documentation | General Developers | None | None | None |
 | `evidence/README.md` | 240L (19877B) | 2024-10-12 | Experimental audit logs and empirical verification outputs | Researchers / Maintainers | None | None | None |
 | `evidence/ResultsE4bLeakage.txt` | 11L (1241B) | 2024-10-12 | Experimental audit logs and empirical verification outputs | Researchers / Maintainers | None | None | None |
 | `evidence/ResultsE6Logtype.txt` | 19L (1812B) | 2024-10-12 | Experimental audit logs and empirical verification outputs | Researchers / Maintainers | None | None | None |
@@ -102,9 +102,9 @@ An automated audit of C++ headers, Python exports, and DuckDB extension entrypoi
 | `ext/duckdb/README.md` | 112L (3902B) | 2024-10-12 | DuckDB community extension quickstart and documentation | DuckDB Analysts | Overlaps with docs/guides/DuckDbExtensionGuide.md and docs/reference/SqlFunctionsReference.md | None | Deprecated v1.x symbols: rbDecompose, rbForm, rbInts, rbStrs, rbReconstruct, rbRebuild, rbEntropy |
 | `ext/otel/README.md` | 88L (2888B) | 2024-10-12 | OpenTelemetry Collector processor documentation | SREs / Observability Engineers | Overlaps with docs/guides/OpenTelemetryIntegration.md | None | Deprecated v1.x symbols: rbReconstruct, RzReconstructSlots |
 | `ext/vector/README.md` | 43L (1553B) | 2024-10-12 | Vector transform adapter documentation | SREs / Pipeline Engineers | Overlaps with docs/guides/VectorIntegration.md | None | None |
-| `extension-ci-tools/docker/README.md` | 5L (388B) |  | Documentation | General Developers | None | None | None |
-| `extension-ci-tools/README.md` | 27L (2249B) |  | Documentation | General Developers | None | None | None |
-| `extension-ci-tools/vcpkg_ports/README.md` | 4L (200B) |  | Documentation | General Developers | None | None | None |
+| `extension-ci-tools/docker/README.md` | 5L (388B) | | Documentation | General Developers | None | None | None |
+| `extension-ci-tools/README.md` | 27L (2249B) | | Documentation | General Developers | None | None | None |
+| `extension-ci-tools/vcpkg_ports/README.md` | 4L (200B) | | Documentation | General Developers | None | None | None |
 | `lib/python/Guide.md` | 487L (22369B) | 2024-10-12 | Python package documentation, guide, and publishing notes | Python Developers | Overlaps with docs/guides/PythonDeveloperGuide.md and docs/reference/PythonApiReference.md | None | Deprecated v1.x symbols: rbDecompose, rbReconstruct |
 | `lib/python/Publishing.md` | 119L (3623B) | 2024-10-12 | Python package documentation, guide, and publishing notes | Python Developers | Overlaps with docs/guides/PythonDeveloperGuide.md and docs/reference/PythonApiReference.md | None | None |
 | `lib/python/README.md` | 280L (12523B) | 2026-10-13 | Python package documentation, guide, and publishing notes | Python Developers | Overlaps with docs/guides/PythonDeveloperGuide.md and docs/reference/PythonApiReference.md | None | Deprecated v1.x symbols: rbDecompose, rbReconstruct |

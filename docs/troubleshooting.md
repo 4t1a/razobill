@@ -17,6 +17,7 @@ Skip this page if your pipeline is running normally.
 Literal curly braces inside raw log lines must be escaped as `{{` or `}}` if you are manually creating or editing template strings.
 
 **How to resolve**:
+
 1. If constructing templates manually, replace `{` with `{{` and `}` with `}}` for literal characters.
 2. If splitting input lines with `RzSplit`, unescaped braces in the input message are automatically escaped into `{{` or `}}`.
 3. Check your template string for unclosed placeholders like `{` or `{invalid}`.
@@ -33,6 +34,7 @@ The template contains $N$ `{i}` placeholders and $M$ `{s}` placeholders, but the
 
 **How to resolve**:
 Ensure that the number of elements in the `ints` array equals the count of `{i}` markers in the template, and the number of elements in `strs` equals the count of `{s}` markers:
+
 ```python
 import pyrazobill as rz
 
@@ -53,6 +55,7 @@ The caller allocated an output buffer with insufficient bytes to hold the recons
 
 **How to resolve**:
 Check `outLength` after the call. When `RZ_ERR_BUFFER_TOO_SMALL` is returned, `*outLength` is populated with the exact required byte capacity:
+
 ```c
 size_t required = 0;
 RzStatus status = RzJoin(&record, buffer, capacity, &required);
@@ -74,6 +77,7 @@ A mode argument other than `"semantic"` or `"exact"` was passed to `RzSplit` or 
 
 **How to resolve**:
 Specify either `"semantic"` (default grouping behavior) or `"exact"` (strict non-grouping tokenizer):
+
 ```python
 import pyrazobill as rz
 
@@ -93,6 +97,7 @@ rec2 = rz.RzSplit(line, mode="exact")
 The input message exceeded the maximum buffer boundary configured in the engine scanner (typically 16 MB per single log line).
 
 **How to resolve**:
+
 1. Check if an unescaped binary dump or crash log was erroneously passed as a single line.
 2. Truncate or pre-split the input message into individual log lines before calling `RzSplit`.
 
@@ -109,11 +114,14 @@ DuckDB failed to load `razobill.duckdb_extension` with an I/O error regarding mi
 Local development builds of DuckDB extensions are unsigned. DuckDB blocks loading unsigned extensions by default for security.
 
 **How to resolve**:
+
 1. For production environments, install the signed community build:
+
    ```sql
    INSTALL razobill FROM community;
    LOAD razobill;
    ```
+
 2. For local testing, allow unsigned extensions in your DuckDB connection:
    - In DuckDB CLI: `duckdb -unsigned`
    - In Python: `duckdb.connect(config={'allow_unsigned_extensions': 'true'})`
@@ -131,8 +139,10 @@ During `pip install pyrazobill` on Windows, MSVC failed with `fatal error C1083:
 The Universal C Runtime (UCRT) SDK headers are missing or not in MSVC's include search paths.
 
 **How to resolve**:
+
 1. `setup.py` automatically detects UCRT paths in Windows 10/11 SDK installations. Ensure the Windows SDK is installed via Visual Studio Installer.
 2. Alternatively, install pre-built binary wheels directly from PyPI which do not require a local C++ compiler:
+
    ```bash
    pip install --only-binary :all: pyrazobill
    ```

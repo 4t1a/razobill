@@ -40,6 +40,7 @@ Decomposes a single log line into a structured record.
 - **Raises**:
   - `RzError`: If `mode` is invalid or `line` is not `str` or `bytes`.
 - **Example**:
+
   ```python
   import pyrazobill as rz
   rec = rz.RzSplit("port 22 open")
@@ -95,12 +96,16 @@ Parses an iterable of lines using multi-threaded C++ workers.
 ## Classes
 
 ### `class RzRecord`
+
 Named tuple representing a decomposed message:
+
 - `template` (*Union[str, bytes]*): Extracted template.
 - `ints` (*List[int]*): Extracted 64-bit signed integers.
 - `strs` (*List[Union[str, bytes]]*): Extracted variable string slices.
 
 ### `class RzError(ValueError)`
+
 Exception raised on parsing or argument validation failures.
 Attributes:
+
 - Includes structured diagnostic messages with what happened, why, and what to do.

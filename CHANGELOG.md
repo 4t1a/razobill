@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [1.1.1] - 2026-10-14
 
 ### Changed
+
 - **Unified Public Surface Across Ecosystem**:
   - Streamlined DuckDB SQL surface to exactly 4 canonical functions with zero aliases: `RzSplit`, `RzJoin`, `RzTemplate`, and `RzHash`.
   - Streamlined Python package (`pyrazobill`) to canonical `RzSplit`, `RzJoin`, `RzTemplate`, `RzSplitMany`, `RzRecord`, and `RzError`.
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [1.0.1] - 2026-10-11
 
 ### Added
+
 - **Resilient Pure-Python Fallback (`pyrazobill._fallback`)**:
   - Full API parity for `decompose`, `reconstruct`, `formKey`, `templateOf`, `hash64`, `entropy`, and `computeLedger` in pure Python.
   - Guarantees seamless installation and operation across all environments, even when C++ development headers or MSVC runtimes are absent.
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - Automated building of native wheels across Python 3.9, 3.10, 3.11, 3.12, and 3.13 on Windows (`win_amd64`), Linux (`manylinux_2_28_x86_64`), and macOS (`arm64` and `x86_64`).
 
 ### Fixed
+
 - Resolved `fatal error C1083: Cannot open include file: 'io.h'` during Windows `pip install`.
 - Modernized `pyproject.toml` license configuration to direct SPDX string (`license = "Apache-2.0"`), resolving setuptools deprecation notices.
 
@@ -42,6 +45,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [1.0.0] - 2026-10-07
 
 ### Added
+
 - **`librazobill` Core C++20 Modular Monolith**:
   - Zero-underscore, publication-grade C++20 engine under [`include/librazobill/`](include/librazobill/).
   - High-performance, zero-allocation token scanning with `ScanMode::Exact` and `ScanMode::Semantic`.
@@ -84,12 +88,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - 14/14 Python test cases passed.
 
 ### Fixed
+
 - Eliminated all dangling string views in Python batch processing via buffer pinning.
 - Fixed DuckDB Windows extension loading compatibility requiring `allow_unsigned_extensions`.
 - Eliminated dictionary memory bloat via generational mark-and-sweep compaction.
 - Mitigated token over-splitting on non-numeric identifiers (usernames, hostnames) via semantic scanning mode.
 
 ### Changed
+
 - Promoted project status from experimental prototype (`0.1.0`) to production release (`1.0.0`) under strict SemVer 2.0.0 governance.
 - Renamed all public C++, C, Python, and CMake interfaces to adhere to an absolute zero-underscore naming policy.
 - Restructured repository layout placing multi-language libraries under `lib/` (`lib/python/`).

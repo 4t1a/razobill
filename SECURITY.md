@@ -22,6 +22,7 @@ The Razobill engineering team takes the security and integrity of our parsing en
    - Any proposed patch or fix.
 
 ### Response Timeline
+
 - **Acknowledgement**: Within 48 hours of initial report.
 - **Assessment & Triage**: Within 5 business days.
 - **Coordinated Disclosure & Patch Release**: Within 30 days or as mutually agreed.

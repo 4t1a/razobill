@@ -19,6 +19,7 @@ Documentation should feel like a precision instrument: calm, mechanically exact,
 Razobill speaks with three core voice traits.
 
 ### Trait 1: Definite and factual
+
 State concrete data structures, mathematical invariants, and runtime behaviors directly.
 Avoid hand-waving claims, defensive comparisons, and hype words.
 
@@ -27,6 +28,7 @@ Avoid hand-waving claims, defensive comparisons, and hype words.
 - **What it never sounds like**: "In today's fast-paced cloud landscape, log data is growing exponentially, but our world-class engine makes parsing effortless."
 
 ### Trait 2: Mechanically exact
+
 Every command, function signature, and code block must execute cleanly and produce the exact output shown.
 Include hardware context and corpus parameters when reporting benchmarks.
 
@@ -35,6 +37,7 @@ Include hardware context and corpus parameters when reporting benchmarks.
 - **What it never sounds like**: "It's blisteringly fast and uses minimal resources."
 
 ### Trait 3: Unadorned and respectful of the reader's time
+
 Use short sentences.
 Dedicate one paragraph to one idea.
 Show working code before explaining internal theory.
@@ -69,42 +72,54 @@ Use only these six named recurring blocks.
 Each component serves one documented purpose and uses GitHub alert markdown syntax.
 
 ### Component 1: TL;DR
+
 Provides an executive summary in two sentences or fewer at the start of complex guides.
+
 ```markdown
 > [!NOTE]
 > **TL;DR**: Razobill splits log lines into templates and parameter arrays, reducing storage footprint while guaranteeing byte-identical reconstruction.
 ```
 
 ### Component 2: Try it
+
 Presents a verified, copy-pasteable snippet that produces immediate results.
+
 ```markdown
 > [!TIP]
 > **Try it**: Run `python -c "import pyrazobill as rz; print(rz.RzSplit('port 22 open'))"` in your terminal.
 ```
 
 ### Component 3: Gotcha
+
 Flags non-obvious failure modes, lifetime gotchas, or boundary conditions.
+
 ```markdown
 > [!WARNING]
 > **Gotcha**: In the C ABI, `outRecord.strValues` contains pointers into the caller's message buffer; do not free the buffer before freeing the record.
 ```
 
 ### Component 4: Under the hood
+
 Explains engine internals, SIMD dispatching, or memory layout for advanced readers.
+
 ```markdown
 > [!IMPORTANT]
 > **Under the hood**: Delimiter scanning uses 32-byte AVX2 vector registers with branchless hardware trailing-zero counts.
 ```
 
 ### Component 5: Migration note
+
 Explains migrations from legacy v1.x symbols or third-party tools.
+
 ```markdown
 > [!CAUTION]
 > **Migration note**: Legacy `rbDecompose` and `\x12`/`\x13` delimiters were replaced in v1.1.1 by `RzSplit` and `{i}`/`{s}` placeholders.
 ```
 
 ### Component 6: Real-world impact
+
 Quantifies disk, bandwidth, or latency impact with verifiable production metrics.
+
 ```markdown
 > [!NOTE]
 > **Real-world impact**: Replaces 10 TB of raw text logs with 1.2 TB of Parquet ZSTD columnar stripes.
@@ -115,12 +130,14 @@ Quantifies disk, bandwidth, or latency impact with verifiable production metrics
 ## 5. Visuals and diagrams
 
 1. **Wordmark / Logo**: Embed the logo via `<picture>` with light and dark mode variants using `assets/Logo.jpeg` and `assets/Logo-light.jpeg`.
+
    ```html
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="assets/Logo.jpeg">
      <img src="assets/Logo-light.jpeg" alt="Razobill Logo" width="320">
    </picture>
    ```
+
 2. **Palette**: Constrain diagram and UI styling to four primary colors:
    - Primary Accent: `#0284C7` (Teal Blue)
    - Invertibility / Success: `#059669` (Emerald Green)
@@ -156,6 +173,7 @@ Quantifies disk, bandwidth, or latency impact with verifiable production metrics
 Every page belongs to one of four Diataxis quadrants.
 
 ### Template A: tutorial (learning-oriented)
+
 ```markdown
 # [Action-oriented title: e.g. Getting started in 5 minutes]
 
@@ -180,6 +198,7 @@ Links to relevant how-to guides and API reference.
 ```
 
 ### Template B: how-to guide (task-oriented)
+
 ```markdown
 # [Goal-oriented title: e.g. Compacting logs in DuckDB]
 
@@ -198,6 +217,7 @@ Query or test confirming success.
 ```
 
 ### Template C: reference (information-oriented)
+
 ```markdown
 # [Symbol or module name: e.g. DuckDB SQL functions]
 
@@ -217,6 +237,7 @@ Summary table of all functions in scope.
 ```
 
 ### Template D: explanation (understanding-oriented)
+
 ```markdown
 # [Concept title: e.g. Lossless invertibility]
 

@@ -211,9 +211,10 @@ private:
                 if (s.release) s.release(&s);
             }
         } schg{schema};
-        if (out)
+        if (out) {
             for (std::int64_t c = 0; c < schema.n_children; ++c)
                 out->names.emplace_back(schema.children[c]->name ? schema.children[c]->name : "");
+        }
         for (;;) {
             ArrowArray batch{};
             if (stream.get_next(&stream, &batch) != 0) throw BackendError("cannot read result batch");

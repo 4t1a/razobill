@@ -5,6 +5,7 @@
 Every public name serves exactly one concrete developer task. Redundant aliases, deprecated variants, and internal engine stubs are removed.
 
 ### 1.1 SQL (DuckDB Extension) — Budget: <= 4 functions, 0 aliases (Used: 4 functions)
+
 | Function | Return Type | Developer Task Served |
 | :--- | :--- | :--- |
 | `RzSplit(line)` | `STRUCT(template, ints, strs)` | Decomposes a log message into structured template, numbers, and word strings for analytical indexing. |
@@ -16,6 +17,7 @@ Every public name serves exactly one concrete developer task. Redundant aliases,
 - *Aliases*: 0 aliases registered. `rb_join`, `rb_rebuild`, `rbForm`, `rbInts`, `rbEntropy`, etc. are removed.
 
 ### 1.2 Python (`pyrazobill`) — Budget: <= 8 names in `__all__` (Used: 7 names)
+
 | Symbol | Type | Developer Task Served |
 | :--- | :--- | :--- |
 | `split(line, mode=...)` | Function | Parses a single log line into a named tuple `Decomposed(template, ints, strs)`. |
@@ -27,6 +29,7 @@ Every public name serves exactly one concrete developer task. Redundant aliases,
 | `__version__` | String | Exposes semantic package version. |
 
 ### 1.3 C ABI (`razobill.h`) — Budget: <= 6 functions, <= 3 types (Used: 6 functions, 2 types)
+
 | Function / Type | Role | Developer Task Served |
 | :--- | :--- | :--- |
 | `razobill_split` | Function | Parses a buffer into decomposed template string and integer/string arrays. |
@@ -43,14 +46,17 @@ Every public name serves exactly one concrete developer task. Redundant aliases,
 ## 2. Template Format
 
 ### Format Specification
+
 - Number placeholder: `{i}` (64-bit integer parsed and formatted via `std::to_chars` / `std::from_chars`).
 - String placeholder: `{s}` (variable word, path, IP, or token).
 - Literal brace escaping: `{{` represents a literal `{` character; `}}` represents a literal `}` character.
 
 ### Rationale & Invariants
+
 1. **Unambiguity**: Replaces ambiguous `{}` and `<*>` with typed, self-describing placeholders `{i}` and `{s}`.
 2. **Lossless Invertibility**: Any arbitrary byte string containing `{` or `}` escapes cleanly as `{{` or `}}` and reconstructs without distortion.
 3. **Parquet & Storage Migration**: For Parquet datasets previously partitioned on legacy `\x12`/`\x13` or `<*>` forms, a one-line SQL regex migration is provided:
+
    ```sql
    REPLACE(REPLACE(legacy_form, '\x12', '{s}'), '<*>', '{s}')
    ```
@@ -60,6 +66,7 @@ Every public name serves exactly one concrete developer task. Redundant aliases,
 ## 3. Mode Default: Semantic Scan
 
 ### Measured Evidence on Real Corpora
+
 | Dataset | Lines Evaluated | Exact Mode Unique Templates | Semantic Mode Unique Templates | Reduction Factor | Lossless Invertibility |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `logs/SSH/SSH.log` | 10,000 | 517 | 120 | **4.31x** | 100% byte-identical |
@@ -74,13 +81,16 @@ Every public name serves exactly one concrete developer task. Redundant aliases,
 ## 4. Naming Conventions & Plain Language
 
 ### Ecosystem Naming Rules
+
 - **SQL & DuckDB**: `lower_snake_case` prefixed by `razobill_` (e.g. `razobill_split`, `razobill_join`). No camelCase, no legacy prefixes.
 - **Python**: PEP 8 compliant `lower_snake_case` (e.g. `split`, `join`, `split_many`).
 - **C ABI**: `razobill_` prefix with `lower_snake_case` for functions/types; `RAZOBILL_` prefix with uppercase for enum constants. Replaces the legacy "zero-underscore" rule.
 - **Header**: Single unified header `include/razobill.h`. Library file named `razobill` (shared) and `razobill_core` (static), eliminating double prefixes (`liblib...`).
 
 ### Plain Language Policy
+
 The public API and documentation strictly ban internal information-theory terms in user-facing surfaces:
+
 - Banned terms: *entropy, ledger, latitude, doubt, conveyance, leakage, channel capacity, Miller-Madow, certified interval, Shannon, arena, slot, form key*.
 - Plain vocabulary: *template, numbers, words, line, split, join, exact, semantic*.
 - Historical paper citation is retained respectfully in `NOTICE` and in a brief footnote at the bottom of `README.md`.

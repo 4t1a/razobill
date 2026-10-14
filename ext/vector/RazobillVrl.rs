@@ -47,20 +47,15 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
     let mut record: RzRecord = unsafe { std::mem::zeroed() };
     let c_str = CString::new(raw_msg).map_err(|e| e.to_string())?;
 
-    let status = unsafe {
-        RzSplit(
-            c_str.as_ptr(),
-            raw_msg.len(),
-            &mut record,
-        )
-    };
+    let status = unsafe { RzSplit(c_str.as_ptr(), raw_msg.len(), &mut record) };
 
     if !matches!(status, RzStatus::Ok) {
         return Err("Razobill decomposition failed".to_string());
     }
 
-    let form_slice =
-        unsafe { std::slice::from_raw_parts(record.template_str as *const u8, record.template_length) };
+    let form_slice = unsafe {
+        std::slice::from_raw_parts(record.template_str as *const u8, record.template_length)
+    };
     let form_str = String::from_utf8_lossy(form_slice).to_string();
 
     let mut ints = Vec::with_capacity(record.int_count);

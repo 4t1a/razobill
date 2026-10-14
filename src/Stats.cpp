@@ -298,7 +298,7 @@ ConsequenceDecomposition consequenceDecomposition(std::span<const XY> xy, std::s
 }
 
 MergeCost mergeCost(std::span<const XY> xy, const std::unordered_map<std::uint64_t, bool>& merged, double totalEvents) {
-    if (merged.size() < 2) return {0.0, 0.0};
+    if (merged.size() < 2) return {.jsd = 0.0, .share = 0.0};
     std::unordered_map<std::uint64_t, double> nf;
     std::unordered_map<std::pair<std::uint64_t, std::uint32_t>, double, PairHash64> nfy;
     std::unordered_map<std::uint32_t, double> ny;
@@ -312,7 +312,7 @@ MergeCost mergeCost(std::span<const XY> xy, const std::unordered_map<std::uint64
         nF.add(r.n);
     }
     const double N = nF.value();
-    if (!(N > 0.0)) return {0.0, 0.0};
+    if (!(N > 0.0)) return {.jsd = 0.0, .share = 0.0};
 
     Sum jsd;
     for (const auto& [key, n] : nfy) {
@@ -322,7 +322,7 @@ MergeCost mergeCost(std::span<const XY> xy, const std::unordered_map<std::uint64
             jsd.add((n / N) * std::log2(p_yf / p_yF));
         }
     }
-    return {std::max(jsd.value(), 0.0), totalEvents > 0.0 ? N / totalEvents : 0.0};
+    return {.jsd = std::max(jsd.value(), 0.0), .share = totalEvents > 0.0 ? N / totalEvents : 0.0};
 }
 
 double leakage(std::span<const XY> xy, std::span<const FormMeaning> map) {
@@ -383,7 +383,7 @@ DepthLedger computeDepthLedger(std::span<const HierarchicalStep> steps) {
 
     std::size_t L = 0;
     for (const auto& s : steps) {
-        if (s.levels.size() > L) L = s.levels.size();
+        L = std::max(L, s.levels.size());
     }
 
     std::vector<std::unordered_map<std::uint64_t, double>> wMaps(L + 1);

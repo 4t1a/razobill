@@ -7,6 +7,7 @@ This document provides the complete record of the documentation refactor under v
 ## 1. Migration Overview
 
 All documentation has been reorganized from an ad-hoc directory structure into the Diataxis documentation architecture:
+
 - `docs/tutorials/`: Action-oriented tutorials for new adopters.
 - `docs/how-to/`: Task-oriented recipes for solving specific engineering integrations.
 - `docs/reference/`: Technical API definitions, signatures, and stability policies.

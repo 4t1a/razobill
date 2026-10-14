@@ -9,6 +9,7 @@ Skip this guide if you only process logs in local memory.
 ## Problem
 
 Long-term retention of raw text logs in Amazon S3 or Google Cloud Storage results in high storage bills:
+
 - Uncompressed text requires substantial object storage space.
 - Querying raw JSON or text via Amazon Athena requires scanning gigabytes of data per query.
 - Standard compression (Gzip) compresses well but prevents column pruning during queries.

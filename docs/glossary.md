@@ -29,26 +29,34 @@ Banned synonyms are rejected during documentation linting.
 ## Detailed definitions
 
 ### Template
+
 A template is the constant character sequence of a log message with variable fields replaced by typed markers:
+
 - `{i}`: A placeholder for a 64-bit signed integer.
 - `{s}`: A placeholder for a variable word (string).
 - `{{` and `}}`: Escaped literal braces.
 
 ### Numbers
+
 The list or vector of 64-bit signed integers extracted from numeric tokens during a split operation.
 Numbers are parsed using standard fast float/integer routines (`std::from_chars`) and formatted via `std::to_chars`.
 
 ### Words
+
 The list or vector of variable substrings extracted from tokens during a split operation.
 In semantic mode, tokens representing volatile entities (such as IP addresses, hash strings, and file paths) are extracted into words.
 
 ### Semantic mode versus exact mode
+
 - **Semantic mode** (default): Uses heuristic character analysis to group complex tokens into single string slots, preventing template proliferation across high-entropy identifiers.
 - **Exact mode**: Evaluates strict whitespace and punctuation delimiters without grouping non-numeric strings into single slots.
 
 ### Invertibility
+
 The mathematical and operational invariant of Razobill:
+
 ```text
 join(split(message)) == message
 ```
+
 No characters, delimiters, or trailing whitespaces are discarded or modified during decomposition and reconstruction.

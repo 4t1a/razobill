@@ -9,14 +9,17 @@ Skip this article if you only need high-level API details.
 ## Branchless delimiter scanning
 
 Traditional log tokenizers scan strings byte-by-byte in a scalar loop:
+
 ```c
 while (*ptr && *ptr != ' ' && *ptr != '\t' && *ptr != '\n') {
     ptr++;
 }
 ```
+
 In modern superscalar CPUs, this scalar loop suffers from branch mispredictions whenever delimiter frequencies fluctuate.
 
 Razobill replaces scalar loops with SIMD vector scanning (`SimdScanner.hpp`):
+
 - 32 bytes (AVX2) or 64 bytes (AVX-512) are loaded into SIMD vector registers in a single instruction.
 - The input chunk is compared against delimiter broadcast vectors in parallel.
 - The result of the comparison is extracted into a bitmask (`_mm256_movemask_epi8`).

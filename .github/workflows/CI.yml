@@ -164,4 +164,3 @@ jobs:
           python -m pip install --upgrade pip cyclonedx-bom
           cyclonedx-py poetry --output-format json --outfile sbom.json || cyclonedx-py requirements requirements.txt --outfile sbom.json
           test -s sbom.json
-

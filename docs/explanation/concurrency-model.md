@@ -10,6 +10,7 @@ Skip this article if you are processing single messages sequentially.
 
 In high-volume telemetry ingestion, logs arrive from thousands of concurrent microservices.
 Common multi-threading architectures often hit synchronization bottlenecks:
+
 - Global locks on template dictionaries create contention across CPU cores.
 - Thread context switching and thread pool lock contention degrade throughput.
 - Python GIL (Global Interpreter Lock) serializes execution across worker threads.
@@ -21,6 +22,7 @@ Razobill eliminates shared-state contention by designing parsing as an embarrass
 ## Lock-free thread-local scratchpads
 
 When executing inside a multi-threaded database (such as DuckDB) or across native worker threads:
+
 - Each thread operates on an isolated `Scratch` buffer.
 - Parsing routines allocate zero locks, atomic counters, or mutual exclusion primitives on the hot path.
 - Memory allocated by thread $A$ is never read or written by thread $B$.
@@ -30,12 +32,14 @@ When executing inside a multi-threaded database (such as DuckDB) or across nativ
 ## Python GIL release in `RzSplitMany`
 
 In Python, parsing millions of strings in a Python loop is CPU-bound and constrained by the GIL:
+
 ```python
 # Sequential Python loop (GIL constrained)
 records = [rz.RzSplit(line) for line in millions_of_lines]
 ```
 
 When you call `rz.RzSplitMany(lines)`:
+
 1. Python strings are collected into a C++ string vector.
 2. The Python GIL is explicitly released using `py::gil_scoped_release`.
 3. Background worker threads in `librazobill` parse chunks of messages simultaneously.
@@ -46,6 +50,7 @@ When you call `rz.RzSplitMany(lines)`:
 ## Work-stealing thread pool (`ThreadPool.hpp`)
 
 For batch tasks, librazobill includes a cache-aware work-stealing thread pool:
+
 - Worker threads maintain local work queues.
 - When an idle worker exhausts its local batch, it steals tasks from the tail of another worker's queue.
 - This balances uneven workloads (e.g. mixed short syslog messages and long Java stack traces) across all CPU cores.

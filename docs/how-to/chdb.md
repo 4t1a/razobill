@@ -9,6 +9,7 @@ Skip this guide if you are working exclusively with DuckDB (see [Compacting logs
 ## Problem
 
 Storing large volumes of raw log text in ClickHouse presents analytical challenges:
+
 1. Scanning raw log strings with repeated regular expressions (`extractAll`, `replaceRegexpAll`) consumes high CPU during template aggregation.
 2. Grouping unstructured strings across distributed clusters requires shuffling large variable-length byte payloads across network boundaries.
 3. While DuckDB achieves over 50% physical compression via slot decomposition, ClickHouse's native `CODEC(ZSTD(3))` already compresses raw log strings to ~0.53x of uncompressed size.
@@ -19,6 +20,7 @@ Decomposing lines into separate slot columns provides diminishing compression re
 ## Solution
 
 The optimal ClickHouse architecture is **Additive Mode**:
+
 1. Keep the raw log message column intact with `CODEC(ZSTD(3))` for forensic auditing and full-text search.
 2. Add a lightweight 64-bit form hash column (`form_id UInt64`) indexed with `CODEC(ZSTD(3))`.
 3. Leverage Razobill's exact `xxHash64` parity so that hashes computed in C++, Python, and ClickHouse SQL match bit-for-bit without data drift.

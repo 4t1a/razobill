@@ -32,12 +32,14 @@ Before submitting code, please review our core invariants:
 ## Development setup
 
 ### Prerequisites
+
 - **C++20 compiler**: GCC 12+, Clang 15+, or MSVC 2022+
 - **CMake**: Version 3.20 or newer
 - **Ninja**: Fast build system (recommended)
 - **Python**: Version 3.9 or newer with `pybind11` and `setuptools`
 
 ### Building the C++ core
+
 ```bash
 # Configure release build
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -47,6 +49,7 @@ ninja -C build
 ```
 
 ### Running C++ test suites
+
 ```bash
 # 1. Run core unit test suite (41 test cases, 1,082,496 assertions)
 ./build/UnitTests.exe
@@ -56,6 +59,7 @@ ninja -C build
 ```
 
 ### Building and testing Python bindings
+
 ```bash
 # Run Python unit test suite
 python -m unittest discover -s lib/python/tests
@@ -83,6 +87,7 @@ When submitting or updating documentation:
    - Avoid marketing hype words ("blazing", "revolutionary", "seamless").
 4. **Automated verification**:
    - Run the documentation linter to verify compliance before opening a pull request:
+
      ```bash
      python tools/LintDocs.py
      ```

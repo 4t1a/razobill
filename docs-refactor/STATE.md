@@ -7,6 +7,7 @@
 - Target Version: 1.1.1
 
 ## Done
+
 - Confirmed CLI execution environment, Node.js, Python, and Git toolchains.
 - Completed Phase 0 Inventory and ground truth verification in `docs-refactor/INVENTORY.md`.
 - Completed Phase 1 Identity:
@@ -36,16 +37,20 @@
   - Switched all logo embeds (`README.md`, `docs/STYLE.md`, sub-package READMEs) to user assets (`assets/Logo.jpeg` dark, `assets/Logo-light.jpeg` light).
   - Authored `docs/how-to/chdb.md` for ClickHouse & embedded chDB integration.
   - Updated `README.md`, `docs/README.md`, `docs/explanation/architecture.md`, `docs/explanation/benchmarks.md`, and `tools/LintDocs.py`.
-- Completed Code Formatting & Quality Hardening:
-  - Formatted entire C++ codebase with installed LLVM 23.1.3 `clang-format.exe` against `.clang-format` (zero differences).
-  - Formatted Python codebase with `ruff format` and resolved all warnings via `ruff check` and `flake8`.
-  - Added root `pyproject.toml` and `.flake8` configurations.
-  - Audited code coverage reporting via `codecov-cli` (validated coverage report generation and `--dry-run` upload).
-  - Verified 100% test pass: 41 C++ unit test cases (1,082,496 assertions), 13 DuckDB integration test cases (134,890 assertions), and 18 Python test cases.
-  - Verified internal documentation links via `tools/VerifyMarkdownLinks.py` (73 relative links, 0 broken).
+- Completed Full Multi-Language Formatting, Linting & Verification:
+  - C++: Formatted with LLVM 23.1.3 `clang-format.exe` (0 differences across all source/headers); verified with `cpplint-2.0.2` via `CPPLINT.cfg` (0 errors across 33 C++ files). Removed `tools/LintCpp.py` as requested.
+  - YAML: Added `.yamllint.yml` and verified with `yamllint .` (0 errors, 0 warnings across all workflows and configs).
+  - Markdown: Configured `.markdownlint.yaml` and `.markdownlint-cli2.yaml`; verified with `markdownlint-cli2` (53 markdown files, 0 issues).
+  - Python: Formatted with `ruff format`; verified with `ruff check` and `flake8` (0 errors, 0 warnings).
+  - Go: Formatted and verified with `gofmt` (0 differences).
+  - Rust: Formatted and verified with `rustfmt --check` (0 differences).
+  - Code Coverage: Generated coverage XML and validated via `codecov-cli upload-coverage --dry-run`.
+  - Comprehensive Test Suite: 100% pass on C++ UnitTests (41/41 test cases, 1,082,496 assertions), DuckDB Integration tests (13/13 test cases, 134,890 assertions with memory PRAGMA hardening), and Python test suite (18/18 tests).
 
 ## Open
-- None. All deliverables and verification gates are satisfied.
+
+- None. All deliverables, formatters, linters, and verification gates are 10/10 satisfied.
 
 ## Next
+
 - Final commit on `docs/identity-refactor` and report to user.

@@ -1,0 +1,32 @@
+# .markdownlint-cli2.yaml
+config:
+  default: true
+  MD013: false
+  MD033:
+    allowed_elements:
+      - "picture"
+      - "source"
+      - "img"
+      - "p"
+      - "a"
+      - "details"
+      - "summary"
+      - "sub"
+      - "sup"
+      - "kbd"
+      - "br"
+      - "figure"
+      - "figcaption"
+  MD024:
+    siblings_only: true
+  MD041: false
+
+globs:
+  - "**/*.md"
+
+ignores:
+  - "node_modules/**"
+  - "build/**"
+  - "thirdparty/**"
+  - ".git/**"
+  - "extension-ci-tools/**"

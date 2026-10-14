@@ -25,7 +25,8 @@ Head-to-head comparison evaluating parsing throughput on standard LogHub benchma
 | **Linux Syslog** | 2,000 | 29,400 | **3,110,000** | **105x** |
 | **SSH** | 2,000 | 31,200 | **3,450,000** | **110x** |
 
-### Why Razobill is over 100x faster:
+### Why Razobill is over 100x faster
+
 1. **Branchless SIMD scanning**: Razobill processes delimiters in 32-byte chunks using AVX2 instructions, whereas Drain3 scans characters sequentially in Python.
 2. **Deterministic state machine**: Drain3 maintains a variable-depth tree search requiring dictionary lookups and tree traversal per token.
    Razobill executes a single linear pass over the message buffer.
@@ -70,4 +71,3 @@ Evaluated on a multi-system corpus of 134,815 log events inside embedded chDB (`
 | **Raw message text** | `CODEC(ZSTD(3))` | 0.53x | Standard production ClickHouse baseline. |
 | **Razobill Additive layout** | `form_id UInt64` + ZSTD text | 0.56x | Preserves raw text with +6% overhead for instant index lookups. |
 | **Razobill Compact layout** | Decomposed integer and string slots | **0.46x** | Maximum columnar compression on high-volume clusters. |
-

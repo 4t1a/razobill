@@ -23,6 +23,7 @@ It supports both compile-time vector flags and runtime CPUID multiversioning.
 ## Compiler configuration
 
 ### ARM NEON targets
+
 On AArch64 targets, NEON vectorization is enabled by default with standard optimization flags:
 
 ```bash
@@ -34,6 +35,7 @@ cmake --build build
 ```
 
 ### x86-64 targets
+
 Enable AVX2 vectorization:
 
 ```bash
@@ -45,6 +47,7 @@ cmake --build build
 ```
 
 For server clusters supporting AVX-512BW:
+
 ```bash
 cmake -B build \
     -DCMAKE_BUILD_TYPE=Release \
@@ -63,6 +66,7 @@ Run the microbenchmark executable to verify hardware acceleration:
 ```
 
 Look for the reported scanner implementation in the console output:
+
 - `AVX-512BW`: 64 bytes per cycle.
 - `AVX2`: 32 bytes per cycle.
 - `ARM NEON`: 16 bytes per cycle.

@@ -11,6 +11,7 @@ Skip this article if you only need the API syntax for calling `RzSplit` and `RzJ
 Traditional log parsers treat log clustering as an unsupervised machine learning or probabilistic tree search problem.
 Heuristic tools like Drain, Spell, and AEL group messages by token frequency or length.
 In doing so, they introduce irreversible distortion:
+
 1. They discard non-numeric variable tokens (such as file paths, IP addresses, or hostnames) when assigning templates.
 2. They alter whitespace, punctuation, and uppercase/lowercase casing.
 3. They split identical application log formats into hundreds of separate clusters due to unseen token variations.
@@ -29,6 +30,7 @@ Razobill establishes an exact algebraic relation over the set of all byte string
 $$\text{RzJoin}(\text{RzSplit}(x)) = x \quad \forall x \in \Sigma^*$$
 
 Every decomposed record contains three discrete projections:
+
 1. **Template ($T$)**: The invariant character skeleton, containing typed slot markers:
    - `{i}`: Placeholder for a 64-bit integer.
    - `{s}`: Placeholder for a variable word.
@@ -37,12 +39,15 @@ Every decomposed record contains three discrete projections:
 3. **Words ($S$)**: A contiguous vector of string slices pointing directly into the input byte stream.
 
 ### Proof of bijection
+
 During decomposition:
+
 - Literal occurrences of `{` or `}` in the original input string are escaped into `{{` or `}}`.
 - When an integer is detected at byte position $[p_k, p_k + L_k]$, its numeric value is parsed and appended to $I$, and the sequence `{i}` replaces $[p_k, p_k + L_k]$ in $T$.
 - When a variable word is detected at byte position $[q_m, q_m + M_m]$, a pointer and length slice are appended to $S$, and the sequence `{s}` replaces $[q_m, q_m + M_m]$ in $T$.
 
 During reconstruction (`RzJoin`):
+
 - The template string is scanned linearly for `{` characters.
 - Double braces `{{` and `}}` are collapsed back into single literal `{` and `}` bytes.
 - Placeholders `{i}` pop the next integer from $I$ and format it directly into the output buffer via high-speed `std::to_chars`.
@@ -66,6 +71,7 @@ flowchart LR
 The algebraic decomposition in Razobill is grounded in information-theoretic semantic accounting introduced by M. M. Atta (2026) in [*Latitude and Doubt*](https://doi.org/10.5281/zenodo.23287286).
 
 Under this model, the information content of a log event is partitioned into:
+
 - Invariant structural template information.
 - Numeric and variable parameter payload information.
 

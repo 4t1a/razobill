@@ -25,6 +25,7 @@ The C++20 engine is located under `include/librazobill/`:
 ## Core classes
 
 ### `struct razobill::core::SlotRecord`
+
 ```cpp
 namespace razobill::core {
 
@@ -38,11 +39,15 @@ struct SlotRecord {
 ```
 
 ### `class razobill::core::MemoryArena`
+
 Provides zero-allocation chunk recycling across batches:
+
 - `void* allocate(size_t bytes)`: Allocates 64-byte aligned memory.
 - `void reset()`: Resets offset counter to zero without freeing memory blocks.
 
 ### `class razobill::core::StringPool`
+
 Compacts and deduplicates string literals:
+
 - `std::string_view intern(std::string_view str)`: Deduplicates string using xxHash64.
 - `void gc()`: Compacts live allocations monotonically.

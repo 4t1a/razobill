@@ -176,7 +176,7 @@ TEST_CASE("meaning layer: gate, doubt, versions, ledger identities") {
     CHECK(after.second == 0);
     CHECK(after.first > 0);
     rz.pin(4);
-    CHECK(std::pair{certified(), ambiguous()} == before);
+    CHECK(std::make_pair(certified(), ambiguous()) == before);
     rz.pin(5);
     CHECK_THROWS_AS(rz.pin(99), std::invalid_argument);
     CHECK_THROWS_AS(rz.retire("NO_SUCH"), std::invalid_argument);

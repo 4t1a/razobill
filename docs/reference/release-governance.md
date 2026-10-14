@@ -26,6 +26,7 @@ Every release candidate must complete this automated verification checklist:
 ## Artifact distribution and signing
 
 Official release artifacts include:
+
 - Multi-platform precompiled Python wheels on PyPI (`pyrazobill`).
 - DuckDB loadable extensions published to the official DuckDB Community repository.
 - GitHub release archives accompanied by SHA-256 checksums and GPG cryptographic signatures.

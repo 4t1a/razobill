@@ -25,20 +25,26 @@ Joining those components reconstructs the original raw bytes bit-for-bit with ze
 Choose the runtime environment for your stack.
 
 ### Python package
+
 Install the verified binary wheel from PyPI:
+
 ```bash
 pip install pyrazobill
 ```
 
 ### DuckDB extension
+
 Load the extension directly inside your DuckDB shell or client:
+
 ```sql
 INSTALL razobill FROM community;
 LOAD razobill;
 ```
 
 ### C ABI shared library
+
 Link against the native C++20 shared library `razobill.dll` or `librazobill.so`:
+
 ```c
 #include "librazobill/RazobillC.h"
 ```
@@ -50,6 +56,7 @@ Link against the native C++20 shared library `razobill.dll` or `librazobill.so`:
 Parse a message into structured columns and reconstruct the original text.
 
 ### In Python
+
 Run this self-contained script in your terminal:
 
 ```python
@@ -77,6 +84,7 @@ assert restored == line
 > **Try it**: Run `python -c "import pyrazobill as rz; print(rz.RzSplit('port 22 open'))"` in your shell.
 
 ### In DuckDB SQL
+
 Decompose and query logs directly using analytical SQL:
 
 ```sql

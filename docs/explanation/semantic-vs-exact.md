@@ -9,6 +9,7 @@ Skip this article if you are satisfied with default semantic scanning.
 ## The challenge of template explosion
 
 When parsing telemetry logs, pure delimiter tokenizers encounter combinatorial explosion:
+
 - Log messages contain volatile tokens such as IPv4/IPv6 addresses, hex hashes, UUIDs, and absolute file paths.
 - If every distinct word token is treated as part of the constant template, a system emitting 100,000 log lines can produce 20,000 distinct templates.
 - This cardinality explosion destroys database partition pruning and ruins analytical group-by performance.
@@ -34,6 +35,7 @@ Razobill addresses this with two scanning modes: **semantic mode** and **exact m
 ## Semantic grouping heuristics
 
 In semantic mode, the scanner examines token character compositions:
+
 1. **IP addresses**: Dotted-quad and colon-delimited hex strings (e.g. `192.168.1.100`, `fe80::1`) are extracted as `{s}` words.
 2. **File paths and URIs**: Tokens containing slashes (e.g. `/var/log/syslog`, `https://api.internal/v1`) are extracted as `{s}` words.
 3. **Hexadecimal hashes and UUIDs**: High-entropy strings containing mixed hex digits and hyphens are extracted as `{s}` words.

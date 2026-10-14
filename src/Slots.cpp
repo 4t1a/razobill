@@ -54,8 +54,12 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
                          std::span<const std::string_view> strs, std::string& out) {
     std::string_view skeleton, types;
     std::size_t nInt = 0, nStr = 0;
-    if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) return s;
-    if (ints.size() < nInt || strs.size() < nStr) return Status::SlotUnderflow;
+    if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) {
+        return s;
+    }
+    if (ints.size() < nInt || strs.size() < nStr) {
+        return Status::SlotUnderflow;
+    }
 
     std::size_t size = skeleton.size() - types.size();
     for (std::size_t i = 0; i < nInt; ++i) {
@@ -69,13 +73,13 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
     out.clear();
     out.reserve(size);
     std::size_t ti = 0, ii = 0, si = 0;
-    char num[32];
+    std::array<char, 32> num{};
     for (char c : skeleton) {
         if (static_cast<unsigned char>(c) != kPlaceholder) {
             out.push_back(c);
         } else if (types[ti++] == 'I') {
-            const auto r = std::to_chars(num, num + sizeof num, ints[ii++]);
-            out.append(num, r.ptr);
+            const auto r = std::to_chars(num.data(), num.data() + num.size(), ints[ii++]);
+            out.append(num.data(), r.ptr);
         } else {
             out.append(strs[si++]);
         }
@@ -134,15 +138,15 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
     p = tmpl.data();
     nInt = 0;
     nStr = 0;
-    char numBuf[32];
+    std::array<char, 32> numBuf{};
     while (p < end) {
         if (*p == '{') {
             if (p + 1 < end && *(p + 1) == '{') {
                 out.push_back('{');
                 p += 2;
             } else if (p + 2 < end && *(p + 1) == 'i' && *(p + 2) == '}') {
-                const auto r = std::to_chars(numBuf, numBuf + sizeof(numBuf), ints[nInt++]);
-                out.append(numBuf, r.ptr);
+                const auto r = std::to_chars(numBuf.data(), numBuf.data() + numBuf.size(), ints[nInt++]);
+                out.append(numBuf.data(), r.ptr);
                 p += 3;
             } else if (p + 2 < end && *(p + 1) == 's' && *(p + 2) == '}') {
                 out.append(strs[nStr++]);
@@ -206,19 +210,21 @@ Status parse(std::string_view msg, SlotRecord& out, ScanMode mode) {
     return Status::Ok;
 }
 
-Status reconstruct(std::string_view form, std::span<const std::int64_t> ints, std::span<const std::string_view> strs,
+Status reconstruct(std::string_view tmpl, std::span<const std::int64_t> ints, std::span<const std::string_view> strs,
                    std::string& out) {
-    if (isLegacyFormKey(form)) {
-        return reconstructLegacy(form, ints, strs, out);
+    if (isLegacyFormKey(tmpl)) {
+        return reconstructLegacy(tmpl, ints, strs, out);
     }
-    return reconstructNew(form, ints, strs, out);
+    return reconstructNew(tmpl, ints, strs, out);
 }
 
 Status templateOf(std::string_view form, std::string& out) {
     if (isLegacyFormKey(form)) {
         std::string_view skeleton, types;
         std::size_t nInt = 0, nStr = 0;
-        if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) return s;
+        if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) {
+            return s;
+        }
         out.clear();
         for (char c : skeleton) {
             if (static_cast<unsigned char>(c) == kPlaceholder)

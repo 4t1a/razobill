@@ -519,8 +519,10 @@ int RazobillEngine::retire(const std::string& meaning) {
     requireName(meaning);
     const int cur = static_cast<int>(db_.query("SELECT v FROM rb_meta").i64(0, 0));
     const auto rules = activeRulesLocked(cur);
-    if (std::none_of(rules.begin(), rules.end(), [&](const Rule& r) { return r.meaning == meaning; }))
+    auto matchesMeaning = [&](const Rule& r) { return r.meaning == meaning; };
+    if (std::none_of(rules.begin(), rules.end(), matchesMeaning)) {
         throw std::invalid_argument("no active meaning named " + meaning);
+    }
     const int v = static_cast<int>(db_.query("SELECT coalesce(max(v), 0) FROM rb_event").i64(0, 0)) + 1;
     db_.exec("INSERT INTO rb_event VALUES (" + std::to_string(v) + ", 'retire', " + dx_->quote(meaning) + ", '', 0)");
     db_.exec(dx_->truncate("rb_meta"));

@@ -82,6 +82,7 @@ for rec in records:
 ## Documentation
 
 Full documentation is available in the project repository:
+
 - [Python developer guide](../../docs/how-to/python.md)
 - [Python API reference](../../docs/reference/python-api.md)
 - [Lossless invertibility](../../docs/explanation/lossless-invertibility.md)

@@ -28,6 +28,7 @@ python -c "import pyrazobill as rz; print(rz.__version__)"
 ```
 
 Expected output:
+
 ```text
 1.1.1
 ```
@@ -51,6 +52,7 @@ print("Words:   ", record.strs)
 ```
 
 Expected output:
+
 ```text
 Template: Failed password for {s} from {s} port {i}
 Numbers:  [22]
@@ -73,6 +75,7 @@ print("Matches input:", reconstructed == line)
 ```
 
 Expected output:
+
 ```text
 Reconstructed: Failed password for root from 192.168.1.100 port 22
 Matches input: True
@@ -97,6 +100,7 @@ SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS parsed;
 ```
 
 Expected output:
+
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                         parsed                                         │

@@ -11,10 +11,12 @@ Skip this document if you only write queries.
 Razobill adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) (`MAJOR.MINOR.PATCH`).
 
 ### 1. API compatibility (source level)
+
 - Minor version releases (`1.x` to `1.y`) guarantee that existing valid code compiles without modification.
 - Functions and symbols are never removed in a minor release without a deprecation window.
 
 ### 2. ABI compatibility (binary level)
+
 - Governed by `LIBRAZOBILL_ABI_VERSION`.
 - As long as `LIBRAZOBILL_ABI_VERSION` remains unchanged, consumers can swap shared library binaries (`.dll`, `.so`) without recompiling host applications.
 - Struct field order in `RzRecord` is fixed and immutable for a given ABI version.

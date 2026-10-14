@@ -17,6 +17,7 @@ This consumes substantial network egress bandwidth and overburdens downstream lo
 
 The `razobillprocessor` module compiles the librazobill C ABI into a native Go processor for the OpenTelemetry Collector.
 It parses incoming `plog.LogRecord` payloads in sub-microsecond time:
+
 1. Replaces `LogRecord.Body` with the compact template string.
 2. Extracts numeric values into a typed integer slice attribute (`razobill.ints`).
 3. Extracts variable words into a string slice attribute (`razobill.strs`).
@@ -88,6 +89,7 @@ processors:
 ```
 
 Compile the collector:
+
 ```bash
 builder --config ext/otel/BuilderConfig.yaml
 ```

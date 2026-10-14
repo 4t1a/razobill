@@ -14,9 +14,9 @@ transforms:
     source: |
       # Calls native librazobill C ABI transform
       .razobill = parse_razobill!(.message)
-      
-      # Retain formKey as the primary message skeleton
-      .message = .razobill.form
+
+      # Retain template as the primary message skeleton
+      .message = .razobill.template
       .ints = .razobill.ints
       .strs = .razobill.strs
       .hash = .razobill.hash

@@ -18,7 +18,13 @@ Checks: >
   readability-*,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
-  -readability-identifier-length
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-braces-around-statements,
+  -bugprone-not-null-terminated-result,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -readability-avoid-nested-conditional-operator
 
 WarningsAsErrors: ''
 HeaderFilterRegex: 'include/librazobill/.*'

@@ -22,6 +22,7 @@ You need a C++ engine that guarantees zero allocations on the parsing path while
 ## CMake integration
 
 ### Option A: subdirectory integration
+
 Add Razobill to your CMake build tree:
 
 ```cmake
@@ -38,6 +39,7 @@ target_link_libraries(my_service PRIVATE razobill_core)
 ```
 
 ### Option B: universal C ABI linking
+
 If linking dynamically across binary boundaries, include the public header and link against the shared library:
 
 ```c

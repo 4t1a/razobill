@@ -27,6 +27,7 @@ It provides zero-allocation log decomposition with stable binary layout.
 ## Types
 
 ### `typedef struct RzRecord`
+
 ```c
 typedef struct RzRecord {
     const char* templateStr;
@@ -41,11 +42,13 @@ typedef struct RzRecord {
 ```
 
 **Lifetimes**:
+
 1. Pointers in `strValues` point directly into the caller's message buffer (zero-copy string views).
    The message buffer must outlive `outRecord`.
 2. Memory allocated for `templateStr`, `intValues`, and pointer arrays must be released with `RzFree(outRecord)`.
 
 ### `typedef enum RzStatus`
+
 ```c
 typedef enum RzStatus {
     RZ_OK = 0,
@@ -64,6 +67,7 @@ typedef enum RzStatus {
 ## Functions
 
 ### `RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* outRecord)`
+
 Splits a message into a template string, 64-bit integers, and string slices.
 
 - **Parameters**:
@@ -75,6 +79,7 @@ Splits a message into a template string, 64-bit integers, and string slices.
 ---
 
 ### `RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength)`
+
 Reconstructs the original message from a decomposed record.
 
 - **Parameters**:
@@ -87,14 +92,17 @@ Reconstructs the original message from a decomposed record.
 ---
 
 ### `RzStatus RzTemplate(const char* message, size_t messageLength, char* outBuffer, size_t bufferCapacity, size_t* outLength)`
+
 Extracts the template representation without allocating parsed value arrays.
 
 ---
 
 ### `void RzFree(RzRecord* record)`
+
 Releases heap memory associated with a record. Safe to call on zeroed records or `NULL`.
 
 ---
 
 ### `const char* RzStatusMessage(RzStatus status)`
+
 Returns a static string description for any status code.

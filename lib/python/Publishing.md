@@ -13,6 +13,7 @@ python -m pip install --upgrade pip build twine wheel cibuildwheel
 ```
 
 Verify that your C++20 compiler toolchain is active:
+
 - **Windows**: MSVC 2019+ or Clang 16+ with CMake 3.20+
 - **Linux**: GCC 11+ or Clang 14+ (`manylinux_2_28` compatible)
 - **macOS**: Apple Clang 14+ (Xcode 14+)
@@ -34,6 +35,7 @@ python -m build
 ```
 
 Expected output in `lib/python/dist/`:
+
 - `pyrazobill-1.0.0.tar.gz`: Universal source distribution bundled with C++20 core engine headers
 - `pyrazobill-1.0.0-cp313-cp313-win_amd64.whl`: Platform-specific native binary wheel
 
@@ -48,7 +50,8 @@ For cross-platform binary distribution covering Windows, Linux (`manylinux_2_28`
 python -m cibuildwheel --output-dir dist lib/python
 ```
 
-### Supported Platform Matrix:
+### Supported Platform Matrix
+
 | OS | Architecture | Target Tag | Minimum Toolchain |
 | :--- | :--- | :--- | :--- |
 | Windows | x86_64 | `cp310-cp313-win_amd64` | MSVC 19.29+ / MinGW-w64 GCC 12+ |
@@ -68,6 +71,7 @@ twine check dist/*
 ```
 
 Expected output:
+
 ```text
 Checking dist/pyrazobill-1.0.0.tar.gz: PASSED
 Checking dist/pyrazobill-1.0.0-cp313-cp313-win_amd64.whl: PASSED
@@ -113,7 +117,8 @@ Users worldwide can now install the official release directly via:
 pip install pyrazobill
 ```
 
-### Post-Release Smoke Test:
+### Post-Release Smoke Test
+
 ```bash
 python -c "import pyrazobill; print('pyrazobill successfully installed. ABI Version:', pyrazobill.abiVersion())"
 ```

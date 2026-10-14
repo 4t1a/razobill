@@ -48,6 +48,7 @@ print("Words:   ", record.strs)
 ```
 
 Output:
+
 ```text
 Template: Accepted publickey for {s} from {s} port {i} {s}
 Numbers:  [54322]
@@ -87,6 +88,7 @@ for rec in records:
 ```
 
 Output:
+
 ```text
 Connection reset by {s} port {i} [80]
 Connection reset by {s} port {i} [443]
@@ -124,6 +126,7 @@ except rz.RzError as err:
 ```
 
 Output:
+
 ```text
 Caught expected error: [razobill] What happened: Invalid scan mode. Why: Expected 'semantic' or 'exact', got 'invalid_mode'. What to do: Use mode='semantic' (default) or mode='exact'.
 ```

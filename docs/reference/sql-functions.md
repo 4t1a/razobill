@@ -22,6 +22,7 @@ The extension exposes exactly four scalar functions with zero aliases.
 ## Function reference
 
 ### `RzSplit(line: VARCHAR) -> STRUCT(template VARCHAR, ints BIGINT[], strs VARCHAR[])`
+
 ### `RzSplit(line: BLOB) -> STRUCT(template BLOB, ints BIGINT[], strs BLOB[])`
 
 Decomposes an input string or binary buffer into a composite struct.
@@ -34,6 +35,7 @@ Decomposes an input string or binary buffer into a composite struct.
     - `ints`: Contiguous `BIGINT[]` array of extracted 64-bit signed integers.
     - `strs`: `VARCHAR[]` or `BLOB[]` array of extracted variable words.
 - **Example**:
+
   ```sql
   SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS res;
   -- res.template: 'Failed password for {s} from {s} port {i}'
@@ -44,6 +46,7 @@ Decomposes an input string or binary buffer into a composite struct.
 ---
 
 ### `RzJoin(template, ints, strs) -> VARCHAR / BLOB`
+
 ### `RzJoin(template, arg1, arg2, ...) -> VARCHAR / BLOB`
 
 Restores the exact original log line byte-for-byte from decomposed components.
@@ -58,6 +61,7 @@ Restores the exact original log line byte-for-byte from decomposed components.
 - **Errors**:
   - Throws an error if placeholder counts do not match argument counts.
 - **Example**:
+
   ```sql
   SELECT RzJoin('Failed password for {s} from {s} port {i}', [22], ['root', '192.168.1.100']);
   -- Output: 'Failed password for root from 192.168.1.100 port 22'
@@ -66,6 +70,7 @@ Restores the exact original log line byte-for-byte from decomposed components.
 ---
 
 ### `RzTemplate(line: VARCHAR) -> VARCHAR`
+
 ### `RzTemplate(line: BLOB) -> BLOB`
 
 Extracts only the structural template representation of a message.
@@ -75,6 +80,7 @@ Extracts only the structural template representation of a message.
 - **Returns**:
   - The template string without allocating arrays for integer or string values.
 - **Example**:
+
   ```sql
   SELECT RzTemplate('Worker 12 finished in 45 ms');
   -- Output: 'Worker {i} finished in {i} ms'
@@ -83,6 +89,7 @@ Extracts only the structural template representation of a message.
 ---
 
 ### `RzHash(line: VARCHAR) -> UBIGINT`
+
 ### `RzHash(line: BLOB) -> UBIGINT`
 
 Computes a deterministic 64-bit hash (xxHash64) of the structural template.
@@ -92,6 +99,7 @@ Computes a deterministic 64-bit hash (xxHash64) of the structural template.
 - **Returns**:
   - 64-bit unsigned integer (`UBIGINT`) suitable for join partitioning and indexing.
 - **Example**:
+
   ```sql
   SELECT RzHash('Worker 12 finished in 45 ms');
   ```

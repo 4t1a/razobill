@@ -29,13 +29,15 @@ $$E(m) = I(m) + \Lambda(m)$$
 $$C(m) = I(m) + \Delta(m)$$
 
 Where:
+
 * **$E(m)$ (Emission Entropy):** The total information content emitted by the generating system.
 * **$I(m)$ (Intrinsic Meaning):** The invariant semantic core of the message (corresponding to the static format string or Abstract Syntax Tree call-site in source code).
 * **$\Lambda(m)$ (Latitude):** Redundancy or over-specification (variable tokens that vary between executions, such as timestamps, transaction IDs, or memory addresses).
 * **$C(m)$ (Captured Information):** The representation stored by the analytical database engine.
 * **$\Delta(m)$ (Doubt):** Underspecification, ambiguity, or information destruction introduced by the parser or representation ($\Delta > 0$ means lossy destruction of original event data).
 
-### Core Invariants Proven Empirically:
+### Core Invariants Proven Empirically
+
 1. **Constructive Lossless Invertibility ($\Delta = 0$):**
    Every log message decomposed by Razobill into a structural `form_id` and typed argument slots $(k_i, k_s)$ satisfies:
    $$\forall m \in \Sigma^*, \quad \text{Reconstruct}(\text{Decompose}(m)) \equiv m$$
@@ -52,7 +54,7 @@ Where:
 ## 2. Master Experiment Mapping
 
 | Script | Mathematical Thesis / Theorem | Benchmark Datasets | Core Empirical Finding |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **[`E1Forms.py`](E1Forms.py)** | **Vocabulary Law (Corollary 2)**<br/>$$2^E = 2^{C+\Lambda} \le N$$ | 16 Loghub enterprise systems (2,000 events each) | **Finite Structural Dictionary**: Median raw message uniqueness ratio is $0.28$, meaning $> 72\%$ of incoming logs are instant dictionary hits. Production software emits a tightly bounded vocabulary. |
 | **[`E4bLeakage.py`](E4bLeakage.py)** | **Adequacy & Leakage (Theorem 5)**<br/>$$L_Y(W) = I(X; Y \mid W) = 0$$ | 7 Loghub systems with ground-truth severity `Level` labels | **Fatal Semantic Leakage**: Coarse keyword clustering ('error', 'fail') causes **$69.1\%$ mutual information loss** and a **$45.0\%$ silent wrong-answer rate** in operational alerting queries. |
 | **[`E6Logtype.py`](E6Logtype.py)** | **Stateless Grammar vs. Stateful Heuristics**<br/>$$\text{Form}(m) = \pi(m)$$ | 16 Loghub benchmark datasets (32,000 events total) | **Zero State Drift**: Deterministic CLP-style tokenization achieves $0.808$ median Grouping Accuracy with **$\Delta = 0.000$ Doubt**, while the top 50 forms capture **$97.5\%$ of total log volume**. |
@@ -69,15 +71,16 @@ Where:
 ## 3. In-Depth Empirical Results & Historical Run Logs
 
 ### 3.1 Experiment 6: Deterministic CLP Forms vs. Stateful Drain3
+
 **Source Script:** [`E6Logtype.py`](E6Logtype.py)
 **Historical Run Log:** [`ResultsE6Logtype.txt`](ResultsE6Logtype.txt)
 
 This experiment evaluates whether complex, stateful online clustering algorithms (such as Drain3's prefix parse tree) are required to extract structured forms from raw log streams, or if a stateless, deterministic lexer achieves comparable grouping accuracy while eliminating state drift and arrival-order bias.
 
-#### Full 16-Dataset Empirical Measurements:
+#### Full 16-Dataset Empirical Measurements
 
 | Dataset (`ds`) | Ground Truth (`gt`) | Razobill Logtypes | Drain3 Clusters | GA (Razobill) | GA (Drain3) | $\Lambda$ (Razobill) | $\Delta$ (Razobill) | $\Lambda$ (Drain3) | $\Delta$ (Drain3) | Top-50 Volume Share |
-|---|---|---|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Android** | 166 | 211 | 148 | 0.807 | 0.734 | 0.196 | **0.000** | 0.009 | 0.200 | 84.0% |
 | **Apache** | 6 | 6 | 6 | **1.000** | **1.000** | 0.000 | **0.000** | 0.000 | 0.000 | **100.0%** |
 | **BGL** | 120 | 179 | 107 | **0.933** | 0.854 | 0.171 | **0.006** | 0.071 | 0.044 | 91.4% |
@@ -91,12 +94,13 @@ This experiment evaluates whether complex, stateful online clustering algorithms
 | **OpenStack** | 43 | 67 | 72 | **0.502** | 0.309 | 0.813 | **0.000** | 0.633 | 0.507 | 98.4% |
 | **Proxifier** | 8 | 404 | 38 | 0.001 | 0.017 | 4.899 | **0.000** | 2.161 | 0.021 | 71.2% |
 | **Spark** | 36 | 39 | 33 | 0.738 | **0.922** | 0.245 | **0.000** | 0.000 | 0.063 | **100.0%** |
-| **Thunderbird**| 149 | 197 | 179 | 0.665 | **0.958** | 0.102 | **0.000** | 0.098 | 0.017 | 92.6% |
+| **Thunderbird** | 149 | 197 | 179 | 0.665 | **0.958** | 0.102 | **0.000** | 0.098 | 0.017 | 92.6% |
 | **Windows** | 50 | 66 | 45 | **0.988** | 0.571 | 0.028 | **0.000** | 0.000 | 0.055 | 99.2% |
 | **Zookeeper** | 50 | 57 | 46 | **0.995** | 0.967 | 0.016 | **0.000** | 0.006 | 0.021 | 99.6% |
 | **Summary / Median** | **50.0** | **70.5** | **45.5** | **0.808** | **0.871** | **0.113** | **0.000** | **0.006** | **0.050** | **97.5%** |
 
-#### Scientific Deductions:
+#### Scientific Deductions
+
 1. **Zero Doubt ($\Delta = 0.000$)**: In 14 out of 16 systems, Razobill exhibits $\Delta = 0.000$ (mean $0.004$), whereas Drain3 exhibits a mean Doubt of $0.094$. Drain3's similarity thresholds aggressively merge distinct call-sites, corrupting the semantic structure. Razobill never loses distinction between disparate call-sites.
 2. **Order Independence**: Drain3 builds an in-memory prefix tree; if log line $A$ arrives before $B$, the resulting clusters differ from when $B$ arrives before $A$. Razobill is a pure, stateless function $\text{Form}(m) = \pi(m)$ computed in single-pass C++20 SIMD with zero cross-message state.
 3. **The Volume Concentration Law**: Across all 16 production systems, the top 50 unique forms account for a median of **$97.5\%$ of total log volume** (reaching $100.0\%$ in Apache, HDFS, and Spark). Software developers do not invent new log formats continuously; production systems loop repeatedly through a tiny, static vocabulary.
@@ -104,15 +108,16 @@ This experiment evaluates whether complex, stateful online clustering algorithms
 ---
 
 ### 3.2 Experiment 4b: The Peril of Semantic Leakage
+
 **Source Script:** [`E4bLeakage.py`](E4bLeakage.py)
 **Historical Run Log:** [`ResultsE4bLeakage.txt`](ResultsE4bLeakage.txt)
 
 Modern observability vendors frequently promote "AI semantic clustering" or regex keyword clustering (e.g., grouping all messages containing *"failed"*, *"timeout"*, or *"connection dropped"* into unified buckets). This experiment proves **Theorem 5 (Semantic Leakage)**: coarse clustering destroys mutual information and blinds alerting systems.
 
-#### Full 7-Dataset Semantic Leakage Audit:
+#### Full 7-Dataset Semantic Leakage Audit
 
 | Dataset | Severity Levels | Unique Templates | Mutual Info $I(X; Y)$ | Identity Leakage $L_Y(X)$ | Keyword Class Leakage $L_Y(W_{\text{kw}})$ | 1-Bucket Leakage $L_Y(W_{\text{univ}})$ | Leakage Share ($L/I$) | Wrong-Level Alert Rate |
-|---|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Android** | 5 | 202 | 1.739 bits | **0.000** | 1.574 | 1.739 | **90.5%** | **64.4%** |
 | **Apache** | 2 | 6 | 0.878 bits | **0.000** | 0.171 | 0.878 | **19.5%** | **74.0%** |
 | **BGL** | 5 | 178 | 0.852 bits | **0.000** | 0.793 | 0.852 | **93.2%** | **55.9%** |
@@ -122,7 +127,8 @@ Modern observability vendors frequently promote "AI semantic clustering" or rege
 | **Zookeeper** | 3 | 57 | 0.972 bits | **0.000** | 0.628 | 0.972 | **64.6%** | **71.8%** |
 | **Mean** | — | — | — | **0.000** | — | — | **69.1%** | **45.0%** |
 
-#### Scientific Deductions:
+#### Scientific Deductions
+
 1. **$69.1\%$ Mutual Information Destroyed**: When monitoring tools group messages by keyword heuristics rather than exact AST forms, an average of $69.1\%$ of the information linking the log event to its operational severity is erased.
 2. **The 45.0% Silent Failure Rate**: In $45.0\%$ of expanded rows returned by semantic keyword queries, the ground-truth operational severity `Level` differs from the searched template! Routine informational messages (e.g., *"Retry attempt succeeded"*) are lumped into the same bucket as fatal system panics (*"Retry loop failed: kernel panic"*).
 3. **Razobill's Zero Leakage Guarantee**: Under Razobill's exact structural `form_id`, identity leakage is mathematically zero:
@@ -132,15 +138,16 @@ Modern observability vendors frequently promote "AI semantic clustering" or rege
 ---
 
 ### 3.3 Experiment 7: Real-World Database Columnar Compaction
+
 **Source Script:** [`E7Default.py`](E7Default.py)
 **Historical Run Log:** [`ResultsE7Default.txt`](ResultsE7Default.txt)
 
 This experiment evaluates the physical, on-disk storage footprint of log data stored in **DuckDB (at standard $256\text{ KiB}$ block allocation boundaries)** and **Apache Parquet (ZSTD-19 and Parquet V2)** over the canonical 134,815-event multi-system corpus ($11,680,951$ raw bytes, $2,260$ unique forms, $20,680$ distinct strings).
 
-#### Full Storage Footprint & Encoding Measurements:
+#### Full Storage Footprint & Encoding Measurements
 
 | Storage Layout | Description | DuckDB On-Disk Size | DuckDB Ratio | Parquet ZSTD-19 | Parquet V2 | Engine Encodings Utilized (DuckDB Blocks) |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | **`R0 Raw`** | Plain unparsed text (`VARCHAR`) | $6,291,456\text{ B}$ | $1.00\times$ | $865,795\text{ B}$ | $901,530\text{ B}$ | FSST (21), Constant (8), Dictionary (6) |
 | **`R1 Additive`** | Raw text + indexed `form_id` | $6,029,312\text{ B}$ | $0.96\times$ | $906,958\text{ B}$ | $942,693\text{ B}$ | FSST (21), Constant (10), Dictionary (6), BitPacking (2) |
 | **`CU-i Compact`** | Inline slots ($4\text{ int}, 4\text{ str}$), arrival order | $3,932,160\text{ B}$ | $0.62\times$ | $1,228,025\text{ B}$ | $1,095,218\text{ B}$ | Constant (18), Uncompressed (17), Dictionary (12), RLE (10) |
@@ -148,7 +155,8 @@ This experiment evaluates the physical, on-disk storage footprint of log data st
 | **`CU-d Compact`** | Dictionary-pooled slots, arrival order | $3,145,728\text{ B}$ | $0.50\times$ | $1,151,317\text{ B}$ | $971,363\text{ B}$ | Constant (21), Uncompressed (16), BitPacking (15), RLE (13) |
 | **`CC-d Compact`** | Dictionary-pooled slots, clustered by `form_id` | **$2,883,584\text{ B}$** | **$0.46\times$** | **$980,363\text{ B}$** | **$844,240\text{ B}$** | **Constant (19), Uncompressed (17), BitPacking (15), RLE (13)** |
 
-#### Key Storage Insights:
+#### Key Storage Insights
+
 * **$54\%$ Physical Storage Reduction**: Razobill's clustered dictionary layout (`CC-d`) reduces DuckDB disk usage from $6.29\text{ MB}$ down to $2.88\text{ MB}$ ($0.46\times$).
 * **Vectorized Execution**: While raw text forces DuckDB to invoke FSST string decompression on every query filter, decomposed slots are compressed via lightweight **BitPacking** and **Run-Length Encoding (RLE)**. SQL filters like `WHERE int0 > 500` execute at raw memory bandwidth without string parsing.
 * **Lossless Reversibility**: Unlike traditional lossy parsers that discard punctuation or variable delimiters, the compressed table can reconstruct the exact byte-for-byte original log message via Razobill's constructive inversion algorithm.
@@ -158,13 +166,17 @@ This experiment evaluates the physical, on-disk storage footprint of log data st
 ## 4. Reproducing the Experiments
 
 ### Step 1: Python Environment & Dependencies
+
 Ensure Python $\ge 3.10$ is installed with the required data engineering libraries:
+
 ```bash
 pip install pandas numpy pyarrow duckdb drain3 chdb
 ```
 
 ### Step 2: Dataset Verification
+
 The evaluation scripts automatically discover datasets located in the repository's `logs/` directory or the standard `/home/claude/loghub/` research path:
+
 ```text
 logs/
 ├── Android_v2/
@@ -207,6 +219,7 @@ python bench/s3/StressAwsS3LocalStack.py 100000 --threads 4
 ```
 
 All scripts print their execution matrices directly to standard output and produce byte-identical results matching the checked-in proof artifacts:
+
 * [`ResultsE4bLeakage.txt`](ResultsE4bLeakage.txt)
 * [`ResultsE6Logtype.txt`](ResultsE6Logtype.txt)
 * [`ResultsE7Default.txt`](ResultsE7Default.txt)

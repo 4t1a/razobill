@@ -9,6 +9,7 @@ Skip this guide if you only need single-line API signatures.
 ## What you will build
 
 You will build a Python and DuckDB pipeline that:
+
 1. Decomposes raw log streams in parallel using `RzSplitMany`.
 2. Stores structured templates, numbers, and words into a columnar table.
 3. Computes analytical metrics over variable integer arrays.
@@ -41,11 +42,13 @@ print("Sample numbers: ", records[1].ints)
 ```
 
 Run the script:
+
 ```bash
 python pipeline.py
 ```
 
 Expected output:
+
 ```text
 Decomposed 4 log events.
 Sample template: {s} {s}:{s}:{s} [WARN] Node {i} heartbeat delayed by {i} ms
@@ -108,6 +111,7 @@ for row in results:
 ```
 
 Expected output:
+
 ```text
 Template: {s} {s}:{s}:{s} [WARN] Node {i} heartbeat delayed by {i} ms
 Count:    2
@@ -133,6 +137,7 @@ print("Audit verification successful: 100% byte fidelity.")
 ```
 
 Expected output:
+
 ```text
 Audit verification successful: 100% byte fidelity.
 ```
