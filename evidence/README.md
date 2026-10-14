@@ -223,8 +223,8 @@ All scripts print their execution matrices directly to standard output and produ
 * [`ResultsE4bLeakage.txt`](ResultsE4bLeakage.txt)
 * [`ResultsE6Logtype.txt`](ResultsE6Logtype.txt)
 * [`ResultsE7Default.txt`](ResultsE7Default.txt)
-* [`docs/benchmarks/AwsS3CompactionReport.md`](../docs/benchmarks/AwsS3CompactionReport.md)
-* [`docs/benchmarks/Drain3VsRazobillS3.md`](../docs/benchmarks/Drain3VsRazobillS3.md)
+* [`docs/explanation/benchmarks.md`](../docs/explanation/benchmarks.md)
+* [`docs/how-to/s3-compaction.md`](../docs/how-to/s3-compaction.md)
 
 ---
 
