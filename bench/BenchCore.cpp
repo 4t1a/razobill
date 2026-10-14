@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "librazobill/Hash.hpp"
-#include "razobill.h"
+#include "librazobill/RazobillC.h"
 #include "librazobill/SimdScanner.hpp"
 #include "librazobill/Slots.hpp"
 #include "librazobill/ThreadPool.hpp"
@@ -175,29 +175,29 @@ int main(int argc, char** argv) {
         return reconstructed.size();
     });
 
-    // 5. Universal C ABI: razobill_split
-    timeOperation("C ABI razobill_split", [&](const std::string& m) {
-        razobill_record_t r{};
-        (void)razobill_split(m.data(), m.size(), &r);
-        std::size_t count = r.int_count + r.str_count;
-        razobill_free(&r);
+    // 5. Universal C ABI: RzSplit
+    timeOperation("C ABI RzSplit", [&](const std::string& m) {
+        RzRecord r{};
+        (void)RzSplit(m.data(), m.size(), &r);
+        std::size_t count = r.intCount + r.strCount;
+        RzFree(&r);
         return count;
     });
 
-    // 6. Universal C ABI: razobill_split + razobill_join (round-trip)
-    timeOperation("C ABI split + join (round-trip)", [&](const std::string& m) {
-        razobill_record_t r{};
-        (void)razobill_split(m.data(), m.size(), &r);
+    // 6. Universal C ABI: RzSplit + RzJoin (round-trip)
+    timeOperation("C ABI RzSplit + RzJoin (round-trip)", [&](const std::string& m) {
+        RzRecord r{};
+        (void)RzSplit(m.data(), m.size(), &r);
         std::size_t outLen = 0;
-        (void)razobill_join(&r, buffer, sizeof(buffer), &outLen);
-        razobill_free(&r);
+        (void)RzJoin(&r, buffer, sizeof(buffer), &outLen);
+        RzFree(&r);
         return outLen;
     });
 
-    // 7. Universal C ABI: razobill_template
-    timeOperation("C ABI razobill_template", [&](const std::string& m) {
+    // 7. Universal C ABI: RzTemplate
+    timeOperation("C ABI RzTemplate", [&](const std::string& m) {
         std::size_t outLen = 0;
-        (void)razobill_template(m.data(), m.size(), buffer, sizeof(buffer), &outLen);
+        (void)RzTemplate(m.data(), m.size(), buffer, sizeof(buffer), &outLen);
         return outLen;
     });
 

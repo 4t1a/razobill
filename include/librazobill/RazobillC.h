@@ -1,144 +1,138 @@
-// Universal C ABI Header for librazobill.
-// Provides pure C linkage (extern "C") with zero C++ runtime dependencies for foreign language interop.
-//
-// ARCHITECTURE: Why a Pure C ABI?
-// C++ is powerful, but its ABI is notoriously fragile: name mangling varies between GCC and MSVC,
-// std::string layout changes between standard library revisions, and C++ exceptions cannot cross
-// language boundaries without crashing the host process.
-//
-// A pure C ABI is eternal.
-// Whether calling from Rust (bindgen), Go (cgo), Python (ctypes/cffi), Zig, C#, or Java (JNI/Panama),
-// primitive pointers, size_t lengths, and numeric status codes work seamlessly across all platforms.
-//
-// OWNERSHIP INVARIANT:
-// Any memory allocated inside the C++ runtime must be released via `RzFreeRecord()`.
-// Never call `free()` directly on pointers returned by `RzSlotRecord`.
+/*
+ * Razobill Universal C ABI
+ *
+ * High-performance, zero-allocation log decomposition and byte-exact reconstruction.
+ *
+ * ARCHITECTURE & LIFETIMES:
+ * 1. RzSplit decomposes an input byte slice into a readable template format
+ *    with {i} and {s} placeholders, extracted 64-bit integers, and string token views.
+ * 2. ZERO-COPY STRINGS: Pointers in outRecord->strs point directly into the caller's
+ *    input message buffer. The message buffer MUST outlive outRecord.
+ * 3. RECORD LIFECYCLE: Any memory allocated by RzSplit must be freed with
+ *    RzFree(outRecord).
+ * 4. LOSSLESS INVERTIBILITY: RzJoin(record, ...) restores the exact original
+ *    byte sequence byte-for-byte on all valid records.
+ * 5. BUFFER SAFETY: RzJoin and RzTemplate write at most bufferCapacity bytes into
+ *    the destination buffer without writing any trailing NUL byte. If bufferCapacity is
+ *    insufficient, RZ_ERR_BUFFER_TOO_SMALL is returned and *outLength is set to the
+ *    exact required capacity in bytes.
+ * 6. FFI CONVENIENCE: Foreign language callers (Go, Rust, Python, Zig, C#) can manually
+ *    populate an RzRecord (with internalHandle = NULL) to call RzJoin.
+ */
 #ifndef LIBRAZOBILL_CAPI_H
 #define LIBRAZOBILL_CAPI_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#if defined(LIBRAZOBILL_EXPORTS)
-#define RZ_API __declspec(dllexport)
+#  if defined(LIBRAZOBILL_EXPORTS)
+#    define RZ_API __declspec(dllexport)
+#  else
+#    define RZ_API
+#  endif
 #else
-#define RZ_API
-#endif
-#else
-#define RZ_API __attribute__((visibility("default")))
+#  define RZ_API __attribute__((visibility("default")))
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum RzStatusCode {
-    RZ_SUCCESS = 0,
-    RZ_ERR_TOO_LARGE = 1,
-    RZ_ERR_MALFORMED = 2,
-    RZ_ERR_SLOT_UNDERFLOW = 3,
-    RZ_ERR_BUFFER_TOO_SMALL = 4,
-    RZ_ERR_INVALID_PARAM = 5,
-    RZ_ERR_NO_MEMORY = 6,
+/**
+ * Result status codes returned by Razobill C functions.
+ */
+typedef enum RzStatus {
+    RZ_OK = 0,
+    RZ_ERR_INVALID_ARGUMENT = 1,
+    RZ_ERR_BUFFER_TOO_SMALL = 2,
+    RZ_ERR_MALFORMED_TEMPLATE = 3,
+    RZ_ERR_COUNT_MISMATCH = 4,
+    RZ_ERR_MESSAGE_TOO_LARGE = 5,
+    RZ_ERR_OUT_OF_MEMORY = 6,
     RZ_ERR_INTERNAL = 7
-} RzStatusCode;
+} RzStatus;
 
-typedef enum RzScanMode { RZ_SCAN_EXACT = 0, RZ_SCAN_SEMANTIC = 1 } RzScanMode;
-
-typedef struct RzSlotRecord {
-    uint64_t formKeyHash;
-    const char* formKey;
-    size_t formKeyLength;
+/**
+ * Container representing a decomposed log message.
+ */
+typedef struct RzRecord {
+    const char* templateStr;
+    size_t templateLength;
     const int64_t* intValues;
     size_t intCount;
     const char* const* strValues;
     const size_t* strLengths;
     size_t strCount;
     void* internalHandle;
-} RzSlotRecord;
+} RzRecord;
 
-// Opaque engine handle
-typedef struct RzEngine RzEngine;
+/**
+ * Splits a log message into a template string, 64-bit integers, and variable string slices.
+ *
+ * @param message Pointer to the input message bytes (does not require NUL termination).
+ * @param messageLength Length of the message in bytes.
+ * @param outRecord Output record struct populated on success.
+ * @return RZ_OK on success, or an error status code.
+ */
+RZ_API RzStatus RzSplit(
+    const char* message,
+    size_t messageLength,
+    RzRecord* outRecord
+);
 
-// Lifecycle
-RZ_API RzEngine* RzCreateEngine(void);
-RZ_API void RzDestroyEngine(RzEngine* engine);
+/**
+ * Reconstructs the exact original message from a decomposed record.
+ *
+ * @param record Pointer to the record to join.
+ * @param outBuffer Target buffer to receive the reconstructed bytes (may be NULL if probing capacity).
+ * @param bufferCapacity Capacity of outBuffer in bytes.
+ * @param outLength Pointer to receive the actual written or required length in bytes (may be NULL).
+ * @return RZ_OK on success, or an error status code.
+ */
+RZ_API RzStatus RzJoin(
+    const RzRecord* record,
+    char* outBuffer,
+    size_t bufferCapacity,
+    size_t* outLength
+);
 
-// Parsing & Lossless Reconstruction
-RZ_API RzStatusCode RzParse(const char* message, size_t messageLength, RzScanMode mode, RzSlotRecord* outRecord);
-RZ_API RzStatusCode RzDecompose(const char* message, size_t messageLength, RzScanMode mode, RzSlotRecord* outRecord);
-RZ_API RzStatusCode RzReconstruct(const RzSlotRecord* record, char* outBuffer, size_t bufferCapacity,
-                                  size_t* outLength);
-RZ_API RzStatusCode RzReconstructSlots(const char* formKey, size_t formKeyLength, const int64_t* intValues,
-                                       size_t intCount, const char* const* strValues, const size_t* strLengths,
-                                       size_t strCount, char* outBuffer, size_t bufferCapacity, size_t* outLength);
-RZ_API void RzFreeRecord(RzSlotRecord* record);
+/**
+ * Extracts only the template representation of a message without allocating parsed arrays.
+ *
+ * @param message Pointer to the input message bytes.
+ * @param messageLength Length of the message in bytes.
+ * @param outBuffer Target buffer to receive the template (may be NULL if probing capacity).
+ * @param bufferCapacity Capacity of outBuffer in bytes.
+ * @param outLength Pointer to receive the actual written or required length in bytes (may be NULL).
+ * @return RZ_OK on success, or an error status code.
+ */
+RZ_API RzStatus RzTemplate(
+    const char* message,
+    size_t messageLength,
+    char* outBuffer,
+    size_t bufferCapacity,
+    size_t* outLength
+);
 
-// Utility functions
-RZ_API RzStatusCode RzTemplateOf(const char* formKey, size_t formKeyLength, char* outBuffer, size_t bufferCapacity,
-                                 size_t* outLength);
-RZ_API uint64_t RzHash64(const char* text, size_t length);
+/**
+ * Releases heap memory allocated for a record by RzSplit.
+ * Safe to call with NULL or on zeroed records.
+ */
+RZ_API void RzFree(RzRecord* record);
 
-// Theoretical Ledger & Information Theory C API (Latitude and Doubt, 2026)
-typedef struct RzCell {
-    uint64_t form;
-    uint32_t meaning;
-    double mass;
-} RzCell;
+/**
+ * Returns a static human-readable description for a status code.
+ */
+RZ_API const char* RzStatusMessage(RzStatus status);
 
-typedef struct RzLedger {
-    double coverage;
-    double content;
-    double expression;
-    double latitude;
-    double doubt;
-    double conveyance;
-    double distance;
-    double effectiveVocabulary;
-    double effectiveContent;
-    double effectiveLatitude;
-    double effectiveDoubt;
-    double contentMm;
-    double expressionMm;
-    double latitudeMm;
-    double doubtMm;
-    double conveyanceMm;
-    double contentEpsilon;
-    double contentHalfWidth;
-} RzLedger;
-
-typedef struct RzCertifiedInterval {
-    double epsilon;
-    double halfWidth;
-} RzCertifiedInterval;
-
-// Theorem 7: The Price of Saying (Section 4.1)
-typedef struct RzPriceOfSaying {
-    double expectedMeaningBits;
-    double expectedExpressionBits;
-    double expectedClarificationBits;
-    double totalSayingBits;
-    double sayingCostBits;
-    double lowerBoundBits;
-    double upperBoundBits;
-} RzPriceOfSaying;
-
-RZ_API RzStatusCode RzComputeLedger(const RzCell* cells, size_t cellCount, double totalEvents, double confidenceAlpha,
-                                    RzLedger* outLedger);
-RZ_API double RzMillerMadow(double pluginEntropy, size_t observedCategories, double sampleSize);
-RZ_API RzCertifiedInterval RzComputeCertifiedInterval(size_t alphabetSize, double sampleSize, double confidenceAlpha);
-RZ_API RzStatusCode RzComputePriceOfSaying(const RzLedger* ledger, double nMessages, RzPriceOfSaying* outPrice);
-
-// Version & ABI metadata
+/**
+ * Returns the runtime library semantic version string (e.g. "2.0.0").
+ */
 RZ_API const char* RzVersion(void);
-RZ_API uint32_t RzVersionMajor(void);
-RZ_API uint32_t RzVersionMinor(void);
-RZ_API uint32_t RzVersionPatch(void);
-RZ_API uint32_t RzAbiVersion(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LIBRAZOBILL_CAPI_H
+#endif /* LIBRAZOBILL_CAPI_H */

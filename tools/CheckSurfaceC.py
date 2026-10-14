@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Surface Budget Enforcer: Razobill C Universal ABI Header
-Enforces hard caps: <= 6 functions, <= 3 types in include/razobill.h.
-Zero legacy aliases. Zero banned words.
+Surface Budget Enforcer: Razobill C Universal ABI Header (RazobillC.h)
+Enforces hard caps: <= 6 functions, <= 3 types in include/librazobill/RazobillC.h.
+Unified CamelCase with Rz prefix. Zero legacy aliases. Zero banned words.
 """
 import re
 import sys
 from pathlib import Path
 
-HEADER_PATH = Path(__file__).resolve().parent.parent / "include" / "razobill.h"
+HEADER_PATH = Path(__file__).resolve().parent.parent / "include" / "librazobill" / "RazobillC.h"
 
 BANNED_TERMS = [
     "entropy", "ledger", "latitude", "doubt", "conveyance", "leakage",
@@ -30,11 +30,11 @@ def main():
             print(f"VIOLATION: Found banned term '{term}' {len(matches)} time(s) in {HEADER_PATH}")
             sys.exit(1)
 
-    # 2. Count functions declared with RAZOBILL_API
-    func_pattern = re.compile(r"RAZOBILL_API\s+[\w\s\*]+\s+(razobill_\w+)\s*\(", re.MULTILINE)
+    # 2. Count functions declared with RZ_API
+    func_pattern = re.compile(r"RZ_API\s+[\w\s\*]+\s+(Rz\w+)\s*\(", re.MULTILINE)
     functions = func_pattern.findall(content)
 
-    # 3. Count public types (razobill_* typedefs)
+    # 3. Count public types (Rz* typedefs)
     type_pattern = re.compile(r"typedef\s+(?:enum|struct)\s+(\w+)\s*\{", re.MULTILINE)
     types = type_pattern.findall(content)
 

@@ -11,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-#include "razobill.h"
+#include "librazobill/RazobillC.h"
 #include "librazobill/Slots.hpp"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -76,32 +76,32 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
 
     // -------------------------------------------------------------------------
-    // 3. Universal C ABI Verification: razobill_split / razobill_join / razobill_free
+    // 3. Universal C ABI Verification: RzSplit / RzJoin / RzFree
     // -------------------------------------------------------------------------
     {
-        razobill_record_t crec{};
-        const razobill_status_t splitCode = razobill_split(reinterpret_cast<const char*>(data), size, &crec);
-        if (splitCode != RAZOBILL_OK) {
-            std::cerr << "FUZZ ERROR: C-ABI razobill_split failed with status " << splitCode << "\n";
+        RzRecord crec{};
+        const RzStatus splitCode = RzSplit(reinterpret_cast<const char*>(data), size, &crec);
+        if (splitCode != RZ_OK) {
+            std::cerr << "FUZZ ERROR: C-ABI RzSplit failed with status " << splitCode << "\n";
             std::abort();
         }
 
         // Buffer probing
         size_t requiredLen = 0;
-        const razobill_status_t probeCode = razobill_join(&crec, nullptr, 0, &requiredLen);
-        if (probeCode != RAZOBILL_ERR_BUFFER_TOO_SMALL || requiredLen != size) {
-            std::cerr << "FUZZ ERROR: C-ABI razobill_join probing failed\n";
-            razobill_free(&crec);
+        const RzStatus probeCode = RzJoin(&crec, nullptr, 0, &requiredLen);
+        if (probeCode != RZ_ERR_BUFFER_TOO_SMALL || requiredLen != size) {
+            std::cerr << "FUZZ ERROR: C-ABI RzJoin probing failed\n";
+            RzFree(&crec);
             std::abort();
         }
 
         // Allocate exact buffer
         std::vector<char> buffer(size);
         size_t outLength = 0;
-        const razobill_status_t joinCode = razobill_join(&crec, buffer.data(), buffer.size(), &outLength);
-        if (joinCode != RAZOBILL_OK) {
-            std::cerr << "FUZZ ERROR: C-ABI razobill_join failed with status " << joinCode << "\n";
-            razobill_free(&crec);
+        const RzStatus joinCode = RzJoin(&crec, buffer.data(), buffer.size(), &outLength);
+        if (joinCode != RZ_OK) {
+            std::cerr << "FUZZ ERROR: C-ABI RzJoin failed with status " << joinCode << "\n";
+            RzFree(&crec);
             std::abort();
         }
 
@@ -110,10 +110,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             std::cerr << "FUZZ C-ABI INVARIANT VIOLATION:\n"
                       << "Original:      " << input << "\n"
                       << "Reconstructed: " << rebuiltView << "\n";
-            razobill_free(&crec);
+            RzFree(&crec);
             std::abort();
         }
-        razobill_free(&crec);
+        RzFree(&crec);
     }
 
     return 0;
