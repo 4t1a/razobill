@@ -4,15 +4,16 @@
 
 Every public name serves exactly one concrete developer task. Redundant aliases, deprecated variants, and internal engine stubs are removed.
 
-### 1.1 SQL (DuckDB Extension) — Budget: <= 4 functions, 0 aliases (Used: 3 functions)
+### 1.1 SQL (DuckDB Extension) — Budget: <= 4 functions, 0 aliases (Used: 4 functions)
 | Function | Return Type | Developer Task Served |
 | :--- | :--- | :--- |
-| `razobill_split(line)` | `STRUCT(template, ints, strs)` | Decomposes a log message into structured template, numbers, and word strings for analytical indexing. |
-| `razobill_join(template, ints, strs)` | `VARCHAR` / `BLOB` | Reconstructs the exact original log message byte-for-byte from decomposed components. |
-| `razobill_template(line)` | `VARCHAR` / `BLOB` | Extracts only the structural template for high-cardinality aggregation without slot allocation. |
+| `RzSplit(line)` | `STRUCT(template, ints, strs)` | Decomposes a log message into structured template, numbers, and word strings for analytical indexing. |
+| `RzJoin(template, ints, strs)` | `VARCHAR` / `BLOB` | Reconstructs the exact original log message byte-for-byte from decomposed components (also supports varargs). |
+| `RzTemplate(line)` | `VARCHAR` / `BLOB` | Extracts only the structural template for high-cardinality aggregation without slot allocation. |
+| `RzHash(line)` | `UBIGINT` | Computes fast, deterministic 64-bit hash (xxHash64) of a template or message for identity and indexing. |
 
-- *Prefix collision check*: Verified against `duckdb_functions()`. Zero collisions exist for `razobill_` or `razobill%`.
-- *Aliases*: 0 aliases registered. `rb_join`, `rb_rebuild`, `rbForm`, `rbInts`, etc. are removed.
+- *Prefix collision check*: Verified against `duckdb_functions()`. Zero collisions exist for `Rz` prefix in DuckDB built-ins.
+- *Aliases*: 0 aliases registered. `rb_join`, `rb_rebuild`, `rbForm`, `rbInts`, `rbEntropy`, etc. are removed.
 
 ### 1.2 Python (`pyrazobill`) — Budget: <= 8 names in `__all__` (Used: 7 names)
 | Symbol | Type | Developer Task Served |

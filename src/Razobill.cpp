@@ -229,11 +229,10 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         return s;
     };
 
-    const std::string fnForm = cfg_.scanMode == core::ScanMode::Semantic ? "rb_form_semantic" : "rb_form";
-    const std::string fnInts = cfg_.scanMode == core::ScanMode::Semantic ? "rb_ints_semantic" : "rb_ints";
-    const std::string fnStrs = cfg_.scanMode == core::ScanMode::Semantic ? "rb_strs_semantic" : "rb_strs";
-    db_.exec("CREATE OR REPLACE TEMP TABLE rb_s AS SELECT " + list("") + fnForm + "(" + m + ") AS rbf, " + fnInts +
-             "(" + m + ") AS rbi, " + fnStrs + "(" + m + ") AS rbs FROM " + src);
+    db_.exec("CREATE OR REPLACE TEMP TABLE rb_s AS SELECT " + list("") +
+             "(RzSplit(" + m + ")).template AS rbf, " +
+             "(RzSplit(" + m + ")).ints AS rbi, " +
+             "(RzSplit(" + m + ")).strs AS rbs FROM " + src);
     db_.exec("CREATE TABLE IF NOT EXISTS rb_str(id INTEGER, s VARCHAR)");
     db_.exec("CREATE TABLE IF NOT EXISTS rb_layout(ki INTEGER, ks INTEGER)");
     if (db_.query("SELECT count(*) FROM rb_layout").i64(0, 0) == 0)
@@ -271,7 +270,7 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         joins +=
             " LEFT JOIN rb_str d" + std::to_string(j) + " ON d" + std::to_string(j) + ".id = c.d" + std::to_string(j);
     }
-    db_.exec("CREATE OR REPLACE VIEW " + name + " AS SELECT " + list("c.") + "c.form_no, rb_rebuild(f.form, " + ivs +
+    db_.exec("CREATE OR REPLACE VIEW " + name + " AS SELECT " + list("c.") + "c.form_no, RzJoin(f.form, " + ivs +
              svs + "c.oi, c.os) AS " + m + " FROM " + dst + " c LEFT JOIN rb_form f ON f.no = c.form_no" + joins);
     phys_ = dst;
     view_ = name;
@@ -584,8 +583,7 @@ std::optional<MeaningOf> RazobillEngine::meaningOf(const std::string& text) {
     core::SlotRecord slots;
     if (const auto s = core::parse(text, slots, cfg_.scanMode); s != Status::Ok)
         throw std::invalid_argument(describe(s));
-    std::string key = slots.formKey();
-    const auto id = core::xxh64(key);
+    const auto id = core::xxh64(slots.templateStr);
     std::scoped_lock lock(mu_);
     if (db_.query("SELECT count(*) FROM rb_form WHERE id = " + std::to_string(id)).i64(0, 0) == 0) return std::nullopt;
     MeaningOf out{id, std::nullopt, std::nullopt, id};

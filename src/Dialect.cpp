@@ -44,11 +44,11 @@ public:
     std::string matches(std::string_view h, std::string_view p) const override {
         return "regexp_matches(" + std::string(h) + ", " + std::string(p) + ")";
     }
-    std::string formExpr(std::string_view col, core::ScanMode mode = core::ScanMode::Semantic) const override {
-        return (mode == core::ScanMode::Semantic ? "rb_form_semantic(" : "rb_form(") + std::string(col) + ")";
+    std::string formExpr(std::string_view col, core::ScanMode /*mode*/ = core::ScanMode::Semantic) const override {
+        return "RzTemplate(" + std::string(col) + ")";
     }
-    std::string hashExpr(std::string_view t) const override { return "rb_hash(" + std::string(t) + ")"; }
-    std::string templateExpr(std::string_view f) const override { return "rb_template(" + std::string(f) + ")"; }
+    std::string hashExpr(std::string_view t) const override { return "RzHash(" + std::string(t) + ")"; }
+    std::string templateExpr(std::string_view f) const override { return std::string(f); }
     std::string truncate(std::string_view t) const override { return "DELETE FROM " + std::string(t); }
 };
 

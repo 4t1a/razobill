@@ -7,11 +7,12 @@
 //
 // CONCURRENCY & ZERO ALLOCATION:
 // DuckDB executes scalar functions across multiple background worker threads simultaneously.
-// We use a `thread_local Scratch` struct. Every OS thread has its own private parsing arena:
+// We use a thread-local Scratch struct. Every OS thread has its own private working buffer:
 // - ZERO locks or atomic operations on the query hot path.
 // - Buffers expand once to steady-state capacity and are reused across all subsequent chunks.
 // - A 1 MB retention cap (`kScratchKeepBytes`) automatically prunes memory if an anomalous log
-//   caused temporary buffer spikes.
+//   caused temporary spikes.
+
 #include <cstring>
 #include <exception>
 #include <string>
@@ -19,9 +20,7 @@
 #include <vector>
 
 #include "duckdb_extension.h"
-#include "librazobill/Hash.hpp"
 #include "librazobill/Slots.hpp"
-#include "librazobill/Stats.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -30,10 +29,16 @@ namespace {
 using razobill::Status;
 namespace core = razobill::core;
 
-// 1 MB high-water mark: if a thread parses gigantic logs, prune buffers back to 1MB
 constexpr std::size_t kScratchKeepBytes = std::size_t{1} << 20;
 
-enum class Kind : unsigned char { Int, Str, IntList, StrList, Unsupported };
+enum class Kind : unsigned char {
+    I64, I32, I16, I8,
+    U64, U32, U16, U8,
+    Str,
+    IntList,
+    StrList,
+    Unsupported
+};
 
 struct Arg {
     Kind kind = Kind::Unsupported;
@@ -43,22 +48,50 @@ struct Arg {
     std::uint64_t* childValidity = nullptr;
 };
 
-// Thread-local scratchpad: holds slot buffers and working memory for one DuckDB worker thread.
+inline Kind classify(duckdb_logical_type t) {
+    auto id = duckdb_get_type_id(t);
+    switch (id) {
+    case DUCKDB_TYPE_BIGINT: return Kind::I64;
+    case DUCKDB_TYPE_INTEGER: return Kind::I32;
+    case DUCKDB_TYPE_SMALLINT: return Kind::I16;
+    case DUCKDB_TYPE_TINYINT: return Kind::I8;
+    case DUCKDB_TYPE_UBIGINT: return Kind::U64;
+    case DUCKDB_TYPE_UINTEGER: return Kind::U32;
+    case DUCKDB_TYPE_USMALLINT: return Kind::U16;
+    case DUCKDB_TYPE_UTINYINT: return Kind::U8;
+    case DUCKDB_TYPE_VARCHAR:
+    case DUCKDB_TYPE_BLOB:
+        return Kind::Str;
+    case DUCKDB_TYPE_LIST: {
+        auto elem = duckdb_list_type_child_type(t);
+        auto elemId = duckdb_get_type_id(elem);
+        duckdb_destroy_logical_type(&elem);
+        if (elemId == DUCKDB_TYPE_BIGINT || elemId == DUCKDB_TYPE_INTEGER || elemId == DUCKDB_TYPE_UBIGINT) {
+            return Kind::IntList;
+        }
+        if (elemId == DUCKDB_TYPE_VARCHAR || elemId == DUCKDB_TYPE_BLOB) {
+            return Kind::StrList;
+        }
+        return Kind::Unsupported;
+    }
+    default:
+        return Kind::Unsupported;
+    }
+}
+
 struct Scratch {
-    core::SlotRecord slots;
+    core::SlotRecord record;
     std::string text;
     std::vector<std::int64_t> ints;
     std::vector<std::string_view> strs;
-    std::vector<double> doubleBuf;
     std::vector<Arg> args;
 
-    // Prunes excess capacity after processing a data chunk
     void trim() {
         if (text.capacity() > kScratchKeepBytes) std::string().swap(text);
-        if (slots.skeleton.capacity() > kScratchKeepBytes) std::string().swap(slots.skeleton);
+        if (record.skeleton.capacity() > kScratchKeepBytes) std::string().swap(record.skeleton);
+        if (record.templateStr.capacity() > kScratchKeepBytes) std::string().swap(record.templateStr);
         if (ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes) std::vector<std::int64_t>().swap(ints);
         if (strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes) std::vector<std::string_view>().swap(strs);
-        if (doubleBuf.capacity() * sizeof(double) > kScratchKeepBytes) std::vector<double>().swap(doubleBuf);
     }
 };
 
@@ -67,30 +100,51 @@ Scratch& scratch() {
     return s;
 }
 
-// Zero-copy string view from DuckDB string representation.
-// NOTE: DuckDB stores short strings (<= 12 bytes) inline inside the struct,
-// while longer strings point to external heap pages. duckdb_string_t_data(&s) abstracts both.
 inline std::string_view viewOf(duckdb_string_t& s) {
     return {duckdb_string_t_data(&s), duckdb_string_t_length(s)};
 }
+
 inline bool isValid(std::uint64_t* validity, idx_t row) {
     return validity == nullptr || duckdb_validity_row_is_valid(validity, row);
 }
+
 inline void setNull(duckdb_vector out, idx_t row) {
     duckdb_vector_ensure_validity_writable(out);
     duckdb_validity_set_row_invalid(duckdb_vector_get_validity(out), row);
 }
-inline void fail(duckdb_function_info info, const char* fn, Status s) {
-    std::string m = std::string(fn) + ": " + razobill::describe(s);
-    duckdb_scalar_function_set_error(info, m.c_str());
-}
+
 inline void put(duckdb_vector out, idx_t row, std::string_view v) {
     duckdb_vector_assign_string_element_len(out, row, v.data(), v.size());
 }
 
-// ---- rb_form / rbForm ----
-template <core::ScanMode Mode = core::ScanMode::Exact>
-[[maybe_unused]] void rbFormImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+inline void fail(duckdb_function_info info, const char* fn, Status s, std::string_view tmpl = {}) {
+    std::string why;
+    switch (s) {
+    case Status::SlotUnderflow:
+        why = "Count mismatch (template placeholders do not match the number of provided integers or strings)";
+        break;
+    case Status::Malformed:
+        why = "Malformed template syntax or unclosed brace";
+        break;
+    case Status::TooLarge:
+        why = "Reconstructed message exceeds maximum size (16 MB)";
+        break;
+    default:
+        why = std::string(razobill::describe(s));
+        break;
+    }
+    std::string m = std::string("[razobill] What happened: ") + fn + " failed. "
+                  + "Why: " + why + ". "
+                  + "What to do: Verify that {i} and {s} placeholders match provided values.";
+    if (!tmpl.empty()) {
+        std::string trunc(tmpl.substr(0, std::min<std::size_t>(tmpl.size(), 60)));
+        m += " Offending template: '" + trunc + "'.";
+    }
+    duckdb_scalar_function_set_error(info, m.c_str());
+}
+
+// ---- RzTemplate ----
+void RzTemplateImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     auto vec = duckdb_data_chunk_get_vector(in, 0);
@@ -101,102 +155,29 @@ template <core::ScanMode Mode = core::ScanMode::Exact>
             setNull(out, r);
             continue;
         }
-        if (auto s = core::parse(viewOf(data[r]), sc.slots, Mode); s != Status::Ok) {
-            fail(info, "rb_form", s);
+        auto sv = viewOf(data[r]);
+        if (sv.empty()) {
+            put(out, r, "");
+            continue;
+        }
+        if (auto s = core::parse(sv, sc.record, core::ScanMode::Semantic); s != Status::Ok) {
+            fail(info, "RzTemplate", s, sv);
             break;
         }
-        sc.slots.formKey(sc.text);
-        put(out, r, sc.text);
+        put(out, r, sc.record.templateStr);
     }
     sc.trim();
 }
 
-// ---- rb_ints / rb_strs ----
-template <bool Ints, core::ScanMode Mode = core::ScanMode::Exact>
-[[maybe_unused]] void rbListImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
-    auto& sc = scratch();
-    const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
-    auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
-    auto* vv = duckdb_vector_get_validity(vec);
-    auto child = duckdb_list_vector_get_child(out);
-    duckdb_list_entry* entries = static_cast<duckdb_list_entry*>(duckdb_vector_get_data(out));
-
-    idx_t total = 0;
-    for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(vv, r)) {
-            entries[r] = {total, 0};
-            setNull(out, r);
-            continue;
-        }
-        if (auto s = core::parse(viewOf(data[r]), sc.slots, Mode); s != Status::Ok) {
-            fail(info, "rb_list", s);
-            break;
-        }
-        const idx_t len = Ints ? sc.slots.ints.size() : sc.slots.strs.size();
-        duckdb_list_vector_reserve(out, total + len);
-        entries[r] = {total, len};
-        if constexpr (Ints) {
-            auto* dst = static_cast<std::int64_t*>(duckdb_vector_get_data(child));
-            for (idx_t i = 0; i < len; ++i)
-                dst[total + i] = sc.slots.ints[i];
-        } else {
-            for (idx_t i = 0; i < len; ++i)
-                put(child, total + i, sc.slots.strs[i]);
-        }
-        total += len;
-    }
-    duckdb_list_vector_set_size(out, total);
-    sc.trim();
-}
-
-// ---- rb_template ----
-void rbTemplateImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
-    auto& sc = scratch();
-    const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
-    auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
-    auto* vv = duckdb_vector_get_validity(vec);
-    for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(vv, r)) {
-            setNull(out, r);
-            continue;
-        }
-        if (auto s = core::templateOf(viewOf(data[r]), sc.text); s != Status::Ok) {
-            fail(info, "rb_template", s);
-            break;
-        }
-        put(out, r, sc.text);
-    }
-    sc.trim();
-}
-
-// ---- rb_hash ----
-void rbHashImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vector out) {
-    const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
-    auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
-    auto* vv = duckdb_vector_get_validity(vec);
-    auto* dst = static_cast<std::uint64_t*>(duckdb_vector_get_data(out));
-    for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(vv, r)) {
-            setNull(out, r);
-            continue;
-        }
-        dst[r] = core::xxh64(viewOf(data[r]));
-    }
-}
-
-// ---- rb_decompose / rbDecompose ----
-template <core::ScanMode Mode = core::ScanMode::Exact>
-[[maybe_unused]] void rbDecomposeImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+// ---- RzSplit ----
+void RzSplitImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     auto vec = duckdb_data_chunk_get_vector(in, 0);
     auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
     auto* vv = duckdb_vector_get_validity(vec);
 
-    auto formChild = duckdb_struct_vector_get_child(out, 0);
+    auto tmplChild = duckdb_struct_vector_get_child(out, 0);
     auto intsChild = duckdb_struct_vector_get_child(out, 1);
     auto strsChild = duckdb_struct_vector_get_child(out, 2);
 
@@ -211,32 +192,41 @@ template <core::ScanMode Mode = core::ScanMode::Exact>
 
     for (idx_t r = 0; r < n; ++r) {
         if (!isValid(vv, r)) {
+            setNull(tmplChild, r);
+            setNull(intsChild, r);
+            setNull(strsChild, r);
             intsEntries[r] = {totalInts, 0};
             strsEntries[r] = {totalStrs, 0};
             setNull(out, r);
             continue;
         }
-        if (auto s = core::parse(viewOf(data[r]), sc.slots, Mode); s != Status::Ok) {
-            fail(info, "rb_decompose", s);
+        auto sv = viewOf(data[r]);
+        if (sv.empty()) {
+            put(tmplChild, r, "");
+            intsEntries[r] = {totalInts, 0};
+            strsEntries[r] = {totalStrs, 0};
+            continue;
+        }
+        if (auto s = core::parse(sv, sc.record, core::ScanMode::Semantic); s != Status::Ok) {
+            fail(info, "RzSplit", s, sv);
             break;
         }
-        sc.slots.formKey(sc.text);
-        put(formChild, r, sc.text);
+        put(tmplChild, r, sc.record.templateStr);
 
-        const idx_t numInts = sc.slots.ints.size();
+        const idx_t numInts = sc.record.ints.size();
         duckdb_list_vector_reserve(intsChild, totalInts + numInts);
         intsEntries[r] = {totalInts, numInts};
         auto* dstInts = static_cast<std::int64_t*>(duckdb_vector_get_data(intsGrandchild));
         for (idx_t i = 0; i < numInts; ++i) {
-            dstInts[totalInts + i] = sc.slots.ints[i];
+            dstInts[totalInts + i] = sc.record.ints[i];
         }
         totalInts += numInts;
 
-        const idx_t numStrs = sc.slots.strs.size();
+        const idx_t numStrs = sc.record.strs.size();
         duckdb_list_vector_reserve(strsChild, totalStrs + numStrs);
         strsEntries[r] = {totalStrs, numStrs};
         for (idx_t i = 0; i < numStrs; ++i) {
-            put(strsGrandchild, totalStrs + i, sc.slots.strs[i]);
+            put(strsGrandchild, totalStrs + i, sc.record.strs[i]);
         }
         totalStrs += numStrs;
     }
@@ -245,105 +235,16 @@ template <core::ScanMode Mode = core::ScanMode::Exact>
     sc.trim();
 }
 
-// ---- rb_entropy / rbEntropy ----
-void rbEntropyImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vector out) {
-    auto& sc = scratch();
-    const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
-    auto* entries = static_cast<const duckdb_list_entry*>(duckdb_vector_get_data(vec));
-    auto* vv = duckdb_vector_get_validity(vec);
-    auto child = duckdb_list_vector_get_child(vec);
-    auto* childData = static_cast<const double*>(duckdb_vector_get_data(child));
-    auto* childVv = duckdb_vector_get_validity(child);
-    auto* dst = static_cast<double*>(duckdb_vector_get_data(out));
-
-    for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(vv, r)) {
-            setNull(out, r);
-            continue;
-        }
-        const auto entry = entries[r];
-        sc.doubleBuf.clear();
-        sc.doubleBuf.reserve(entry.length);
-        for (idx_t i = 0; i < entry.length; ++i) {
-            if (isValid(childVv, entry.offset + i)) {
-                sc.doubleBuf.push_back(childData[entry.offset + i]);
-            }
-        }
-        dst[r] = razobill::stats::entropyOfCounts(sc.doubleBuf);
-    }
-    sc.trim();
-}
-
-// ---- rb_miller_madow / rbMillerMadow ----
-void rbMillerMadowImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vector out) {
-    const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vecH = duckdb_data_chunk_get_vector(in, 0);
-    auto vecK = duckdb_data_chunk_get_vector(in, 1);
-    auto vecN = duckdb_data_chunk_get_vector(in, 2);
-
-    auto* dataH = static_cast<const double*>(duckdb_vector_get_data(vecH));
-    auto* dataK = static_cast<const int64_t*>(duckdb_vector_get_data(vecK));
-    auto* dataN = static_cast<const double*>(duckdb_vector_get_data(vecN));
-
-    auto* vvH = duckdb_vector_get_validity(vecH);
-    auto* vvK = duckdb_vector_get_validity(vecK);
-    auto* vvN = duckdb_vector_get_validity(vecN);
-
-    auto* dst = static_cast<double*>(duckdb_vector_get_data(out));
-
-    for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(vvH, r) || !isValid(vvK, r) || !isValid(vvN, r)) {
-            setNull(out, r);
-            continue;
-        }
-        const double h = dataH[r];
-        const int64_t k = dataK[r];
-        const double sampleCount = dataN[r];
-        dst[r] = razobill::stats::millerMadow(h, k > 0 ? static_cast<std::size_t>(k) : 0, sampleCount);
-    }
-}
-
-// ---- rebuild / reconstruct ----
-enum Shape { kJoin, kRebuild };
-
-Kind classify(duckdb_logical_type t) {
-    switch (duckdb_get_type_id(t)) {
-    case DUCKDB_TYPE_BIGINT:
-        return Kind::Int;
-    case DUCKDB_TYPE_VARCHAR:
-    case DUCKDB_TYPE_BLOB:
-        return Kind::Str;
-    case DUCKDB_TYPE_LIST: {
-        auto elem = duckdb_list_type_child_type(t);
-        const auto id = duckdb_get_type_id(elem);
-        duckdb_destroy_logical_type(&elem);
-        if (id == DUCKDB_TYPE_BIGINT) return Kind::IntList;
-        if (id == DUCKDB_TYPE_VARCHAR || id == DUCKDB_TYPE_BLOB) return Kind::StrList;
-        return Kind::Unsupported;
-    }
-    default:
-        return Kind::Unsupported;
-    }
-}
-
-template <Shape S>
-[[maybe_unused]] void rebuildImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
+// ---- RzJoin ----
+void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
     const idx_t numCols = duckdb_data_chunk_get_column_count(in);
     if (numCols < 1) return;
 
-    auto formVec = duckdb_data_chunk_get_vector(in, 0);
-    auto formType = duckdb_vector_get_column_type(formVec);
-    auto formTypeId = duckdb_get_type_id(formType);
-    duckdb_destroy_logical_type(&formType);
-    if (formTypeId != DUCKDB_TYPE_VARCHAR && formTypeId != DUCKDB_TYPE_BLOB) {
-        duckdb_scalar_function_set_error(info, "razobill: template parameter must be VARCHAR or BLOB");
-        return;
-    }
-    auto* formData = static_cast<duckdb_string_t*>(duckdb_vector_get_data(formVec));
-    auto* formVv = duckdb_vector_get_validity(formVec);
+    auto tmplVec = duckdb_data_chunk_get_vector(in, 0);
+    auto* tmplData = static_cast<duckdb_string_t*>(duckdb_vector_get_data(tmplVec));
+    auto* tmplVv = duckdb_vector_get_validity(tmplVec);
 
     sc.args.resize(numCols - 1);
     for (idx_t c = 1; c < numCols; ++c) {
@@ -361,19 +262,51 @@ template <Shape S>
         }
     }
 
+    const bool isStandardThreeArg = (numCols == 3 &&
+                                     sc.args[0].kind == Kind::IntList &&
+                                     sc.args[1].kind == Kind::StrList);
+
     for (idx_t r = 0; r < n; ++r) {
-        if (!isValid(formVv, r)) {
+        if (!isValid(tmplVv, r)) {
             setNull(out, r);
             continue;
         }
+        if (isStandardThreeArg) {
+            if (!isValid(sc.args[0].validity, r) || !isValid(sc.args[1].validity, r)) {
+                setNull(out, r);
+                continue;
+            }
+        }
+
         sc.ints.clear();
         sc.strs.clear();
 
         for (const auto& a : sc.args) {
             if (!isValid(a.validity, r)) continue;
             switch (a.kind) {
-            case Kind::Int:
+            case Kind::I64:
                 sc.ints.push_back(static_cast<const std::int64_t*>(a.data)[r]);
+                break;
+            case Kind::I32:
+                sc.ints.push_back(static_cast<const std::int32_t*>(a.data)[r]);
+                break;
+            case Kind::I16:
+                sc.ints.push_back(static_cast<const std::int16_t*>(a.data)[r]);
+                break;
+            case Kind::I8:
+                sc.ints.push_back(static_cast<const std::int8_t*>(a.data)[r]);
+                break;
+            case Kind::U64:
+                sc.ints.push_back(static_cast<std::int64_t>(static_cast<const std::uint64_t*>(a.data)[r]));
+                break;
+            case Kind::U32:
+                sc.ints.push_back(static_cast<std::int64_t>(static_cast<const std::uint32_t*>(a.data)[r]));
+                break;
+            case Kind::U16:
+                sc.ints.push_back(static_cast<std::int64_t>(static_cast<const std::uint16_t*>(a.data)[r]));
+                break;
+            case Kind::U8:
+                sc.ints.push_back(static_cast<std::int64_t>(static_cast<const std::uint8_t*>(a.data)[r]));
                 break;
             case Kind::Str:
                 sc.strs.push_back(viewOf(static_cast<duckdb_string_t*>(a.data)[r]));
@@ -382,7 +315,9 @@ template <Shape S>
                 const auto entry = static_cast<const duckdb_list_entry*>(a.data)[r];
                 const auto* p = static_cast<const std::int64_t*>(a.childData);
                 for (idx_t i = 0; i < entry.length; ++i) {
-                    if (isValid(a.childValidity, entry.offset + i)) sc.ints.push_back(p[entry.offset + i]);
+                    if (isValid(a.childValidity, entry.offset + i)) {
+                        sc.ints.push_back(p[entry.offset + i]);
+                    }
                 }
                 break;
             }
@@ -390,7 +325,9 @@ template <Shape S>
                 const auto entry = static_cast<const duckdb_list_entry*>(a.data)[r];
                 auto* p = static_cast<duckdb_string_t*>(a.childData);
                 for (idx_t i = 0; i < entry.length; ++i) {
-                    if (isValid(a.childValidity, entry.offset + i)) sc.strs.push_back(viewOf(p[entry.offset + i]));
+                    if (isValid(a.childValidity, entry.offset + i)) {
+                        sc.strs.push_back(viewOf(p[entry.offset + i]));
+                    }
                 }
                 break;
             }
@@ -399,13 +336,34 @@ template <Shape S>
             }
         }
 
-        if (auto s = core::reconstruct(viewOf(formData[r]), sc.ints, sc.strs, sc.text); s != Status::Ok) {
-            fail(info, S == kJoin ? "rb_join" : "rb_rebuild", s);
+        auto tmplSv = viewOf(tmplData[r]);
+        if (tmplSv.empty() && sc.ints.empty() && sc.strs.empty()) {
+            put(out, r, "");
+            continue;
+        }
+        if (auto s = core::reconstruct(tmplSv, sc.ints, sc.strs, sc.text); s != Status::Ok) {
+            fail(info, "RzJoin", s, tmplSv);
             break;
         }
         put(out, r, sc.text);
     }
     sc.trim();
+}
+
+// ---- RzHash ----
+void RzHashImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vector out) {
+    const idx_t n = duckdb_data_chunk_get_size(in);
+    auto vec = duckdb_data_chunk_get_vector(in, 0);
+    auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
+    auto* vv = duckdb_vector_get_validity(vec);
+    auto* dst = static_cast<std::uint64_t*>(duckdb_vector_get_data(out));
+    for (idx_t r = 0; r < n; ++r) {
+        if (!isValid(vv, r)) {
+            setNull(out, r);
+            continue;
+        }
+        dst[r] = core::xxh64(viewOf(data[r]));
+    }
 }
 
 template <void (*Fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)>
@@ -415,7 +373,7 @@ void guarded(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out)
     } catch (const std::exception& ex) {
         duckdb_scalar_function_set_error(info, ex.what());
     } catch (...) {
-        duckdb_scalar_function_set_error(info, "razobill: unknown exception");
+        duckdb_scalar_function_set_error(info, "razobill: unexpected exception");
     }
 }
 
@@ -439,19 +397,6 @@ public:
 private:
     explicit Type(duckdb_logical_type owned) : t(owned) {}
 };
-
-bool add(duckdb_connection con, const char* name, std::initializer_list<duckdb_logical_type> params,
-         duckdb_logical_type ret, void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
-    auto f = duckdb_create_scalar_function();
-    duckdb_scalar_function_set_name(f, name);
-    for (auto p : params)
-        duckdb_scalar_function_add_parameter(f, p);
-    duckdb_scalar_function_set_return_type(f, ret);
-    duckdb_scalar_function_set_function(f, fn);
-    const bool ok = duckdb_register_scalar_function(con, f) == DuckDBSuccess;
-    duckdb_destroy_scalar_function(&f);
-    return ok;
-}
 
 class FunctionSet {
 public:
@@ -501,81 +446,50 @@ private:
 
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info, struct duckdb_extension_access*) {
     Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT),
-        ubigint(DUCKDB_TYPE_UBIGINT), doubleType(DUCKDB_TYPE_DOUBLE);
+        ubigint(DUCKDB_TYPE_UBIGINT);
     Type any(DUCKDB_TYPE_ANY);
-    Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob),
-         doubleList = Type::listOf(doubleType);
+    Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob);
 
-    std::vector<const char*> structNames = {"form", "ints", "strs"};
+    std::vector<const char*> structNames = {"template", "ints", "strs"};
     std::vector<duckdb_logical_type> structTypesVarchar = {varchar.t, bigintList.t, varcharList.t};
     std::vector<duckdb_logical_type> structTypesBlob = {blob.t, bigintList.t, blobList.t};
-    Type decomposeStructVarchar = Type::structOf(structNames, structTypesVarchar);
-    Type decomposeStructBlob = Type::structOf(structNames, structTypesBlob);
-
-    auto regDualUnary = [&](const char* cName, const char* sName, duckdb_logical_type retVarchar,
-                            duckdb_logical_type retBlob, auto fn) {
-        FunctionSet cSet(cName), sSet(sName);
-        cSet.add({varchar.t}, retVarchar, fn);
-        cSet.add({blob.t}, retBlob, fn);
-        sSet.add({varchar.t}, retVarchar, fn);
-        sSet.add({blob.t}, retBlob, fn);
-        return cSet.registerSet(connection) && sSet.registerSet(connection);
-    };
+    Type splitStructVarchar = Type::structOf(structNames, structTypesVarchar);
+    Type splitStructBlob = Type::structOf(structNames, structTypesBlob);
 
     bool ok = true;
-    ok = ok && regDualUnary("rbForm", "rb_form", varchar.t, blob.t, guarded<rbFormImpl<core::ScanMode::Exact>>);
-    ok = ok && regDualUnary("rbFormSemantic", "rb_form_semantic", varchar.t, blob.t,
-                            guarded<rbFormImpl<core::ScanMode::Semantic>>);
-    ok = ok && regDualUnary("rbInts", "rb_ints", bigintList.t, bigintList.t,
-                            guarded<rbListImpl<true, core::ScanMode::Exact>>);
-    ok = ok && regDualUnary("rbIntsSemantic", "rb_ints_semantic", bigintList.t, bigintList.t,
-                            guarded<rbListImpl<true, core::ScanMode::Semantic>>);
-    ok = ok && regDualUnary("rbStrs", "rb_strs", varcharList.t, blobList.t,
-                            guarded<rbListImpl<false, core::ScanMode::Exact>>);
-    ok = ok && regDualUnary("rbStrsSemantic", "rb_strs_semantic", varcharList.t, blobList.t,
-                            guarded<rbListImpl<false, core::ScanMode::Semantic>>);
-    ok = ok && regDualUnary("rbDecompose", "rb_decompose", decomposeStructVarchar.t, decomposeStructBlob.t,
-                            guarded<rbDecomposeImpl<core::ScanMode::Exact>>);
-    ok = ok && regDualUnary("rbDecomposeSemantic", "rb_decompose_semantic", decomposeStructVarchar.t,
-                            decomposeStructBlob.t, guarded<rbDecomposeImpl<core::ScanMode::Semantic>>);
-    ok = ok && regDualUnary("rbTemplate", "rb_template", varchar.t, blob.t, guarded<rbTemplateImpl>);
-    ok = ok && regDualUnary("rbHash", "rb_hash", ubigint.t, ubigint.t, guarded<rbHashImpl>);
 
-    // Math functions
-    ok = ok && add(connection, "rbEntropy", {doubleList.t}, doubleType.t, guarded<rbEntropyImpl>);
-    ok = ok && add(connection, "rb_entropy", {doubleList.t}, doubleType.t, guarded<rbEntropyImpl>);
-    ok = ok && add(connection, "rbMillerMadow", {doubleType.t, bigint.t, doubleType.t}, doubleType.t,
-                   guarded<rbMillerMadowImpl>);
-    ok = ok && add(connection, "rb_miller_madow", {doubleType.t, bigint.t, doubleType.t}, doubleType.t,
-                   guarded<rbMillerMadowImpl>);
+    // 1. RzSplit(line) -> STRUCT(template, ints, strs)
+    FunctionSet splitSet("RzSplit");
+    splitSet.add({varchar.t}, splitStructVarchar.t, guarded<RzSplitImpl>);
+    splitSet.add({blob.t}, splitStructBlob.t, guarded<RzSplitImpl>);
+    ok = ok && splitSet.registerSet(connection);
 
-    // Reconstruction / Join
-    auto regJoin = [&](const char* name) {
-        FunctionSet s(name);
-        s.add({varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<rebuildImpl<kJoin>>);
-        s.add({blob.t, bigintList.t, blobList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
-        s.add({blob.t, bigintList.t, varcharList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
-        s.add({varchar.t, bigintList.t, blobList.t}, blob.t, guarded<rebuildImpl<kJoin>>);
-        return s.registerSet(connection);
-    };
-    ok = ok && regJoin("rbReconstruct");
-    ok = ok && regJoin("rb_join");
+    // 2. RzJoin(template, ints, strs) -> VARCHAR / BLOB (also supports varargs)
+    FunctionSet joinSet("RzJoin");
+    joinSet.add({varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<RzJoinImpl>);
+    joinSet.add({blob.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
+    joinSet.add({blob.t, bigintList.t, varcharList.t}, blob.t, guarded<RzJoinImpl>);
+    joinSet.add({varchar.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
+    joinSet.addVarargs(varchar.t, any.t, varchar.t, guarded<RzJoinImpl>);
+    joinSet.addVarargs(blob.t, any.t, blob.t, guarded<RzJoinImpl>);
+    ok = ok && joinSet.registerSet(connection);
 
-    // Varargs Rebuild
-    auto regRebuild = [&](const char* name) {
-        FunctionSet s(name);
-        s.addVarargs(varchar.t, any.t, varchar.t, guarded<rebuildImpl<kRebuild>>);
-        s.addVarargs(blob.t, any.t, blob.t, guarded<rebuildImpl<kRebuild>>);
-        return s.registerSet(connection);
-    };
-    ok = ok && regRebuild("rbRebuild");
-    ok = ok && regRebuild("rb_rebuild");
+    // 3. RzTemplate(line) -> VARCHAR / BLOB
+    FunctionSet tmplSet("RzTemplate");
+    tmplSet.add({varchar.t}, varchar.t, guarded<RzTemplateImpl>);
+    tmplSet.add({blob.t}, blob.t, guarded<RzTemplateImpl>);
+    ok = ok && tmplSet.registerSet(connection);
+
+    // 4. RzHash(line) -> UBIGINT
+    FunctionSet hashSet("RzHash");
+    hashSet.add({varchar.t}, ubigint.t, guarded<RzHashImpl>);
+    hashSet.add({blob.t}, ubigint.t, guarded<RzHashImpl>);
+    ok = ok && hashSet.registerSet(connection);
 
     return ok;
 }
 
-// Dual-entrypoint alias: allows loading via both 'LOAD razobill;' (Community Standard)
-// and 'LOAD librazobill;' (Legacy C API ABI).
+// Dual-entrypoint alias: allows loading via both 'LOAD razobill;' and 'LOAD librazobill;'
 DUCKDB_EXTENSION_EXTERN_C_GUARD_OPEN
 DUCKDB_CAPI_ENTRY_VISIBILITY DUCKDB_EXTENSION_API bool librazobill_init_c_api(duckdb_extension_info info,
                                                                               struct duckdb_extension_access* access) {

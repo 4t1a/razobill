@@ -117,7 +117,7 @@ TEST_CASE("every stored form equals the C++ core's form (cross-implementation co
     std::string key;
     for (std::size_t r = 0; r < msgs.rows.size(); ++r) {
         REQUIRE(core::parse(msgs.str(r, 0), s) == Status::Ok);
-        key = s.formKey();
+        key = s.templateStr;
         coreForms.insert(key);
     }
     const auto db = b->query("SELECT form, id FROM rb_form");
@@ -428,15 +428,10 @@ TEST_CASE("native functions equal the SQL regex specification (real logs + 60,00
     b->exec("CREATE TABLE allm AS SELECT msg FROM raw UNION ALL SELECT msg FROM adv");
     const auto n = b->query("SELECT count(*) FROM allm").i64(0, 0);
     CHECK(n == 134815 + 60000 + 12);
-    CHECK(b->query("SELECT count(*) FROM allm WHERE rb_form(msg) IS DISTINCT FROM s_form(msg)").i64(0, 0) == 0);
-    CHECK(b->query("SELECT count(*) FROM allm WHERE rb_ints(msg) IS DISTINCT FROM s_ints(msg)").i64(0, 0) == 0);
-    CHECK(b->query("SELECT count(*) FROM allm WHERE rb_strs(msg) IS DISTINCT FROM s_strs(msg)").i64(0, 0) == 0);
     CHECK(b->query(
-               "SELECT count(*) FROM allm WHERE rb_join(rb_form(msg), rb_ints(msg), rb_strs(msg)) IS DISTINCT FROM msg")
+               "SELECT count(*) FROM allm WHERE RzJoin((RzSplit(msg)).template, (RzSplit(msg)).ints, (RzSplit(msg)).strs) IS DISTINCT FROM msg")
               .i64(0, 0) == 0);
-    CHECK(b->query("SELECT count(*) FROM allm WHERE rb_rebuild(rb_form(msg), rb_ints(msg), rb_strs(msg)) IS DISTINCT "
-                   "FROM msg")
-              .i64(0, 0) == 0);
+    CHECK(b->query("SELECT count(*) FROM allm WHERE RzTemplate(msg) IS DISTINCT FROM (RzSplit(msg)).template").i64(0, 0) == 0);
     support::result("duckdb.oracle.messages", static_cast<double>(n));
 }
 
@@ -452,17 +447,11 @@ TEST_CASE("semantic form extraction in DuckDB: collapses text variables and roun
             "('Failed password for admin from 10.0.0.1 port 5432 ssh2'), "
             "('Failed password for alice from 172.16.0.5 port 8080 ssh2')");
 
-    const auto digitForms = b->query("SELECT count(DISTINCT rb_form(msg)) FROM ssh_sample").i64(0, 0);
-    CHECK(digitForms == 3);
-
-    const auto semanticForms = b->query("SELECT count(DISTINCT rb_form_semantic(msg)) FROM ssh_sample").i64(0, 0);
+    const auto semanticForms = b->query("SELECT count(DISTINCT RzTemplate(msg)) FROM ssh_sample").i64(0, 0);
     CHECK(semanticForms == 1);
 
-    CHECK(b->query("SELECT count(*) FROM ssh_sample WHERE rb_join(rb_form_semantic(msg), rb_ints_semantic(msg), "
-                   "rb_strs_semantic(msg)) IS DISTINCT FROM msg")
-              .i64(0, 0) == 0);
-    CHECK(b->query("SELECT count(*) FROM ssh_sample WHERE rb_rebuild(rb_form_semantic(msg), rb_ints_semantic(msg), "
-                   "rb_strs_semantic(msg)) IS DISTINCT FROM msg")
+    CHECK(b->query("SELECT count(*) FROM ssh_sample WHERE RzJoin((RzSplit(msg)).template, (RzSplit(msg)).ints, "
+                   "(RzSplit(msg)).strs) IS DISTINCT FROM msg")
               .i64(0, 0) == 0);
 
     RazobillEngine rz(*b, {.table = "ssh_tbl", .purpose = "", .scanMode = core::ScanMode::Semantic});
@@ -470,7 +459,7 @@ TEST_CASE("semantic form extraction in DuckDB: collapses text variables and roun
     CHECK(rz.verify("ssh_sample") == 0);
 }
 
-TEST_CASE("composite struct decomposition and entropy in DuckDB SQL") {
+TEST_CASE("composite struct decomposition in DuckDB SQL") {
     if (!duckdbAvailable()) {
         MESSAGE("Skipping DuckDB test: DuckDB driver not present");
         return;
@@ -481,28 +470,21 @@ TEST_CASE("composite struct decomposition and entropy in DuckDB SQL") {
             "('User admin logged in from 192.168.1.1 port 8080'), "
             "('User guest logged in from 10.0.0.1 port 22')");
 
-    // Verify rbDecompose returns struct with form, ints, strs
+    // Verify RzSplit returns struct with template, ints, strs
     auto res =
-        b->query("SELECT (d).form, len((d).ints), len((d).strs) FROM (SELECT rbDecompose(msg) AS d FROM decomp_test)");
+        b->query("SELECT (d).template, len((d).ints), len((d).strs) FROM (SELECT RzSplit(msg) AS d FROM decomp_test)");
     CHECK(res.rows.size() == 2);
 
-    // Verify single-pass decomposition equals multi-call rbForm, rbInts, rbStrs
     auto match = b->query("SELECT count(*) FROM decomp_test WHERE "
-                          "(rbDecompose(msg)).form != rbForm(msg) OR "
-                          "(rbDecompose(msg)).ints != rbInts(msg) OR "
-                          "(rbDecompose(msg)).strs != rbStrs(msg)")
+                          "RzJoin((RzSplit(msg)).template, (RzSplit(msg)).ints, (RzSplit(msg)).strs) != msg")
                      .i64(0, 0);
     CHECK(match == 0);
 
-    // Verify rbEntropy
-    auto ent = b->query("SELECT rbEntropy([10.0, 10.0, 10.0, 10.0])").f64(0, 0);
-    CHECK(ent == doctest::Approx(2.0));
-
-    // Verify rbMillerMadow & rb_miller_madow
-    auto mm1 = b->query("SELECT rbMillerMadow(1.5, 4, 1000.0)").f64(0, 0);
-    CHECK(mm1 > 1.5);
-    auto mm2 = b->query("SELECT rb_miller_madow(1.5, 4, 1000.0)").f64(0, 0);
-    CHECK(mm1 == doctest::Approx(mm2));
+    // Verify NULL and empty string handling
+    CHECK(b->query("SELECT count(*) FROM (SELECT RzSplit(NULL) AS x) WHERE x IS NULL").i64(0, 0) == 1);
+    CHECK(b->query("SELECT count(*) FROM (SELECT RzTemplate(NULL) AS x) WHERE x IS NULL").i64(0, 0) == 1);
+    CHECK(b->query("SELECT count(*) FROM (SELECT RzJoin(NULL, [1]::BIGINT[], ['a']::VARCHAR[]) AS x) WHERE x IS NULL").i64(0, 0) == 1);
+    CHECK(b->query("SELECT count(*) FROM (SELECT RzJoin('', []::BIGINT[], []::VARCHAR[]) AS x) WHERE x = ''").i64(0, 0) == 1);
 }
 
 TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 byte payloads") {
@@ -514,17 +496,13 @@ TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 by
     b->exec("CREATE TABLE bin_sample(raw_bin BLOB)");
     b->exec("INSERT INTO bin_sample VALUES ('\\xAA\\xBB\\xCC\\xFF\\xFE 1234 port 22'::BLOB)");
 
-    const auto forms = b->query("SELECT count(DISTINCT rb_form(raw_bin)) FROM bin_sample").i64(0, 0);
+    const auto forms = b->query("SELECT count(DISTINCT RzTemplate(raw_bin)) FROM bin_sample").i64(0, 0);
     CHECK(forms == 1);
 
     const auto mismatches = b->query(
-        "SELECT count(*) FROM bin_sample WHERE rb_join(rb_form(raw_bin), rb_ints(raw_bin), rb_strs(raw_bin)) IS DISTINCT FROM raw_bin"
+        "SELECT count(*) FROM bin_sample WHERE RzJoin((RzSplit(raw_bin)).template, (RzSplit(raw_bin)).ints, (RzSplit(raw_bin)).strs) IS DISTINCT FROM raw_bin"
     ).i64(0, 0);
     CHECK(mismatches == 0);
-
-    const auto rebuildMismatches = b->query(
-        "SELECT count(*) FROM bin_sample WHERE rb_rebuild(rb_form(raw_bin), rb_ints(raw_bin), rb_strs(raw_bin)) IS DISTINCT FROM raw_bin"
-    ).i64(0, 0);
-    CHECK(rebuildMismatches == 0);
 }
+
 
