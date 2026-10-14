@@ -45,9 +45,7 @@ def main():
     try:
         from chdb import session as S
     except ImportError:
-        print(
-            "[ChStore] Warning: chdb Python package not installed. Skipping ClickHouse MergeTree experiment."
-        )
+        print("[ChStore] Warning: chdb Python package not installed. Skipping ClickHouse MergeTree experiment.")
         print("          Install via: pip install chdb")
         return
 
@@ -68,13 +66,9 @@ def main():
         session.query(
             "CREATE TABLE d.src (sys LowCardinality(String), level LowCardinality(String), comp LowCardinality(String), msg String) ENGINE=MergeTree ORDER BY tuple()"
         )
-        session.query(
-            f"INSERT INTO d.src SELECT sys, level, comp, msg FROM file('{parquetStaging}', Parquet)"
-        )
+        session.query(f"INSERT INTO d.src SELECT sys, level, comp, msg FROM file('{parquetStaging}', Parquet)")
 
-        rowCount = (
-            session.query("SELECT count() FROM d.src", "CSV").bytes().decode().strip()
-        )
+        rowCount = session.query("SELECT count() FROM d.src", "CSV").bytes().decode().strip()
         print(f"[ChStore] Successfully staged {rowCount} rows in ClickHouse MergeTree.\n")
 
         # Helper: queries ClickHouse metadata for physical disk bytes on active parts
@@ -93,13 +87,9 @@ def main():
             return int(result[0]), int(result[1])
 
         # Helper: creates MergeTree table variant, forces OPTIMIZE FINAL, and measures disk footprint
-        def evaluateVariant(
-            tableName: str, ddlColumns: str, selectQuery: str, extraCodec: str = ""
-        ):
+        def evaluateVariant(tableName: str, ddlColumns: str, selectQuery: str, extraCodec: str = ""):
             session.query(f"DROP TABLE IF EXISTS d.{tableName}")
-            session.query(
-                f"CREATE TABLE d.{tableName} ({ddlColumns}) ENGINE=MergeTree ORDER BY tuple() {extraCodec}"
-            )
+            session.query(f"CREATE TABLE d.{tableName} ({ddlColumns}) ENGINE=MergeTree ORDER BY tuple() {extraCodec}")
             session.query(f"INSERT INTO d.{tableName} {selectQuery}")
             session.query(f"OPTIMIZE TABLE d.{tableName} FINAL")
             return measureTableBytes(tableName)
@@ -107,9 +97,7 @@ def main():
         baseCompressed, baseUncompressed = measureTableBytes("src")
         print(f"{'ClickHouse Storage Layout':<60} {'Compressed Disk':<16} {'Ratio'}")
         print("-" * 85)
-        print(
-            f"{'Raw msg String (ClickHouse default LZ4)':<60} {baseCompressed:>12,} B   1.00x"
-        )
+        print(f"{'Raw msg String (ClickHouse default LZ4)':<60} {baseCompressed:>12,} B   1.00x")
 
         # 1. Raw with ZSTD(3) and LowCardinality
         for codecName, ddlSnippet in [
@@ -125,11 +113,7 @@ def main():
 
         # 2. Decomposed Columnar Razobill Layout
         DELIMITERS = r"""\s=,;:()\[\]{}"'<>|/"""
-        TOKEN_REGEX = (
-            (f"[^{DELIMITERS}]*[0-9][^{DELIMITERS}]*")
-            .replace("\\", "\\\\")
-            .replace("'", "\\'")
-        )
+        TOKEN_REGEX = (f"[^{DELIMITERS}]*[0-9][^{DELIMITERS}]*").replace("\\", "\\\\").replace("'", "\\'")
 
         formKeySql = f"concat(replaceRegexpAll(msg, '{TOKEN_REGEX}', char(18)), char(19), arrayStringConcat(arrayMap(t -> if(match(t, '^(0|[1-9][0-9]{{0,17}})$'), 'I', 'S'), extractAll(msg, '{TOKEN_REGEX}')), ''))"
         tokensSql = f"extractAll(msg, '{TOKEN_REGEX}')"

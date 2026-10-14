@@ -65,10 +65,7 @@ class TestPyRazobill(unittest.TestCase):
         self.assertEqual(tmpl_bytes, b"Accepted publickey for {s} from {s} port {i} {s}")
 
     def test_split_many_batch(self):
-        lines = [
-            f"Receiving block blk_{i} src: /10.0.0.1:{50000 + i} dest: /10.0.0.2:50010"
-            for i in range(500)
-        ]
+        lines = [f"Receiving block blk_{i} src: /10.0.0.1:{50000 + i} dest: /10.0.0.2:50010" for i in range(500)]
         records = rz.RzSplitMany(lines)
         self.assertEqual(len(records), 500)
         for i, rec in enumerate(records):
@@ -176,9 +173,19 @@ class TestPyRazobill(unittest.TestCase):
 
     def test_zero_banned_terms(self):
         banned = [
-            "entropy", "ledger", "latitude", "doubt", "conveyance",
-            "leakage", "channel capacity", "miller-madow", "certified interval",
-            "shannon", "arena", "slot", "form key"
+            "entropy",
+            "ledger",
+            "latitude",
+            "doubt",
+            "conveyance",
+            "leakage",
+            "channel capacity",
+            "miller-madow",
+            "certified interval",
+            "shannon",
+            "arena",
+            "slot",
+            "form key",
         ]
         doc = (rz.__doc__ or "").lower()
         for term in banned:

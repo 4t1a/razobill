@@ -46,9 +46,7 @@ def padded_byte_string(input):
 
 
 def main():
-    arg_parser = argparse.ArgumentParser(
-        description="Append extension metadata to loadable DuckDB extensions"
-    )
+    arg_parser = argparse.ArgumentParser(description="Append extension metadata to loadable DuckDB extensions")
 
     arg_parser.add_argument(
         "-l",
@@ -57,9 +55,7 @@ def main():
         help="Path to the raw shared library",
         required=True,
     )
-    arg_parser.add_argument(
-        "-n", "--extension-name", type=str, help="Extension name to use", required=True
-    )
+    arg_parser.add_argument("-n", "--extension-name", type=str, help="Extension name to use", required=True)
 
     arg_parser.add_argument(
         "-o",
@@ -70,9 +66,7 @@ def main():
     )
 
     # The platform
-    arg_parser.add_argument(
-        "-p", "--duckdb-platform", type=str, help="The DuckDB platform to encode"
-    )
+    arg_parser.add_argument("-p", "--duckdb-platform", type=str, help="The DuckDB platform to encode")
     arg_parser.add_argument(
         "-pf",
         "--duckdb-platform-file",
@@ -88,9 +82,7 @@ def main():
         "this encodes the duckdb version or the C API version",
         required=True,
     )
-    arg_parser.add_argument(
-        "-ev", "--extension-version", type=str, help="The Extension version to encode"
-    )
+    arg_parser.add_argument("-ev", "--extension-version", type=str, help="The Extension version to encode")
     arg_parser.add_argument(
         "-evf",
         "--extension-version-file",
@@ -107,9 +99,7 @@ def main():
 
     args = arg_parser.parse_args()
 
-    OUTPUT_FILE = (
-        args.out_file if args.out_file else args.extension_name + ".duckdb_extension"
-    )
+    OUTPUT_FILE = args.out_file if args.out_file else args.extension_name + ".duckdb_extension"
     OUTPUT_FILE_TMP = OUTPUT_FILE + ".tmp"
 
     print("Creating extension binary:")
@@ -131,9 +121,7 @@ def main():
             print(f"Failed to read platform from file {args.duckdb_platform_file}")
             raise
         if not PLATFORM:
-            raise Exception(
-                f"Platform file passed to script is empty: {args.duckdb_platform_file}"
-            )
+            raise Exception(f"Platform file passed to script is empty: {args.duckdb_platform_file}")
     else:
         raise Exception(
             "Neither --duckdb-platform nor --duckdb-platform-file found, please specify the platform using either"
@@ -147,14 +135,10 @@ def main():
             with open(args.extension_version_file, "r") as file:
                 EXTENSION_VERSION = file.read().strip()
         except Exception:
-            print(
-                f"Failed to read extension version from file {args.extension_version_file}"
-            )
+            print(f"Failed to read extension version from file {args.extension_version_file}")
             raise
         if not EXTENSION_VERSION:
-            raise Exception(
-                f"Extension version file passed to script is empty: {args.extension_version_file}"
-            )
+            raise Exception(f"Extension version file passed to script is empty: {args.extension_version_file}")
     else:
         raise Exception(
             "Neither --extension-version nor --extension-version-file found, please specify the extension version using either"
@@ -178,9 +162,7 @@ def main():
         file.write(padded_byte_string(args.duckdb_version))
         print(f"   - FIELD2 (duckdb_platform)   = {PLATFORM}")
         file.write(padded_byte_string(PLATFORM))
-        print(
-            "   - FIELD1 (header signature)  = 4 (special value to identify a duckdb extension)"
-        )
+        print("   - FIELD1 (header signature)  = 4 (special value to identify a duckdb extension)")
         file.write(padded_byte_string("4"))
 
         # Write some empty space for the signature

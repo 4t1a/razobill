@@ -98,9 +98,7 @@ TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
     CHECK(outBuf == "thread_safe_token");
 
     bool inspected = false;
-    CHECK(pool.withString(id0, [&](std::string_view v) {
-        inspected = (v == "thread_safe_token");
-    }));
+    CHECK(pool.withString(id0, [&](std::string_view v) { inspected = (v == "thread_safe_token"); }));
     CHECK(inspected);
 
     // Invalid ID bounds check
@@ -128,7 +126,6 @@ TEST_CASE("StringPool concurrent lookup safety and withString accessor") {
     reader.join();
     CHECK(readerMatches.load());
 }
-
 
 TEST_CASE("FormCatalog thread-safe registration") {
     FormCatalog catalog;

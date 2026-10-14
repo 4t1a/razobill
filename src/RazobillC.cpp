@@ -26,11 +26,7 @@ struct InternalRecord {
 
 extern "C" {
 
-RZ_API RzStatus RzSplit(
-    const char* message,
-    size_t messageLength,
-    RzRecord* outRecord
-) {
+RZ_API RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* outRecord) {
     if (!outRecord) return RZ_ERR_INVALID_ARGUMENT;
     if (!message && messageLength > 0) return RZ_ERR_INVALID_ARGUMENT;
 
@@ -47,7 +43,8 @@ RZ_API RzStatus RzSplit(
         auto internal = std::make_unique<InternalRecord>();
         const std::string_view msgView(message, messageLength);
 
-        const razobill::Status status = razobill::core::parse(msgView, internal->slots, razobill::core::ScanMode::Semantic);
+        const razobill::Status status =
+            razobill::core::parse(msgView, internal->slots, razobill::core::ScanMode::Semantic);
         if (status != razobill::Status::Ok) {
             if (status == razobill::Status::TooLarge) return RZ_ERR_MESSAGE_TOO_LARGE;
             if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED_TEMPLATE;
@@ -79,12 +76,7 @@ RZ_API RzStatus RzSplit(
     }
 }
 
-RZ_API RzStatus RzJoin(
-    const RzRecord* record,
-    char* outBuffer,
-    size_t bufferCapacity,
-    size_t* outLength
-) {
+RZ_API RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength) {
     if (!record) return RZ_ERR_INVALID_ARGUMENT;
     if (!record->templateStr && record->templateLength > 0) return RZ_ERR_INVALID_ARGUMENT;
 
@@ -128,13 +120,8 @@ RZ_API RzStatus RzJoin(
     }
 }
 
-RZ_API RzStatus RzTemplate(
-    const char* message,
-    size_t messageLength,
-    char* outBuffer,
-    size_t bufferCapacity,
-    size_t* outLength
-) {
+RZ_API RzStatus RzTemplate(const char* message, size_t messageLength, char* outBuffer, size_t bufferCapacity,
+                           size_t* outLength) {
     if (!message && messageLength > 0) return RZ_ERR_INVALID_ARGUMENT;
 
     try {

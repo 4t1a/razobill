@@ -109,22 +109,16 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
 
     # Columnar bytes measurement via Parquet ZSTD (standard Vector / OTel S3 sink codec)
     con = duckdb.connect()
-    con.execute(
-        "CREATE TABLE edge_stream (form VARCHAR, ints BIGINT[], strs VARCHAR[]);"
-    )
+    con.execute("CREATE TABLE edge_stream (form VARCHAR, ints BIGINT[], strs VARCHAR[]);")
     con.executemany("INSERT INTO edge_stream VALUES (?, ?, ?);", decomposedRecords)
 
     pqFile = Path("build") / f"edge_{path.stem}.parquet"
     pqFile.parent.mkdir(parents=True, exist_ok=True)
-    con.execute(
-        f"COPY edge_stream TO '{pqFile.as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD);"
-    )
+    con.execute(f"COPY edge_stream TO '{pqFile.as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD);")
     razobillParquetBytes = pqFile.stat().st_size
 
     # Also compute packed binary bytes (form dictionary + packed ints + string views)
-    packedIntBytes = b"".join(
-        struct.pack("<q", int(i)) for r in decomposedRecords for i in r[1]
-    )
+    packedIntBytes = b"".join(struct.pack("<q", int(i)) for r in decomposedRecords for i in r[1])
     columnarBlob = (
         "".join(r[0] for r in decomposedRecords).encode("utf-8")
         + packedIntBytes
@@ -139,9 +133,7 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
     print(f"  - Raw Text Wire Payload : {rawBytes:>12,} bytes (100.0%)")
     print(f"  - Raw Gzip Wire Stream  : {rawWireGzip:>12,} bytes (Baseline compressed)")
     print(f"  - Unique Forms Dictionary: {dictFormBytes:>12,} bytes ({len(uniqueForms):,} unique forms)")
-    print(
-        f"  - Razobill Columnar Gzip: {razobillGzipWire:>12,} bytes [Compressed Wire Reduced by {gzipSavedPct:.2f}%]"
-    )
+    print(f"  - Razobill Columnar Gzip: {razobillGzipWire:>12,} bytes [Compressed Wire Reduced by {gzipSavedPct:.2f}%]")
     print(
         f"  - Razobill Parquet ZSTD : {razobillParquetBytes:>12,} bytes [Cloud Egress Reduced by {parquetSavedPct:.2f}%]"
     )
@@ -155,9 +147,7 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
     print("\n[Phase 3: Mathematical Invertibility & Lossless Guarantee]")
     print(f"  - Events Evaluated      : {n:,}")
     print(f"  - Bit-Level Mismatches  : {mismatches}")
-    print(
-        f"  - Invertibility Proof   : {'100.000% EXACT (Zero Drift)' if mismatches == 0 else 'FAILED'}"
-    )
+    print(f"  - Invertibility Proof   : {'100.000% EXACT (Zero Drift)' if mismatches == 0 else 'FAILED'}")
     print("=" * 100)
 
     return {

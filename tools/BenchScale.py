@@ -48,9 +48,7 @@ def main():
 
     print("=" * 110)
     print("LIBRAZOBILL / PYRAZOBILL: MULTI-CORE STRESS TEST & LOSSLESS AUDIT")
-    print(
-        f"Hardware Cores: {num_cpus} Logical Cores | Initial Memory: {initial_rss:.2f} MB"
-    )
+    print(f"Hardware Cores: {num_cpus} Logical Cores | Initial Memory: {initial_rss:.2f} MB")
     print(f"Log Files Target: {len(log_files):,} files discovered")
     print("=" * 110)
 
@@ -92,9 +90,7 @@ def main():
 
     # Process remaining lines
     if batch_lines:
-        res = pyrazobill.auditParallel(
-            batch_lines, pyrazobill.ScanMode.Semantic, numThreads=num_cpus
-        )
+        res = pyrazobill.auditParallel(batch_lines, pyrazobill.ScanMode.Semantic, numThreads=num_cpus)
         total_lines += res.totalLines
         total_bytes += res.totalBytes
         total_mismatches += res.mismatches
@@ -108,9 +104,7 @@ def main():
     print("STRESS TEST & AUDIT SUMMARY RESULTS")
     print("=" * 110)
     print(f"Total Lines Processed : {total_lines:,} lines")
-    print(
-        f"Total Data Volume     : {total_bytes / (1024**3):.2f} GB ({total_bytes / (1024**2):,.2f} MB)"
-    )
+    print(f"Total Data Volume     : {total_bytes / (1024**3):.2f} GB ({total_bytes / (1024**2):,.2f} MB)")
     print(f"Total Wall Time       : {total_elapsed:.2f} seconds")
     print(
         f"End-to-End Throughput : {total_lines / total_elapsed:>12,.0f} msgs/sec ({(total_bytes / (1024**2)) / total_elapsed:>8.2f} MB/sec)"
@@ -118,9 +112,7 @@ def main():
     print(
         f"Lossless Invertibility: {total_mismatches:,} mismatches ({'100% BYTE-FOR-BYTE EXACT' if total_mismatches == 0 else 'FAIL'})"
     )
-    print(
-        f"Peak Memory Working Set: {final_rss:.2f} MB (Delta: +{final_rss - initial_rss:.2f} MB)"
-    )
+    print(f"Peak Memory Working Set: {final_rss:.2f} MB (Delta: +{final_rss - initial_rss:.2f} MB)")
     print("=" * 110)
 
 

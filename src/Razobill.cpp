@@ -229,10 +229,8 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         return s;
     };
 
-    db_.exec("CREATE OR REPLACE TEMP TABLE rb_s AS SELECT " + list("") +
-             "(RzSplit(" + m + ")).template AS rbf, " +
-             "(RzSplit(" + m + ")).ints AS rbi, " +
-             "(RzSplit(" + m + ")).strs AS rbs FROM " + src);
+    db_.exec("CREATE OR REPLACE TEMP TABLE rb_s AS SELECT " + list("") + "(RzSplit(" + m + ")).template AS rbf, " +
+             "(RzSplit(" + m + ")).ints AS rbi, " + "(RzSplit(" + m + ")).strs AS rbs FROM " + src);
     db_.exec("CREATE TABLE IF NOT EXISTS rb_str(id INTEGER, s VARCHAR)");
     db_.exec("CREATE TABLE IF NOT EXISTS rb_layout(ki INTEGER, ks INTEGER)");
     if (db_.query("SELECT count(*) FROM rb_layout").i64(0, 0) == 0)
@@ -243,7 +241,8 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
     const auto ks = std::clamp<std::int64_t>(lay.i64(0, 1), 0, 32);
 
     registerFormsLocked("SELECT rbf AS form FROM rb_s");
-    db_.exec("INSERT INTO rb_str SELECT CAST(coalesce((SELECT max(id) + 1 FROM rb_str), 0) + row_number() OVER () - 1 AS INTEGER), s "
+    db_.exec("INSERT INTO rb_str SELECT CAST(coalesce((SELECT max(id) + 1 FROM rb_str), 0) + row_number() OVER () - 1 "
+             "AS INTEGER), s "
              "FROM (SELECT DISTINCT unnest(rbs[1:" +
              std::to_string(ks) + "]) AS s FROM rb_s) WHERE s NOT IN (SELECT s FROM rb_str)");
 
@@ -270,8 +269,8 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         joins +=
             " LEFT JOIN rb_str d" + std::to_string(j) + " ON d" + std::to_string(j) + ".id = c.d" + std::to_string(j);
     }
-    db_.exec("CREATE OR REPLACE VIEW " + name + " AS SELECT " + list("c.") + "c.form_no, RzJoin(f.form, " + ivs +
-             svs + "c.oi, c.os) AS " + m + " FROM " + dst + " c LEFT JOIN rb_form f ON f.no = c.form_no" + joins);
+    db_.exec("CREATE OR REPLACE VIEW " + name + " AS SELECT " + list("c.") + "c.form_no, RzJoin(f.form, " + ivs + svs +
+             "c.oi, c.os) AS " + m + " FROM " + dst + " c LEFT JOIN rb_form f ON f.no = c.form_no" + joins);
     phys_ = dst;
     view_ = name;
     compact_ = true;

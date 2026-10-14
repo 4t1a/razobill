@@ -17,15 +17,25 @@ import pyrazobill as rz
 
 MAX_NAMES = 8
 BANNED_TERMS = [
-    "entropy", "ledger", "latitude", "doubt", "conveyance",
-    "leakage", "channel capacity", "miller-madow", "certified interval",
-    "shannon", "arena", "slot", "form key"
+    "entropy",
+    "ledger",
+    "latitude",
+    "doubt",
+    "conveyance",
+    "leakage",
+    "channel capacity",
+    "miller-madow",
+    "certified interval",
+    "shannon",
+    "arena",
+    "slot",
+    "form key",
 ]
 
 
 def main():
     names = rz.__all__
-    print(f"Python Public Surface Audit (pyrazobill):")
+    print("Python Public Surface Audit (pyrazobill):")
     print(f"  Names ({len(names)}/{MAX_NAMES}): {', '.join(names)}")
 
     errors = []

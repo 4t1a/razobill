@@ -26,13 +26,13 @@
 #include <stdint.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#  if defined(LIBRAZOBILL_EXPORTS)
-#    define RZ_API __declspec(dllexport)
-#  else
-#    define RZ_API
-#  endif
+#if defined(LIBRAZOBILL_EXPORTS)
+#define RZ_API __declspec(dllexport)
 #else
-#  define RZ_API __attribute__((visibility("default")))
+#define RZ_API
+#endif
+#else
+#define RZ_API __attribute__((visibility("default")))
 #endif
 
 #ifdef __cplusplus
@@ -75,11 +75,7 @@ typedef struct RzRecord {
  * @param outRecord Output record struct populated on success.
  * @return RZ_OK on success, or an error status code.
  */
-RZ_API RzStatus RzSplit(
-    const char* message,
-    size_t messageLength,
-    RzRecord* outRecord
-);
+RZ_API RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* outRecord);
 
 /**
  * Reconstructs the exact original message from a decomposed record.
@@ -90,12 +86,7 @@ RZ_API RzStatus RzSplit(
  * @param outLength Pointer to receive the actual written or required length in bytes (may be NULL).
  * @return RZ_OK on success, or an error status code.
  */
-RZ_API RzStatus RzJoin(
-    const RzRecord* record,
-    char* outBuffer,
-    size_t bufferCapacity,
-    size_t* outLength
-);
+RZ_API RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength);
 
 /**
  * Extracts only the template representation of a message without allocating parsed arrays.
@@ -107,13 +98,8 @@ RZ_API RzStatus RzJoin(
  * @param outLength Pointer to receive the actual written or required length in bytes (may be NULL).
  * @return RZ_OK on success, or an error status code.
  */
-RZ_API RzStatus RzTemplate(
-    const char* message,
-    size_t messageLength,
-    char* outBuffer,
-    size_t bufferCapacity,
-    size_t* outLength
-);
+RZ_API RzStatus RzTemplate(const char* message, size_t messageLength, char* outBuffer, size_t bufferCapacity,
+                           size_t* outLength);
 
 /**
  * Releases heap memory allocated for a record by RzSplit.

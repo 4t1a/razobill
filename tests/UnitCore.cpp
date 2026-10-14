@@ -260,4 +260,3 @@ TEST_CASE("differential scalar vs SIMD delimiter scanner verification") {
         }
     }
 }
-

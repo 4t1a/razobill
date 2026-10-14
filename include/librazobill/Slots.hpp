@@ -37,9 +37,7 @@ struct SlotRecord {
         types.clear();
     }
 
-    void formKey(std::string& out) const {
-        out.assign(templateStr);
-    }
+    void formKey(std::string& out) const { out.assign(templateStr); }
 
     [[nodiscard]] std::string formKey() const {
         std::string res;
@@ -47,9 +45,7 @@ struct SlotRecord {
         return res;
     }
 
-    [[nodiscard]] std::uint64_t formKeyHash() const noexcept {
-        return xxh64(formKey());
-    }
+    [[nodiscard]] std::uint64_t formKeyHash() const noexcept { return xxh64(formKey()); }
 
     void form_key(std::string& out) const { formKey(out); }
 };

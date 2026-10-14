@@ -13,9 +13,19 @@ MAX_FUNCTIONS = 4
 MAX_ALIASES = 0
 
 BANNED_TERMS = [
-    "entropy", "ledger", "latitude", "doubt", "conveyance",
-    "leakage", "channel capacity", "miller-madow", "certified interval",
-    "shannon", "arena", "slot", "form key"
+    "entropy",
+    "ledger",
+    "latitude",
+    "doubt",
+    "conveyance",
+    "leakage",
+    "channel capacity",
+    "miller-madow",
+    "certified interval",
+    "shannon",
+    "arena",
+    "slot",
+    "form key",
 ]
 
 
@@ -31,11 +41,12 @@ def main():
 
     # Inspect registered function names in DUCKDB_EXTENSION_ENTRYPOINT
     import re
+
     # Match FunctionSet <var>("Name")
     fn_matches = re.findall(r'FunctionSet\s+\w+\(\s*"([^"]+)"\s*\);', content)
     unique_fns = sorted(list(set(fn_matches)))
 
-    print(f"DuckDB SQL Public Surface Audit:")
+    print("DuckDB SQL Public Surface Audit:")
     print(f"  Registered Functions ({len(unique_fns)}/{MAX_FUNCTIONS}): {', '.join(unique_fns)}")
 
     errors = []
@@ -45,19 +56,36 @@ def main():
 
     # Check for legacy aliases like rb_join, rb_rebuild, rbForm, etc.
     legacy_aliases = [
-        "rbForm", "rb_form", "rbInts", "rb_ints", "rbStrs", "rb_strs",
-        "rbDecompose", "rb_decompose", "rbReconstruct", "rb_join", "rbRebuild", "rb_rebuild",
-        "rbTemplate", "rb_template", "rbHash", "rb_hash", "rbEntropy", "rb_entropy",
-        "rbMillerMadow", "rb_miller_madow"
+        "rbForm",
+        "rb_form",
+        "rbInts",
+        "rb_ints",
+        "rbStrs",
+        "rb_strs",
+        "rbDecompose",
+        "rb_decompose",
+        "rbReconstruct",
+        "rb_join",
+        "rbRebuild",
+        "rb_rebuild",
+        "rbTemplate",
+        "rb_template",
+        "rbHash",
+        "rb_hash",
+        "rbEntropy",
+        "rb_entropy",
+        "rbMillerMadow",
+        "rb_miller_madow",
     ]
-    found_aliases = [alias for alias in legacy_aliases if f'"{alias}"' in content and 'FunctionSet' in content]
+    found_aliases = [alias for alias in legacy_aliases if f'"{alias}"' in content and "FunctionSet" in content]
     # Filter only those that are actually registered as functions
     actually_registered_aliases = [a for a in found_aliases if a in unique_fns]
     if len(actually_registered_aliases) > MAX_ALIASES:
-        errors.append(f"Found {len(actually_registered_aliases)} legacy aliases: {actually_registered_aliases}. Cap is {MAX_ALIASES}.")
+        errors.append(
+            f"Found {len(actually_registered_aliases)} legacy aliases: {actually_registered_aliases}. Cap is {MAX_ALIASES}."
+        )
 
     # Check for banned terms in comments or error strings
-    lower_content = content.lower()
     for term in BANNED_TERMS:
         # Check if term appears in error strings or comments outside of include/internal core references
         # Let's search lines

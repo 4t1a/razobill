@@ -102,16 +102,11 @@ def runRazobillDecomposeBatch1T(lines):
 def runRazobillDecomposeBatchThreads(lines, numThreads):
     t0 = time.perf_counter()
     chunkSize = (len(lines) + numThreads - 1) // numThreads
-    chunks = [
-        lines[i * chunkSize : min((i + 1) * chunkSize, len(lines))]
-        for i in range(numThreads)
-    ]
+    chunks = [lines[i * chunkSize : min((i + 1) * chunkSize, len(lines))] for i in range(numThreads)]
     chunks = [c for c in chunks if c]
     total = 0
     with ThreadPoolExecutor(max_workers=numThreads) as pool:
-        for batchRes in pool.map(
-            lambda c: pyrazobill.RzSplitMany(c), chunks
-        ):
+        for batchRes in pool.map(lambda c: pyrazobill.RzSplitMany(c), chunks):
             total += len(batchRes)
     elapsed = time.perf_counter() - t0
     return elapsed, total
@@ -122,9 +117,7 @@ def main():
     numCpus = os.cpu_count() or 12
 
     print("=" * 120)
-    print(
-        "HEAD-TO-HEAD BENCHMARK: LIBRAZOBILL (PYRAZOBILL) vs DRAIN3 (He et al., ICWS 2017)"
-    )
+    print("HEAD-TO-HEAD BENCHMARK: LIBRAZOBILL (PYRAZOBILL) vs DRAIN3 (He et al., ICWS 2017)")
     print(
         f"Hardware: {numCpus} Cores | Memory: {psutil.virtual_memory().total / (1024**3):.2f} GB | OS: Windows x86_64"
     )
@@ -180,9 +173,7 @@ def main():
         rzBatchMTRate = n / tBatchMT
 
         # 7. Razobill C++20 Core SIMD auditParallel
-        auditRes = pyrazobill.auditParallel(
-            lines, pyrazobill.ScanMode.Semantic, numThreads=numCpus
-        )
+        auditRes = pyrazobill.auditParallel(lines, pyrazobill.ScanMode.Semantic, numThreads=numCpus)
 
         spParse1T = rzParse1TRate / dRate
         spDecomp1T = rzDecomp1TRate / dRate

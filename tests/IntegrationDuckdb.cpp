@@ -428,10 +428,11 @@ TEST_CASE("native functions equal the SQL regex specification (real logs + 60,00
     b->exec("CREATE TABLE allm AS SELECT msg FROM raw UNION ALL SELECT msg FROM adv");
     const auto n = b->query("SELECT count(*) FROM allm").i64(0, 0);
     CHECK(n == 134815 + 60000 + 12);
-    CHECK(b->query(
-               "SELECT count(*) FROM allm WHERE RzJoin((RzSplit(msg)).template, (RzSplit(msg)).ints, (RzSplit(msg)).strs) IS DISTINCT FROM msg")
+    CHECK(b->query("SELECT count(*) FROM allm WHERE RzJoin((RzSplit(msg)).template, (RzSplit(msg)).ints, "
+                   "(RzSplit(msg)).strs) IS DISTINCT FROM msg")
               .i64(0, 0) == 0);
-    CHECK(b->query("SELECT count(*) FROM allm WHERE RzTemplate(msg) IS DISTINCT FROM (RzSplit(msg)).template").i64(0, 0) == 0);
+    CHECK(b->query("SELECT count(*) FROM allm WHERE RzTemplate(msg) IS DISTINCT FROM (RzSplit(msg)).template")
+              .i64(0, 0) == 0);
     support::result("duckdb.oracle.messages", static_cast<double>(n));
 }
 
@@ -483,8 +484,11 @@ TEST_CASE("composite struct decomposition in DuckDB SQL") {
     // Verify NULL and empty string handling
     CHECK(b->query("SELECT count(*) FROM (SELECT RzSplit(NULL) AS x) WHERE x IS NULL").i64(0, 0) == 1);
     CHECK(b->query("SELECT count(*) FROM (SELECT RzTemplate(NULL) AS x) WHERE x IS NULL").i64(0, 0) == 1);
-    CHECK(b->query("SELECT count(*) FROM (SELECT RzJoin(NULL, [1]::BIGINT[], ['a']::VARCHAR[]) AS x) WHERE x IS NULL").i64(0, 0) == 1);
-    CHECK(b->query("SELECT count(*) FROM (SELECT RzJoin('', []::BIGINT[], []::VARCHAR[]) AS x) WHERE x = ''").i64(0, 0) == 1);
+    CHECK(b->query("SELECT count(*) FROM (SELECT RzJoin(NULL, [1]::BIGINT[], ['a']::VARCHAR[]) AS x) WHERE x IS NULL")
+              .i64(0, 0) == 1);
+    CHECK(
+        b->query("SELECT count(*) FROM (SELECT RzJoin('', []::BIGINT[], []::VARCHAR[]) AS x) WHERE x = ''").i64(0, 0) ==
+        1);
 }
 
 TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 byte payloads") {
@@ -499,10 +503,8 @@ TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 by
     const auto forms = b->query("SELECT count(DISTINCT RzTemplate(raw_bin)) FROM bin_sample").i64(0, 0);
     CHECK(forms == 1);
 
-    const auto mismatches = b->query(
-        "SELECT count(*) FROM bin_sample WHERE RzJoin((RzSplit(raw_bin)).template, (RzSplit(raw_bin)).ints, (RzSplit(raw_bin)).strs) IS DISTINCT FROM raw_bin"
-    ).i64(0, 0);
+    const auto mismatches = b->query("SELECT count(*) FROM bin_sample WHERE RzJoin((RzSplit(raw_bin)).template, "
+                                     "(RzSplit(raw_bin)).ints, (RzSplit(raw_bin)).strs) IS DISTINCT FROM raw_bin")
+                                .i64(0, 0);
     CHECK(mismatches == 0);
 }
-
-

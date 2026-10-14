@@ -70,13 +70,9 @@ def computeLedger(pairCounts):
 
 
 def main():
-    logDirs = sorted(
-        glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*")
-    )
+    logDirs = sorted(glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*"))
     results = []
-    print(
-        "[E6] Comparing deterministic form tokenization against Drain3 tree clustering...\n"
-    )
+    print("[E6] Comparing deterministic form tokenization against Drain3 tree clustering...\n")
 
     for d in logDirs:
         ds = os.path.basename(d.rstrip("/\\"))

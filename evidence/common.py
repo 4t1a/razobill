@@ -50,9 +50,7 @@ def miner(sim: float = 0.4, depth: int = 4) -> TemplateMiner:
     config.profiling_enabled = False
     config.drain_sim_th = sim
     config.drain_depth = depth
-    config.masking_instructions = [
-        MaskingInstruction(pattern, name) for pattern, name in MASKS
-    ]
+    config.masking_instructions = [MaskingInstruction(pattern, name) for pattern, name in MASKS]
     return TemplateMiner(config=config)
 
 
@@ -73,14 +71,8 @@ def load(datasetName: str):
         repoRoot / "logs" / datasetName / f"{datasetName}.log",
     ]
     if "LOGHUB_DIR" in os.environ:
-        candidates.append(
-            Path(os.environ["LOGHUB_DIR"])
-            / datasetName
-            / f"{datasetName}_2k.log_structured.csv"
-        )
-        candidates.append(
-            Path(os.environ["LOGHUB_DIR"]) / datasetName / f"{datasetName}.log"
-        )
+        candidates.append(Path(os.environ["LOGHUB_DIR"]) / datasetName / f"{datasetName}_2k.log_structured.csv")
+        candidates.append(Path(os.environ["LOGHUB_DIR"]) / datasetName / f"{datasetName}.log")
 
     for p in candidates:
         if p.exists():
@@ -91,6 +83,4 @@ def load(datasetName: str):
                     lines = [line.rstrip("\r\n") for line in f]
                 return pd.DataFrame({"Content": lines})
 
-    raise FileNotFoundError(
-        f"Could not locate dataset '{datasetName}'. Searched: {[str(c) for c in candidates]}"
-    )
+    raise FileNotFoundError(f"Could not locate dataset '{datasetName}'. Searched: {[str(c) for c in candidates]}")

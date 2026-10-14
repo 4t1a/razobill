@@ -70,9 +70,7 @@ def main():
     )
     t_parse = time.perf_counter() - t0
     parse_rate = N / t_parse
-    print(
-        f"DuckDB Multi-Threaded Parse : {parse_rate:>12,.0f} msgs/sec in {t_parse:.3f}s"
-    )
+    print(f"DuckDB Multi-Threaded Parse : {parse_rate:>12,.0f} msgs/sec in {t_parse:.3f}s")
 
     # 2. Multi-Threaded Lossless Reconstruction in DuckDB
     t0 = time.perf_counter()
@@ -85,9 +83,7 @@ def main():
     ).fetchone()[0]
     t_rebuild = time.perf_counter() - t0
     rebuild_rate = N / t_rebuild
-    print(
-        f"DuckDB Multi-Threaded Rebuild: {rebuild_rate:>12,.0f} msgs/sec in {t_rebuild:.3f}s"
-    )
+    print(f"DuckDB Multi-Threaded Rebuild: {rebuild_rate:>12,.0f} msgs/sec in {t_rebuild:.3f}s")
     print(f"Reconstruction Mismatches   : {mismatches} (100% BYTE-FOR-BYTE EXACT)")
 
     # 3. Form Cardinality & Aggregation

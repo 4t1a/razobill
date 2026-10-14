@@ -40,7 +40,7 @@ dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/razobill/razobill"
-Documentation = "https://github.com/razobill/razobill/blob/main/docs/Index.md"
+Documentation = "https://github.com/razobill/razobill/blob/main/docs/README.md"
 Repository = "https://github.com/razobill/razobill.git"
 Issues = "https://github.com/razobill/razobill/issues"
 Changelog = "https://github.com/razobill/razobill/blob/main/CHANGELOG.md"

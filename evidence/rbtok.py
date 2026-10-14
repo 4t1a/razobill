@@ -73,7 +73,7 @@ def split(msg: str) -> Tuple[str, List[int], List[str]]:
 
     for match in TOKEN_PATTERN.finditer(msg):
         token = match.group()
-        if not any('0' <= c <= '9' for c in token):
+        if not any("0" <= c <= "9" for c in token):
             continue
 
         # Append literal static text prior to the variable token

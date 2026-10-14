@@ -52,20 +52,14 @@ def verify_links():
             if not resolved.exists():
                 broken.append((str(md_path.relative_to(root)), link, str(resolved)))
 
-    print(
-        f"Checked {len(md_files)} markdown files with {total_links} relative documentation links."
-    )
+    print(f"Checked {len(md_files)} markdown files with {total_links} relative documentation links.")
     if broken:
         print(f"Found {len(broken)} broken link(s):")
         for filePath, linkText, resolvedPath in broken:
-            print(
-                f"  In {filePath}: link '{linkText}' -> target does not exist at {resolvedPath}"
-            )
+            print(f"  In {filePath}: link '{linkText}' -> target does not exist at {resolvedPath}")
         return False
     else:
-        print(
-            "[SUCCESS] All relative documentation links are 100% valid and verified on disk!"
-        )
+        print("[SUCCESS] All relative documentation links are 100% valid and verified on disk!")
         return True
 
 

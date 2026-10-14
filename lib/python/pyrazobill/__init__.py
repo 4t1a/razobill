@@ -23,7 +23,7 @@ True
 import os
 import sys
 from pathlib import Path
-from typing import Any, Iterable, List, NamedTuple, Optional, Sequence, Union
+from typing import Iterable, List, NamedTuple, Optional, Sequence, Union
 
 # On Windows, add the package directory and system PATH to DLL search path for compiled extensions
 _pkg_dir = Path(__file__).resolve().parent
@@ -42,11 +42,13 @@ if sys.platform == "win32":
 
 class RzError(ValueError):
     """Raised when an operation fails due to malformed input, invalid syntax, or mismatched arguments."""
+
     pass
 
 
 class RzRecord(NamedTuple):
     """Decomposed log record containing a template and its variable parameters."""
+
     template: Union[str, bytes]
     ints: List[int]
     strs: List[Union[str, bytes]]
@@ -60,9 +62,11 @@ class RzRecord(NamedTuple):
 
 try:
     from . import Core as _core
+
     _NATIVE = True
 except ImportError:
     from . import _fallback as _core
+
     _NATIVE = False
 
 

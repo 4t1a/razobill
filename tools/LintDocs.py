@@ -49,6 +49,7 @@ DEPRECATION_ALLOWLIST = {
     "docs/STYLE.md",
 }
 
+
 def lint_file(file_path: Path) -> list:
     errors = []
     text = file_path.read_text(encoding="utf-8", errors="replace")
@@ -56,7 +57,6 @@ def lint_file(file_path: Path) -> list:
     rel_path = file_path.as_posix()
 
     # 1. Untagged code fences
-    fence_pattern = re.compile(r"^```(\S*)")
     inside_fence = False
     for i, line in enumerate(lines, 1):
         if line.startswith("```"):
@@ -86,12 +86,46 @@ def lint_file(file_path: Path) -> list:
 
     # 4. Sentence-case headings (ignoring allowed acronyms and code literals)
     ALLOWED_CAPS = {
-        "A", "B", "C", "D",
-        "C++", "C++20", "DuckDB", "Python", "SIMD", "OTel", "OpenTelemetry",
-        "Vector", "API", "ABI", "ADBC", "SQL", "CLI", "S3", "AWS", "JSD", "TL;DR",
-        "AVX-512", "AVX2", "NEON", "CPU", "RAM", "Parquet", "ZSTD", "JSON",
-        "Razobill", "I/O", "POSIX", "CMake", "PyPI", "SDK", "UBIGINT", "VARCHAR",
-        "ClickHouse", "chDB", "MergeTree"
+        "A",
+        "B",
+        "C",
+        "D",
+        "C++",
+        "C++20",
+        "DuckDB",
+        "Python",
+        "SIMD",
+        "OTel",
+        "OpenTelemetry",
+        "Vector",
+        "API",
+        "ABI",
+        "ADBC",
+        "SQL",
+        "CLI",
+        "S3",
+        "AWS",
+        "JSD",
+        "TL;DR",
+        "AVX-512",
+        "AVX2",
+        "NEON",
+        "CPU",
+        "RAM",
+        "Parquet",
+        "ZSTD",
+        "JSON",
+        "Razobill",
+        "I/O",
+        "POSIX",
+        "CMake",
+        "PyPI",
+        "SDK",
+        "UBIGINT",
+        "VARCHAR",
+        "ClickHouse",
+        "chDB",
+        "MergeTree",
     }
 
     heading_pattern = re.compile(r"^(#{1,6})\s+(.*)$")
@@ -105,7 +139,9 @@ def lint_file(file_path: Path) -> list:
         m = heading_pattern.match(line)
         if m:
             heading_text = m.group(2).strip()
-            clean_heading = re.sub(r"^(Step\s+\d+:?|\d+(\.\d+)*\.?|[A-Za-z]\.)\s+", "", heading_text, flags=re.IGNORECASE)
+            clean_heading = re.sub(
+                r"^(Step\s+\d+:?|\d+(\.\d+)*\.?|[A-Za-z]\.)\s+", "", heading_text, flags=re.IGNORECASE
+            )
             # Remove inline code blocks `...` completely
             clean_heading = re.sub(r"`[^`]*`", "", clean_heading).strip()
             words = clean_heading.split()
@@ -139,9 +175,12 @@ def lint_file(file_path: Path) -> list:
     if sentences:
         avg_sentence_len = sum(sentences) / len(sentences)
         if avg_sentence_len > 25:
-            errors.append(f"{rel_path} Average sentence length is too long ({avg_sentence_len:.1f} words > 25.0 threshold).")
+            errors.append(
+                f"{rel_path} Average sentence length is too long ({avg_sentence_len:.1f} words > 25.0 threshold)."
+            )
 
     return errors
+
 
 def main():
     paths = sys.argv[1:] if len(sys.argv) > 1 else ["README.md", "docs/STYLE.md"]
@@ -160,8 +199,9 @@ def main():
             print(f"  - {err}")
         sys.exit(1)
     else:
-        print(f"PASSED: All checked documentation files comply with docs/STYLE.md.")
+        print("PASSED: All checked documentation files comply with docs/STYLE.md.")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

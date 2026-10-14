@@ -83,8 +83,8 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
     return Status::Ok;
 }
 
-Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
-                      std::span<const std::string_view> strs, std::string& out) {
+Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints, std::span<const std::string_view> strs,
+                      std::string& out) {
     const char* p = tmpl.data();
     const char* const end = p + tmpl.size();
     std::size_t nInt = 0, nStr = 0;
@@ -173,9 +173,12 @@ Status parse(std::string_view msg, SlotRecord& out, ScanMode mode) {
             out.skeleton.append(gap);
             out.skeleton.push_back(static_cast<char>(kPlaceholder));
             for (char c : gap) {
-                if (c == '{') out.templateStr.append("{{");
-                else if (c == '}') out.templateStr.append("}}");
-                else out.templateStr.push_back(c);
+                if (c == '{')
+                    out.templateStr.append("{{");
+                else if (c == '}')
+                    out.templateStr.append("}}");
+                else
+                    out.templateStr.push_back(c);
             }
             if (isIntToken(tok)) {
                 std::int64_t v = 0;
@@ -193,15 +196,18 @@ Status parse(std::string_view msg, SlotRecord& out, ScanMode mode) {
 
     out.skeleton.append(result.tail);
     for (char c : result.tail) {
-        if (c == '{') out.templateStr.append("{{");
-        else if (c == '}') out.templateStr.append("}}");
-        else out.templateStr.push_back(c);
+        if (c == '{')
+            out.templateStr.append("{{");
+        else if (c == '}')
+            out.templateStr.append("}}");
+        else
+            out.templateStr.push_back(c);
     }
     return Status::Ok;
 }
 
-Status reconstruct(std::string_view form, std::span<const std::int64_t> ints,
-                   std::span<const std::string_view> strs, std::string& out) {
+Status reconstruct(std::string_view form, std::span<const std::int64_t> ints, std::span<const std::string_view> strs,
+                   std::string& out) {
     if (isLegacyFormKey(form)) {
         return reconstructLegacy(form, ints, strs, out);
     }
@@ -223,8 +229,7 @@ Status templateOf(std::string_view form, std::string& out) {
         return Status::Ok;
     }
     if (form.find(static_cast<char>(kTypeSeparator)) != std::string_view::npos ||
-        form.find(static_cast<char>(kPlaceholder)) != std::string_view::npos ||
-        form == "junk") {
+        form.find(static_cast<char>(kPlaceholder)) != std::string_view::npos || form == "junk") {
         return Status::Malformed;
     }
     out.assign(form);

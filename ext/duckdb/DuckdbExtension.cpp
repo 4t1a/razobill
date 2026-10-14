@@ -31,14 +31,7 @@ namespace core = razobill::core;
 
 constexpr std::size_t kScratchKeepBytes = std::size_t{1} << 20;
 
-enum class Kind : unsigned char {
-    I64, I32, I16, I8,
-    U64, U32, U16, U8,
-    Str,
-    IntList,
-    StrList,
-    Unsupported
-};
+enum class Kind : unsigned char { I64, I32, I16, I8, U64, U32, U16, U8, Str, IntList, StrList, Unsupported };
 
 struct Arg {
     Kind kind = Kind::Unsupported;
@@ -51,14 +44,22 @@ struct Arg {
 inline Kind classify(duckdb_logical_type t) {
     auto id = duckdb_get_type_id(t);
     switch (id) {
-    case DUCKDB_TYPE_BIGINT: return Kind::I64;
-    case DUCKDB_TYPE_INTEGER: return Kind::I32;
-    case DUCKDB_TYPE_SMALLINT: return Kind::I16;
-    case DUCKDB_TYPE_TINYINT: return Kind::I8;
-    case DUCKDB_TYPE_UBIGINT: return Kind::U64;
-    case DUCKDB_TYPE_UINTEGER: return Kind::U32;
-    case DUCKDB_TYPE_USMALLINT: return Kind::U16;
-    case DUCKDB_TYPE_UTINYINT: return Kind::U8;
+    case DUCKDB_TYPE_BIGINT:
+        return Kind::I64;
+    case DUCKDB_TYPE_INTEGER:
+        return Kind::I32;
+    case DUCKDB_TYPE_SMALLINT:
+        return Kind::I16;
+    case DUCKDB_TYPE_TINYINT:
+        return Kind::I8;
+    case DUCKDB_TYPE_UBIGINT:
+        return Kind::U64;
+    case DUCKDB_TYPE_UINTEGER:
+        return Kind::U32;
+    case DUCKDB_TYPE_USMALLINT:
+        return Kind::U16;
+    case DUCKDB_TYPE_UTINYINT:
+        return Kind::U8;
     case DUCKDB_TYPE_VARCHAR:
     case DUCKDB_TYPE_BLOB:
         return Kind::Str;
@@ -133,9 +134,8 @@ inline void fail(duckdb_function_info info, const char* fn, Status s, std::strin
         why = std::string(razobill::describe(s));
         break;
     }
-    std::string m = std::string("[razobill] What happened: ") + fn + " failed. "
-                  + "Why: " + why + ". "
-                  + "What to do: Verify that {i} and {s} placeholders match provided values.";
+    std::string m = std::string("[razobill] What happened: ") + fn + " failed. " + "Why: " + why + ". " +
+                    "What to do: Verify that {i} and {s} placeholders match provided values.";
     if (!tmpl.empty()) {
         std::string trunc(tmpl.substr(0, std::min<std::size_t>(tmpl.size(), 60)));
         m += " Offending template: '" + trunc + "'.";
@@ -262,9 +262,8 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
         }
     }
 
-    const bool isStandardThreeArg = (numCols == 3 &&
-                                     sc.args[0].kind == Kind::IntList &&
-                                     sc.args[1].kind == Kind::StrList);
+    const bool isStandardThreeArg =
+        (numCols == 3 && sc.args[0].kind == Kind::IntList && sc.args[1].kind == Kind::StrList);
 
     for (idx_t r = 0; r < n; ++r) {
         if (!isValid(tmplVv, r)) {
@@ -423,8 +422,7 @@ public:
                     void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
         auto f = duckdb_create_scalar_function();
         duckdb_scalar_function_set_name(f, name_);
-        if (firstParam)
-            duckdb_scalar_function_add_parameter(f, firstParam);
+        if (firstParam) duckdb_scalar_function_add_parameter(f, firstParam);
         duckdb_scalar_function_set_varargs(f, varargsType);
         duckdb_scalar_function_set_special_handling(f);
         duckdb_scalar_function_set_return_type(f, ret);
@@ -445,8 +443,7 @@ private:
 } // namespace
 
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info, struct duckdb_extension_access*) {
-    Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT),
-        ubigint(DUCKDB_TYPE_UBIGINT);
+    Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT), ubigint(DUCKDB_TYPE_UBIGINT);
     Type any(DUCKDB_TYPE_ANY);
     Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob);
 

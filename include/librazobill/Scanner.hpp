@@ -117,8 +117,7 @@ template <class OnToken>
         // Quoted string literal handling in Semantic mode
         if (mode == ScanMode::Semantic && (*p == '"' || *p == '\'')) {
             const unsigned char quote = *p;
-            if ((quote == '"' && p < unclosedDoubleQuoteEnd) ||
-                (quote == '\'' && p < unclosedSingleQuoteEnd)) {
+            if ((quote == '"' && p < unclosedDoubleQuoteEnd) || (quote == '\'' && p < unclosedSingleQuoteEnd)) {
                 // Suffix already confirmed to have no matching unescaped closing quote
                 goto regular_scan;
             }
@@ -141,12 +140,14 @@ template <class OnToken>
                 lastWord = {};
                 continue;
             } else {
-                if (quote == '"') unclosedDoubleQuoteEnd = p;
-                else unclosedSingleQuoteEnd = p;
+                if (quote == '"')
+                    unclosedDoubleQuoteEnd = p;
+                else
+                    unclosedSingleQuoteEnd = p;
                 p = qStart + 1; // Unclosed quote: proceed
             }
         }
-regular_scan:
+    regular_scan:
 
         const auto* const start = p;
         unsigned char seen = 0;

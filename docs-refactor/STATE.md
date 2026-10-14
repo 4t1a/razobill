@@ -36,6 +36,13 @@
   - Switched all logo embeds (`README.md`, `docs/STYLE.md`, sub-package READMEs) to user assets (`assets/Logo.jpeg` dark, `assets/Logo-light.jpeg` light).
   - Authored `docs/how-to/chdb.md` for ClickHouse & embedded chDB integration.
   - Updated `README.md`, `docs/README.md`, `docs/explanation/architecture.md`, `docs/explanation/benchmarks.md`, and `tools/LintDocs.py`.
+- Completed Code Formatting & Quality Hardening:
+  - Formatted entire C++ codebase with installed LLVM 23.1.3 `clang-format.exe` against `.clang-format` (zero differences).
+  - Formatted Python codebase with `ruff format` and resolved all warnings via `ruff check` and `flake8`.
+  - Added root `pyproject.toml` and `.flake8` configurations.
+  - Audited code coverage reporting via `codecov-cli` (validated coverage report generation and `--dry-run` upload).
+  - Verified 100% test pass: 41 C++ unit test cases (1,082,496 assertions), 13 DuckDB integration test cases (134,890 assertions), and 18 Python test cases.
+  - Verified internal documentation links via `tools/VerifyMarkdownLinks.py` (73 relative links, 0 broken).
 
 ## Open
 - None. All deliverables and verification gates are satisfied.

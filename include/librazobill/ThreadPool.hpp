@@ -80,8 +80,7 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-    template <typename F>
-    auto submit(F&& f) -> std::future<typename std::invoke_result<F>::type> {
+    template <typename F> auto submit(F&& f) -> std::future<typename std::invoke_result<F>::type> {
         using ReturnType = typename std::invoke_result<F>::type;
         auto task = std::make_shared<std::packaged_task<ReturnType()>>(std::forward<F>(f));
         std::future<ReturnType> res = task->get_future();

@@ -100,8 +100,7 @@ public:
     // CONTRACT: The callback `fn` MUST NOT invoke mutating methods (such as intern() or clear())
     // on the same StringPool instance, as std::shared_mutex is not recursive and attempting to
     // acquire an exclusive lock while holding a shared lock will result in deadlock.
-    template <typename F>
-    bool withString(std::uint32_t id, F&& fn) const {
+    template <typename F> bool withString(std::uint32_t id, F&& fn) const {
         std::shared_lock<std::shared_mutex> lock(mutex_);
         if (id < idToStr_.size()) {
             fn(std::string_view(idToStr_[id]));

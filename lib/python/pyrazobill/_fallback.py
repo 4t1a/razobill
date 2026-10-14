@@ -7,18 +7,34 @@ from typing import Any, List, Sequence, Tuple, Union
 
 DELIMITERS = set("\t\n\x0c\r =,;:()[]{}\"'<>|/")
 CONTEXT_KEYWORDS = {
-    "for", "user", "by", "from", "ruser", "rhost", "host",
-    "account", "client", "src", "dest", "to", "at", "proxy",
-    "server", "node", "target", "app", "device"
+    "for",
+    "user",
+    "by",
+    "from",
+    "ruser",
+    "rhost",
+    "host",
+    "account",
+    "client",
+    "src",
+    "dest",
+    "to",
+    "at",
+    "proxy",
+    "server",
+    "node",
+    "target",
+    "app",
+    "device",
 }
 
 
 def _is_int_token(s: str) -> bool:
     if not s or len(s) > 18:
         return False
-    if s[0] == '0':
+    if s[0] == "0":
         return len(s) == 1
-    return all('0' <= c <= '9' for c in s)
+    return all("0" <= c <= "9" for c in s)
 
 
 def _scan(msg: str, mode: str):
@@ -46,8 +62,8 @@ def _scan(msg: str, mode: str):
             else:
                 q_start = p
                 p += 1
-                while p < n and msg[p] != q and msg[p] != '\n':
-                    if msg[p] == '\\' and p + 1 < n:
+                while p < n and msg[p] != q and msg[p] != "\n":
+                    if msg[p] == "\\" and p + 1 < n:
                         p += 2
                     else:
                         p += 1
@@ -68,7 +84,7 @@ def _scan(msg: str, mode: str):
         start = p
         seen_digit = False
         while p < n and msg[p] not in DELIMITERS:
-            if '0' <= msg[p] <= '9':
+            if "0" <= msg[p] <= "9":
                 seen_digit = True
             p += 1
 
@@ -78,11 +94,11 @@ def _scan(msg: str, mode: str):
         if seen_digit:
             is_var = True
         elif mode == "semantic":
-            if last_delim in ('=', '@', '"', "'"):
+            if last_delim in ("=", "@", '"', "'"):
                 is_var = True
             elif last_word and last_word.lower() in CONTEXT_KEYWORDS:
                 is_var = True
-            elif p < n and msg[p] == ':' and '.' in tok:
+            elif p < n and msg[p] == ":" and "." in tok:
                 is_var = True
             elif len(tok) > 4 and (tok.endswith(".exe") or tok.endswith(".dll") or tok.endswith(".so")):
                 is_var = True
@@ -171,11 +187,11 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
 
     while p < n:
         c = tmpl_str[p]
-        if c == '{':
-            if p + 1 < n and tmpl_str[p + 1] == '{':
-                out_parts.append('{')
+        if c == "{":
+            if p + 1 < n and tmpl_str[p + 1] == "{":
+                out_parts.append("{")
                 p += 2
-            elif p + 2 < n and tmpl_str[p + 1] == 'i' and tmpl_str[p + 2] == '}':
+            elif p + 2 < n and tmpl_str[p + 1] == "i" and tmpl_str[p + 2] == "}":
                 if i_idx >= len(ints):
                     raise ValueError(
                         "[razobill] What happened: Failed to join log components. "
@@ -185,7 +201,7 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
                 out_parts.append(str(ints[i_idx]))
                 i_idx += 1
                 p += 3
-            elif p + 2 < n and tmpl_str[p + 1] == 's' and tmpl_str[p + 2] == '}':
+            elif p + 2 < n and tmpl_str[p + 1] == "s" and tmpl_str[p + 2] == "}":
                 if s_idx >= len(str_tokens):
                     raise ValueError(
                         "[razobill] What happened: Failed to join log components. "
@@ -201,9 +217,9 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
                     f"Why: Unclosed or unrecognized placeholder near index {p}. "
                     f"What to do: Use {{i}}, {{s}}, or escape literal braces as '{{{{' or '}}}}'."
                 )
-        elif c == '}':
-            if p + 1 < n and tmpl_str[p + 1] == '}':
-                out_parts.append('}')
+        elif c == "}":
+            if p + 1 < n and tmpl_str[p + 1] == "}":
+                out_parts.append("}")
                 p += 2
             else:
                 raise ValueError(
@@ -226,7 +242,9 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
     return res_str.encode("latin1") if is_bytes else res_str
 
 
-def split_many(inputs: Sequence[Union[str, bytes]], mode: str = "semantic") -> List[Tuple[Union[str, bytes], List[int], List[Any]]]:
+def split_many(
+    inputs: Sequence[Union[str, bytes]], mode: str = "semantic"
+) -> List[Tuple[Union[str, bytes], List[int], List[Any]]]:
     return [split(item, mode) for item in inputs]
 
 

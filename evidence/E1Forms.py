@@ -85,9 +85,7 @@ def computeLedger(pairCounts):
 
 
 def main():
-    logDirs = sorted(
-        glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*")
-    )
+    logDirs = sorted(glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*"))
     validDatasets = []
     for d in logDirs:
         name = os.path.basename(d.rstrip("/\\"))
@@ -96,15 +94,11 @@ def main():
             validDatasets.append((name, csvFile))
 
     if not validDatasets:
-        print(
-            "[E1] Warning: No Loghub structured datasets found. Please check logs/ directory."
-        )
+        print("[E1] Warning: No Loghub structured datasets found. Please check logs/ directory.")
         return
 
     results = []
-    print(
-        f"[E1] Auditing form vocabulary across {len(validDatasets)} real-world systems...\n"
-    )
+    print(f"[E1] Auditing form vocabulary across {len(validDatasets)} real-world systems...\n")
 
     for datasetName, filePath in validDatasets:
         df = pd.read_csv(filePath, dtype=str, keep_default_na=False)
@@ -160,9 +154,7 @@ def main():
                 "Delta_tpl": round(ledgerDrain["D"], 3),
                 "H_X_raw": round(ledgerRaw["E"], 2),
                 "H_W": round(ledgerRaw["C"], 2),
-                "drain_lines_per_s": int(
-                    n / (drainDuration if drainDuration > 0 else 1e-6)
-                ),
+                "drain_lines_per_s": int(n / (drainDuration if drainDuration > 0 else 1e-6)),
                 "dict_lookup_lines_per_s": int(n / max(lookupDuration, 1e-9)),
             }
         )

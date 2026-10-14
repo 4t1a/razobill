@@ -55,6 +55,7 @@ includeDirs = [
     "thirdpartyCore/duckdbcapi",
 ]
 
+
 def find_windows_sdk_dirs():
     inc_dirs = []
     lib_dirs = []
@@ -81,6 +82,7 @@ def find_windows_sdk_dirs():
                         lib_dirs.append(p)
     return inc_dirs, lib_dirs
 
+
 try:
     from pybind11.setup_helpers import Pybind11Extension, build_ext
 
@@ -94,9 +96,7 @@ try:
                     ext.include_dirs.extend(inc_dirs)
                     ext.library_dirs.extend(lib_dirs)
                 else:
-                    ext.extra_compile_args.extend(
-                        ["-std=c++20", "-march=native", "-fvisibility=hidden"]
-                    )
+                    ext.extra_compile_args.extend(["-std=c++20", "-march=native", "-fvisibility=hidden"])
                     if sys.platform != "win32":
                         ext.extra_link_args.append("-lpthread")
             try:

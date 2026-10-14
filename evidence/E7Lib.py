@@ -45,9 +45,7 @@ def corpus() -> pd.DataFrame:
     if "LOGHUB_DIR" in os.environ:
         searchDirs.append(os.path.join(os.environ["LOGHUB_DIR"], "*"))
 
-    logDirs = sorted(
-        [d for pattern in searchDirs for d in glob.glob(pattern) if os.path.isdir(d)]
-    )
+    logDirs = sorted([d for pattern in searchDirs for d in glob.glob(pattern) if os.path.isdir(d)])
 
     # 1. Ingest all satellite Loghub datasets
     for directory in logDirs:
@@ -97,9 +95,7 @@ def corpus() -> pd.DataFrame:
         repoRoot / "logs" / "HDFS_100k.log_structured.csv",
     ]
     if "LOGHUB_DIR" in os.environ:
-        hdfsCandidates.append(
-            Path(os.environ["LOGHUB_DIR"]) / "HDFS" / "HDFS_100k.log_structured.csv"
-        )
+        hdfsCandidates.append(Path(os.environ["LOGHUB_DIR"]) / "HDFS" / "HDFS_100k.log_structured.csv")
 
     for hdfsPath in hdfsCandidates:
         if hdfsPath.exists():
@@ -117,8 +113,6 @@ def corpus() -> pd.DataFrame:
             break
 
     if not dataFrames:
-        raise FileNotFoundError(
-            "Could not find Loghub datasets. Check repository logs/ directory or set LOGHUB_DIR."
-        )
+        raise FileNotFoundError("Could not find Loghub datasets. Check repository logs/ directory or set LOGHUB_DIR.")
 
     return pd.concat(dataFrames, ignore_index=True)

@@ -28,16 +28,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         razobill::core::SlotRecord rec;
         const auto status = razobill::core::parse(input, rec, razobill::core::ScanMode::DigitOnly);
         if (status != razobill::Status::Ok) {
-            std::cerr << "FUZZ ERROR: parse failed in Exact mode with status "
-                      << static_cast<int>(status) << "\n";
+            std::cerr << "FUZZ ERROR: parse failed in Exact mode with status " << static_cast<int>(status) << "\n";
             std::abort();
         }
         const std::string form = rec.formKey();
         std::string rebuilt;
         const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
         if (recStatus != razobill::Status::Ok) {
-            std::cerr << "FUZZ ERROR: reconstruct failed in Exact mode with status "
-                      << static_cast<int>(recStatus) << "\n";
+            std::cerr << "FUZZ ERROR: reconstruct failed in Exact mode with status " << static_cast<int>(recStatus)
+                      << "\n";
             std::abort();
         }
         if (rebuilt != input) {
@@ -55,16 +54,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         razobill::core::SlotRecord rec;
         const auto status = razobill::core::parse(input, rec, razobill::core::ScanMode::Semantic);
         if (status != razobill::Status::Ok) {
-            std::cerr << "FUZZ ERROR: parse failed in Semantic mode with status "
-                      << static_cast<int>(status) << "\n";
+            std::cerr << "FUZZ ERROR: parse failed in Semantic mode with status " << static_cast<int>(status) << "\n";
             std::abort();
         }
         const std::string form = rec.formKey();
         std::string rebuilt;
         const auto recStatus = razobill::core::reconstruct(form, rec.ints, rec.strs, rebuilt);
         if (recStatus != razobill::Status::Ok) {
-            std::cerr << "FUZZ ERROR: reconstruct failed in Semantic mode with status "
-                      << static_cast<int>(recStatus) << "\n";
+            std::cerr << "FUZZ ERROR: reconstruct failed in Semantic mode with status " << static_cast<int>(recStatus)
+                      << "\n";
             std::abort();
         }
         if (rebuilt != input) {
@@ -131,8 +129,7 @@ int main(int /*argc*/, char** /*argv*/) {
         "",
         "      \t\t\n\r   ",
         "0",
-        "9223372036854775807"
-    };
+        "9223372036854775807"};
 
     std::cout << "[FuzzDecomposeReconstruct] Running standalone verification harness...\n";
     for (size_t i = 0; i < testCases.size(); ++i) {

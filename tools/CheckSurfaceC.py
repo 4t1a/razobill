@@ -4,6 +4,7 @@ Surface Budget Enforcer: Razobill C Universal ABI Header (RazobillC.h)
 Enforces hard caps: <= 6 functions, <= 3 types in include/librazobill/RazobillC.h.
 Unified CamelCase with Rz prefix. Zero legacy aliases. Zero banned words.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -11,10 +12,21 @@ from pathlib import Path
 HEADER_PATH = Path(__file__).resolve().parent.parent / "include" / "librazobill" / "RazobillC.h"
 
 BANNED_TERMS = [
-    "entropy", "ledger", "latitude", "doubt", "conveyance", "leakage",
-    "channel capacity", "miller-madow", "certified interval", "shannon",
-    "arena", "slot", "form key"
+    "entropy",
+    "ledger",
+    "latitude",
+    "doubt",
+    "conveyance",
+    "leakage",
+    "channel capacity",
+    "miller-madow",
+    "certified interval",
+    "shannon",
+    "arena",
+    "slot",
+    "form key",
 ]
+
 
 def main():
     if not HEADER_PATH.exists():
@@ -54,6 +66,7 @@ def main():
         sys.exit(1)
 
     print("SUCCESS: C surface is within hard budget limits with zero banned terms.")
+
 
 if __name__ == "__main__":
     main()

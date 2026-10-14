@@ -83,9 +83,7 @@ def classifyKeyword(templateText: str) -> str:
 
 
 def main():
-    logDirs = sorted(
-        glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*")
-    )
+    logDirs = sorted(glob.glob(str(repoRoot / "logs" / "*")) + glob.glob("/home/claude/loghub/*"))
     results = []
     print("[E4b] Auditing semantic leakage L_Y(W) across enterprise datasets...\n")
 
@@ -100,19 +98,14 @@ def main():
             continue  # Need at least 2 distinct severity levels to measure mutual information
 
         # Extract deterministic structural forms
-        formKeys = [
-            split(m)[0].replace("\x11", "<*>").replace("\x12", "<*>")
-            for m in df["Content"]
-        ]
+        formKeys = [split(m)[0].replace("\x11", "<*>").replace("\x12", "<*>") for m in df["Content"]]
         uniqueIds = {}
         clusterIds = [uniqueIds.setdefault(fk, len(uniqueIds)) for fk in formKeys]
         idToForm = {i: fk for fk, i in uniqueIds.items()}
 
         X = clusterIds  # What was emitted (forms)
         Y = df["Level"].tolist()  # Downstream consequence (ground-truth severity)
-        W_kw = [
-            classifyKeyword(idToForm[c]) for c in clusterIds
-        ]  # Naive keyword meaning
+        W_kw = [classifyKeyword(idToForm[c]) for c in clusterIds]  # Naive keyword meaning
         W_single = [0] * len(X)  # Monolithic single-bucket map
 
         # Mutual information between form and severity
@@ -124,10 +117,7 @@ def main():
         wrongCount = 0
         totalExpanded = 0
         counts = Counter(X)
-        majorityLevel = {
-            c: Counter(y for x, y in zip(X, Y) if x == c).most_common(1)[0][0]
-            for c in counts
-        }
+        majorityLevel = {c: Counter(y for x, y in zip(X, Y) if x == c).most_common(1)[0][0] for c in counts}
 
         for c in counts:
             cls = classifyKeyword(idToForm[c])
@@ -150,9 +140,7 @@ def main():
                 "leak_kwclass": round(leakKeyword, 3),
                 "leak_one_bucket": round(leakSingle, 3),
                 "leak_kw_share": round(leakKeyword / I_XY, 3) if I_XY > 0 else np.nan,
-                "wrong_level_share": (
-                    round(wrongCount / totalExpanded, 3) if totalExpanded > 0 else 0.0
-                ),
+                "wrong_level_share": (round(wrongCount / totalExpanded, 3) if totalExpanded > 0 else 0.0),
             }
         )
 

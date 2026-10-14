@@ -58,9 +58,7 @@ def measureDuckDbStorage(tablesDict, variantName, blockSize=262144):
         for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
             con.register("stagedSource", pyarrowTbl)
             orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
-            con.execute(
-                f"CREATE TABLE {tableName} AS SELECT * FROM stagedSource{orderClause}"
-            )
+            con.execute(f"CREATE TABLE {tableName} AS SELECT * FROM stagedSource{orderClause}")
 
         con.execute("CHECKPOINT")
         usedBlocks, sizePerBlock = con.execute(
@@ -70,9 +68,7 @@ def measureDuckDbStorage(tablesDict, variantName, blockSize=262144):
         # Query internal DuckDB column compression encodings (BitPacking, RLE, Dictionary, FSST)
         encodings = con.execute(
             "SELECT compression, count(*) FROM ("
-            + " UNION ALL ".join(
-                f"SELECT compression FROM pragma_storage_info('{t}')" for t in tablesDict
-            )
+            + " UNION ALL ".join(f"SELECT compression FROM pragma_storage_info('{t}')" for t in tablesDict)
             + ") GROUP BY 1 ORDER BY 2 DESC"
         ).fetchall()
 
@@ -90,9 +86,7 @@ def measureParquetStorage(tablesDict, variantName, useV2=False):
         con = duckdb.connect()
         for tableName, (pyarrowTbl, sortOrder) in tablesDict.items():
             con.register("stagedSource", pyarrowTbl)
-            parquetFile = os.path.join(
-                tmpDir, f"e7_{variantName}_{tableName}.parquet"
-            ).replace("\\", "/")
+            parquetFile = os.path.join(tmpDir, f"e7_{variantName}_{tableName}.parquet").replace("\\", "/")
             orderClause = f" ORDER BY {sortOrder}" if sortOrder else ""
             v2Clause = ", PARQUET_VERSION 'V2'" if useV2 else ""
             con.execute(
@@ -105,9 +99,7 @@ def measureParquetStorage(tablesDict, variantName, useV2=False):
 
 
 def main():
-    print(
-        "[E7] Assembling canonical multi-system evaluation corpus (134,815 events)..."
-    )
+    print("[E7] Assembling canonical multi-system evaluation corpus (134,815 events)...")
     df = corpus()
     msgs = df["msg"].tolist()
     totalRows = len(df)
@@ -179,9 +171,7 @@ def main():
             **userMetadata,
         }
         for j in range(numIntCols):
-            cols[f"i{j}"] = P(
-                [x[j] if j < len(x) else None for x in extractedInts], I64
-            )
+            cols[f"i{j}"] = P([x[j] if j < len(x) else None for x in extractedInts], I64)
 
         stringSource = extractedStrs if inlineStrings else strDictIds
         for j in range(numStrCols):
@@ -200,16 +190,10 @@ def main():
         )
         return pa.table(cols)
 
-    tableForms = pa.table(
-        {"id": P(range(len(formsDict)), I32), "form": P(list(formsDict), STR)}
-    )
-    tableStrings = pa.table(
-        {"id": P(range(len(stringDict)), I32), "s": P(list(stringDict), STR)}
-    )
+    tableForms = pa.table({"id": P(range(len(formsDict)), I32), "form": P(list(formsDict), STR)})
+    tableStrings = pa.table({"id": P(range(len(stringDict)), I32), "s": P(list(stringDict), STR)})
     tableRaw = pa.table({**userMetadata, "msg": P(msgs, STR)})
-    tableAdditive = pa.table(
-        {**userMetadata, "msg": P(msgs, STR), "form_id": P(formIds, I32)}
-    )
+    tableAdditive = pa.table({**userMetadata, "msg": P(msgs, STR), "form_id": P(formIds, I32)})
 
     variants = {
         "R0 raw": {"t": (tableRaw, None)},
@@ -246,9 +230,7 @@ def main():
     baselineNative = None
     baselineParquet = None
 
-    print(
-        f"{'Storage Layout':<34} {'DuckDB Native':<18} {'Parquet ZSTD19':<16} {'Top Encodings'}"
-    )
+    print(f"{'Storage Layout':<34} {'DuckDB Native':<18} {'Parquet ZSTD19':<16} {'Top Encodings'}")
     print("-" * 90)
 
     for layoutName, tablesConfig in variants.items():

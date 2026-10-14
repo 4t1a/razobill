@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E402",  # Module level import not at top of file (standalone bench/test scripts inject local package to sys.path)
+    "E501",  # Line too long (handled by ruff format, long table printing in benchmarks preserved)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
