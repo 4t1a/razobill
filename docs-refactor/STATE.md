@@ -1,24 +1,26 @@
 # Documentation Refactor State
 
-- Phase: P1 (Identity & Style Definition)
-- Status: Gate 0 Passed / Gate 1 In Progress
+- Phase: P2 (Architecture & Navigation Mapping)
+- Status: Gate 1 Passed / Gate 2 In Progress
 - Branch: docs/identity-refactor
 - Last Updated: 2026-10-14
 - Target Version: 1.1.1
 
 ## Done
 - Confirmed CLI execution environment, Node.js, Python, and Git toolchains.
-- Created and switched to work branch `docs/identity-refactor`.
-- Audited all 65 documentation files across repository and subpackages.
-- Verified C++, Python, and DuckDB ground truth APIs against live headers and binaries.
-- Produced `docs-refactor/INVENTORY.md` cataloging file sizes, dates, audiences, broken links, and deprecated symbols.
-- Standardized project version to 1.1.1 across all targets.
+- Completed Phase 0 Inventory and ground truth verification in `docs-refactor/INVENTORY.md`.
+- Completed Phase 1 Identity:
+  - Recorded identity selection and rationale in `docs-refactor/DECISIONS.md`.
+  - Created light and dark SVG wordmarks in `assets/`.
+  - Authored comprehensive `docs/STYLE.md` with essence, voice traits, glossary, components, visuals, and Diataxis templates.
+  - Built automated style linter `tools/lint_docs.py`.
+  - Rewrote root `README.md` to Diataxis front-door standard; verified clean pass with `tools/lint_docs.py`.
 
 ## Open
-- Define essence, voice traits, and identity direction in `docs-refactor/DECISIONS.md`.
-- Author comprehensive `docs/STYLE.md` incorporating Diataxis templates, glossary, 6 components, SVG wordmark, and palette.
-- Set up automated markdown and style lint configuration.
-- Draft refactored `README.md` passing the new lint rules.
+- Map every legacy document to its new Diataxis home in `docs-refactor/MAP.md`.
+- Create centralized navigation index in `docs/README.md`.
+- Create `docs/troubleshooting.md` organized by verbatim error strings.
+- Create backward-compatible 1-line stubs for moved URLs.
 
 ## Next
-- Propose 3 identity directions, select one in `docs-refactor/DECISIONS.md`, and write `docs/STYLE.md`.
+- Complete Phase 2 architecture mapping and create `docs-refactor/MAP.md`.

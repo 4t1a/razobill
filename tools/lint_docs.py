@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""
+tools/lint_docs.py - Automated style, structure, and glossary linter for Razobill docs.
+Derived directly from docs/STYLE.md.
+"""
+
+import sys
+import re
+from pathlib import Path
+
+# Banned terms and marketing hype
+BANNED_WORDS = {
+    r"\bblazing\b": "Do not use hype word 'blazing'.",
+    r"\brevolutionary\b": "Do not use hype word 'revolutionary'.",
+    r"\bseamless\b": "Do not use hype word 'seamless'.",
+    r"\beffortless\b": "Do not use hype word 'effortless'.",
+    r"\brobust\b": "Do not use hype word 'robust'.",
+    r"\bpowerful\b": "Do not use hype word 'powerful'.",
+    r"\bworld-class\b": "Do not use hype word 'world-class'.",
+    r"let's dive in": "Do not use conversational filler 'let\\'s dive in'.",
+    r"in today's world": "Do not use conversational filler 'in today\\'s world'.",
+}
+
+# Legacy symbols that must not appear in modern guides or reference
+DEPRECATED_SYMBOLS = {
+    r"\brbDecompose\b": "Use RzSplit instead.",
+    r"\brbForm\b": "Use RzTemplate or RzSplit().template instead.",
+    r"\brbInts\b": "Use RzSplit().ints instead.",
+    r"\brbStrs\b": "Use RzSplit().strs instead.",
+    r"\brbReconstruct\b": "Use RzJoin instead.",
+    r"\brbRebuild\b": "Use RzJoin instead.",
+    r"\brbEntropy\b": "Legacy metric removed from extension.",
+    r"\bRzParse\b": "Use RzSplit instead.",
+    r"\bRzReconstructSlots\b": "Use RzJoin instead.",
+    r"\bRzTemplateOf\b": "Use RzTemplate instead.",
+    r"\\x12": "Use {s} placeholder instead of literal \\x12 delimiter.",
+    r"\\x13": "Use {i} placeholder instead of literal \\x13 delimiter.",
+}
+
+# Allowlist for files that document deprecations or historical migrations
+DEPRECATION_ALLOWLIST = {
+    "CHANGELOG.md",
+    "docs/governance/DeprecationPolicy.md",
+    "docs-refactor/INVENTORY.md",
+    "docs-refactor/DECISIONS.md",
+    "docs-refactor/MAP.md",
+    "docs-refactor/CHANGES.md",
+    "docs-refactor/REVIEW.md",
+    "docs/STYLE.md",
+}
+
+def lint_file(file_path: Path) -> list:
+    errors = []
+    text = file_path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    rel_path = file_path.as_posix()
+
+    # 1. Untagged code fences
+    fence_pattern = re.compile(r"^```(\S*)")
+    inside_fence = False
+    for i, line in enumerate(lines, 1):
+        if line.startswith("```"):
+            if not inside_fence:
+                tag = line[3:].strip()
+                if not tag:
+                    errors.append(f"{rel_path}:{i} Untagged code fence. Explicit language required.")
+                inside_fence = True
+            else:
+                inside_fence = False
+
+    # 2. Banned hype words
+    for pat, msg in BANNED_WORDS.items():
+        for i, line in enumerate(lines, 1):
+            if re.search(pat, line, re.IGNORECASE):
+                # ignore if inside markdown quotes quoting the rule itself
+                if "STYLE.md" in rel_path or "lint_docs.py" in rel_path:
+                    continue
+                errors.append(f"{rel_path}:{i} Banned word detected ({pat}): {msg}")
+
+    # 3. Deprecated symbols check
+    if rel_path not in DEPRECATION_ALLOWLIST:
+        for pat, msg in DEPRECATED_SYMBOLS.items():
+            for i, line in enumerate(lines, 1):
+                if re.search(pat, line):
+                    errors.append(f"{rel_path}:{i} Deprecated symbol ({pat}): {msg}")
+
+    # 4. Sentence-case headings (ignoring allowed acronyms and code literals)
+    ALLOWED_CAPS = {
+        "C++", "C++20", "DuckDB", "Python", "SIMD", "OTel", "OpenTelemetry",
+        "Vector", "API", "ABI", "SQL", "CLI", "S3", "AWS", "JSD", "TL;DR",
+        "AVX-512", "AVX2", "NEON", "CPU", "RAM", "Parquet", "ZSTD", "JSON",
+        "Razobill", "I/O", "POSIX", "CMake", "PyPI", "SDK", "UBIGINT", "VARCHAR"
+    }
+
+    heading_pattern = re.compile(r"^(#{1,6})\s+(.*)$")
+    inside_fence_for_heading = False
+    for i, line in enumerate(lines, 1):
+        if line.startswith("```"):
+            inside_fence_for_heading = not inside_fence_for_heading
+            continue
+        if inside_fence_for_heading:
+            continue
+        m = heading_pattern.match(line)
+        if m:
+            heading_text = m.group(2).strip()
+            # Split words ignoring code blocks like `RzSplit`
+            words = [w for w in heading_text.split() if not (w.startswith("`") and w.endswith("`"))]
+            if len(words) > 1:
+                # Check for Title Case where small words or non-initial words are capitalized
+                capitalized_non_first = 0
+                for w in words[1:]:
+                    clean_w = re.sub(r"[^\w+]", "", w)
+                    if clean_w and clean_w[0].isupper() and clean_w not in ALLOWED_CAPS:
+                        capitalized_non_first += 1
+                if capitalized_non_first >= 2:
+                    errors.append(
+                        f"{rel_path}:{i} Heading '{heading_text}' appears to be Title Case instead of sentence-case."
+                    )
+
+    # 5. Sentence length check (ignoring code fences and tables)
+    inside_code = False
+    sentences = []
+    for line in lines:
+        if line.startswith("```"):
+            inside_code = not inside_code
+            continue
+        if inside_code or line.startswith("|") or line.startswith("#") or not line.strip():
+            continue
+        # Split sentences roughly by . ! ?
+        for s in re.split(r"[.!?]+", line):
+            words = s.strip().split()
+            if len(words) > 0:
+                sentences.append(len(words))
+
+    if sentences:
+        avg_sentence_len = sum(sentences) / len(sentences)
+        if avg_sentence_len > 25:
+            errors.append(f"{rel_path} Average sentence length is too long ({avg_sentence_len:.1f} words > 25.0 threshold).")
+
+    return errors
+
+def main():
+    paths = sys.argv[1:] if len(sys.argv) > 1 else ["README.md", "docs/STYLE.md"]
+    total_errors = []
+    for p_str in paths:
+        p = Path(p_str)
+        if p.is_file():
+            total_errors.extend(lint_file(p))
+        elif p.is_dir():
+            for sub_p in p.rglob("*.md"):
+                total_errors.extend(lint_file(sub_p))
+
+    if total_errors:
+        print(f"FAILED: Found {len(total_errors)} lint issue(s):")
+        for err in total_errors:
+            print(f"  - {err}")
+        sys.exit(1)
+    else:
+        print(f"PASSED: All checked documentation files comply with docs/STYLE.md.")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    main()

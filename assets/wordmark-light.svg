@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 72" width="380" height="72" role="img" aria-label="Razobill Wordmark">
+  <defs>
+    <linearGradient id="razorGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#razorGradLight)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 16 52 L 36 18 L 48 38 L 68 18" />
+    <circle cx="68" cy="18" r="3" fill="#059669" stroke="none" />
+  </g>
+  <text x="86" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="36" font-weight="800" fill="#0F172A" letter-spacing="-0.5px">razobill</text>
+  <text x="246" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#0284C7" letter-spacing="1px">1.1.1</text>
+</svg>

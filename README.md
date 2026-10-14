@@ -1,392 +1,152 @@
+# Razobill
+
 <p align="center">
-  <img src="assets/Logo.jpeg" alt="Razobill Logo" width="420" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
+    <img src="assets/wordmark-light.svg" alt="Razobill Logo" width="340">
+  </picture>
 </p>
+
 <p align="center">
-  <h1 align="center">Razobill</h1>
-  <p align="center">
-    <strong>Logs Are Born Structured. It's Time We Stopped Treating Them as Garbage Strings.</strong>
-  </p>
-    Split a log line into a template plus numbers and words, and join them back to the exact original bytes.<br/>
-    High-performance C++20 engine, Python package, and analytical database extension for telemetry.
-  </p>
-  <p align="center">
-    <a href="https://razobill.github.io/razobill/"><img src="https://img.shields.io/badge/Website-razobill.github.io%2Frazobill-5F96AB.svg" alt="Website"></a>
-    <a href="https://doi.org/10.5281/zenodo.23287286"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23287286.svg" alt="DOI: 10.5281/zenodo.23287286"></a>
-    <a href="https://github.com/razobill/razobill/actions/workflows/CI.yml"><img src="https://github.com/razobill/razobill/actions/workflows/CI.yml/badge.svg" alt="Continuous Integration"></a>
-    <a href="https://github.com/razobill/razobill/actions/workflows/Release.yml"><img src="https://github.com/razobill/razobill/actions/workflows/Release.yml/badge.svg" alt="Release Engineering"></a>
-    <a href="https://pypi.org/project/pyrazobill/"><img src="https://img.shields.io/pypi/v/pyrazobill.svg" alt="PyPI Package"></a>
-    <a href="https://github.com/duckdb/community-extensions/pull/3023"><img src="https://img.shields.io/badge/DuckDB%20Community-PR%20%233023-yellow.svg" alt="DuckDB Community Extension PR #3023"></a>
-    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
-    <a href="https://en.wikipedia.org/wiki/C%2B%2B20"><img src="https://img.shields.io/badge/C%2B%2B-20-blue.svg" alt="Language: C++20"></a>
-    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+"></a>
-    <a href="https://semver.org/"><img src="https://img.shields.io/badge/SemVer-2.0.0-green.svg" alt="SemVer 2.0.0"></a>
-    <img src="https://img.shields.io/badge/Lossless-100%25_Exact-brightgreen.svg" alt="Lossless Guarantee">
-    <img src="https://img.shields.io/badge/Unit_Tests-43%2F43_Passed-brightgreen.svg" alt="43/43 Unit Tests">
-    <img src="https://img.shields.io/badge/Assertions-1%2C082%2C866_Passed-brightgreen.svg" alt="1,082,866 Assertions">
-    <img src="https://img.shields.io/badge/DuckDB_Tests-13%2F13_Passed-brightgreen.svg" alt="13/13 DuckDB Tests">
-    <img src="https://img.shields.io/badge/Python_Tests-24%2F24_Passed-brightgreen.svg" alt="24/24 Python Tests">
-  </p>
+  <a href="https://github.com/razobill/razobill/actions/workflows/CI.yml"><img src="https://github.com/razobill/razobill/actions/workflows/CI.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://github.com/razobill/razobill/actions/workflows/Release.yml"><img src="https://github.com/razobill/razobill/actions/workflows/Release.yml/badge.svg" alt="Release Status"></a>
+  <a href="https://pypi.org/project/pyrazobill/"><img src="https://img.shields.io/pypi/v/pyrazobill.svg" alt="PyPI Package Version"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
+
+Razobill is an exact, invertible telemetry engine that turns unstructured log strings into queryable columnar data.
+It splits every log line into a constant template, an array of 64-bit integers, and an array of variable words.
+Joining those components reconstructs the original raw bytes bit-for-bit with zero data loss.
 
 ---
 
-## 1. The Manifesto: The Lost Inversion
+## Quick installation
 
-Every log event in computing history begins life as a typed, structured invocation inside application code:
+Choose the runtime environment for your stack.
 
-```c
-// At emission time, software already knows the exact types, structures, and variables:
-log.warn("Connection to {}:{} timed out after {} retries", host, port, retries);
-```
-
-At this moment, the event is pristine. The variables are distinct numerical integers and string pointers. The structure is fixed.
-
-Then, decades of legacy software engineering commit a catastrophic architectural mistake: **stringification**. The structured event is collapsed into a single, flat, lossy character stream:
-```text
-"2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
-```
-
-Once serialized into a string, this message travels down logging pipelines into downstream analytics systems (Elasticsearch, Loki, Splunk, Drain). And what do those systems do?
-
-**They spend millions of dollars in compute trying to guess what the developer wrote.**
-* They run probabilistic tree clustering (Drain, Spell, AEL) that leaks data and consumes gigabytes of memory.
-* They build multi-terabyte inverted text indexes over numbers and UUIDs that should have been column vectors.
-* They train large language models and vector embeddings to "summarize" log messages that were already structured templates to begin with.
-* When anomalies occur, they discard variables, split templates across random heuristics, and mangle timestamps.
-
-**This is the Lost Inversion.** For twenty years, observability treated log parsing as an unsupervised machine learning problem.
-
-**Razobill proves it is not a machine learning problem. It is an exact, invertible algebraic projection.**
-
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              RAZOBILL INGESTION PIPELINE                               │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-  Raw Log Stream
-  "2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
-        │
-        ▼
-  ┌────────────────────────────────────────────────────────────────────────────────────┐
-  │ 1. SIMD Delimiter Scanning & Classification (AVX-512 / AVX2 / ARM NEON)            │
-  │    Vectorized 32/64-byte character sweeps, zero per-character branching             │
-  └────────────────────────────────────────────────────────────────────────────────────┘
-        │
-        ├───────────────────────────────┬───────────────────────────────┐
-        ▼                               ▼                               ▼
-  ┌───────────────────────────┐   ┌───────────────────────────┐   ┌────────────────────┐
-  │ Integer Fast Path         │   │ String View Slice         │   │ Structural Skeleton│
-  │ [2026, 10, 7, 14, 2, 11,  │   │ ["WARN", "Connection",    │   │ "{}-{}-{} {}:{}:{} │
-  │  10, 0, 0, 1, 5432, 3]    │   │  "to", "timed", ...]      │   │  [{}] ... {}"      │
-  └───────────────────────────┘   └───────────────────────────┘   └────────────────────┘
-        │                               │                               │
-        │                               │                               ▼
-        │                               │                         ┌────────────────────┐
-        │                               │                         │ xxHash64 Form Key  │
-        │                               │                         │ 0x8f4d92a17b0c34e5 │
-        │                               │                         └────────────────────┘
-        ▼                               ▼                               ▼
-  ┌────────────────────────────────────────────────────────────────────────────────────┐
-  │ 2. Single-Pass Memory Arena (Zero Heap Malloc / Chunk Block-Reuse Freelist)        │
-  └────────────────────────────────────────────────────────────────────────────────────┘
-        │
-        ├───────────────────────────────────────────────┤
-        ▼                                               ▼
-  ┌───────────────────────────────────────────┐   ┌────────────────────────────────────┐
-  │ Columnar Storage Engine (Parquet / S3)    │   │ Exact Invertible Reconstruction    │
-  │ • Integer vectors: bit-packed Snappy/ZSTD │   │ • Bit-for-bit exact recovery       │
-  │ • String pools: dictionary encoded        │   │ • 0 bit mismatches across 69.6M    │
-  │ • Form keys: RLE 64-bit hashes            │   │   audited events                   │
-  └───────────────────────────────────────────┘   └────────────────────────────────────┘
-```
-
----
-
-## Quick Start (60 Seconds)
-
-### Python (`pyrazobill`)
-Install directly from [PyPI](https://pypi.org/project/pyrazobill/):
+### Python package
+Install the verified binary wheel from PyPI:
 ```bash
 pip install pyrazobill
 ```
 
-Lossless decomposition and exact reconstruction:
-```python
-import pyrazobill as rz
-
-line = "2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
-tmpl, ints, strs = rz.RzSplit(line)
-recovered = rz.RzJoin(tmpl, ints, strs)
-assert recovered == line
-```
-
-### DuckDB Extension (`razobill`)
-Vectorized in-database execution over columnar tables:
+### DuckDB extension
+Load the extension directly inside your DuckDB shell or client:
 ```sql
 INSTALL razobill FROM community;
 LOAD razobill;
-
--- Single-pass decomposition into template, numbers, and word strings:
-SELECT (RzSplit('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries')).*;
-
--- Exact bit-for-bit lossless log reconstruction in SQL:
-SELECT RzJoin(template, ints, strs)
-FROM (SELECT (RzSplit('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries')).*);
 ```
 
-### C ABI (`include/librazobill/RazobillC.h`)
-Zero-allocation C ABI with exact byte-level recovery:
+### C ABI shared library
+Link against the native C++20 shared library `razobill.dll` or `librazobill.so`:
 ```c
-#include <librazobill/RazobillC.h>
-#include <assert.h>
-#include <string.h>
-
-RzRecord rec;
-RzSplit(msg, len, &rec);
-char buf[256]; size_t out_len = 0;
-RzJoin(&rec, buf, sizeof(buf), &out_len);
-assert(memcmp(buf, msg, len) == 0);
-RzFree(&rec);
+#include "librazobill/RazobillC.h"
 ```
 
 ---
 
-## 2. The Theoretical Foundation: *Latitude and Doubt*
+## First success in five minutes
 
-In 1948, Claude Shannon founded communication theory by explicitly discarding semantic meaning:
-> *"Frequently the messages have meaning; that is they refer to or are correlated according to some system with certain physical or conceptual entities. These semantic aspects of communication are irrelevant to the engineering problem."*
-> — Claude E. Shannon, *A Mathematical Theory of Communication* (1948)
+Parse a message into structured columns and reconstruct the original text.
 
-Shannon's abstraction allowed digital bits to traverse physical wires. But in modern distributed systems, **meaning is the entire engineering problem**.
+### In Python
+Run this self-contained script in your terminal:
 
-*Latitude and Doubt* (M. M. Atta, 2026) restores semantic meaning as **exact, formal information bookkeeping**.
+```python
+import pyrazobill as rz
 
-```
-                           H(W, X) = Total Joint Uncertainty
-    ┌──────────────────────────────────────┬─────────────────────────────────────┐
-    │          What Is Said (E)            │          What Is Meant (C)          │
-    │  E = H(X) = Expression Entropy      │    C = H(W) = Content Entropy       │
-    ├──────────────────┬───────────────────┼───────────────────┬─────────────────┤
-    │  Conveyance (I)  │   Latitude (Λ)    │  Conveyance (I)   │    Doubt (Δ)    │
-    │   I = I(W; X)    │  Λ = H(X | W)     │    I = I(W; X)    │  Δ = H(W | X)   │
-    │   What form      │  Speaker freedom  │    What form      │  What form      │
-    │   conveys of     │  once meaning is  │    conveys of     │  fails to       │
-    │   meaning        │  fixed            │    meaning        │  reveal         │
-    └──────────────────┴───────────────────┴───────────────────┴─────────────────┘
-```
+# Split a log line into a template and parameter arrays
+line = "Failed password for root from 192.168.1.100 port 22"
+record = rz.RzSplit(line)
 
-### The Fundamental Conservation Laws
-Let $W \in \mathcal{W}$ be what the software meant (the semantic form), and $X \in \mathcal{X}$ be what was emitted (the serialized log line):
+print(record.template)
+# 'Failed password for {s} from {s} port {i}'
 
-$$E = I + \Lambda, \quad C = I + \Delta, \quad E - C = \Lambda - \Delta$$
+print(record.ints)
+# [22]
 
-$$H(W, X) = I + \Lambda + \Delta = C + \Lambda = E + \Delta$$
+print(record.strs)
+# ['root', '192.168.1.100']
 
-1. **The Principle of Zero Doubt ($\Delta = 0$)**:
-   In a deterministic computing system, the raw log line uniquely and unambiguously determines its structural form. When Doubt vanishes ($\Delta = 0$), Expression decomposes cleanly:
-   $$E = C + \Lambda$$
-   Every bit of expression in a log stream is either **structural semantic content** ($C$) or **parametric variable latitude** ($\Lambda$).
-
-2. **The Law of Lossless Invertibility**:
-   Because meaning is preserved, the parsing transformation is an exact homomorphism. Reconstruction is guaranteed byte-for-byte with **zero bit-level drift**:
-   $$\forall m \in \Sigma^*, \quad \text{reconstruct}(\text{parse}(m)) \equiv m$$
-
-3. **Semantic Gating & Consequence Decomposition (Theorems 5 & 6)**:
-   For any diagnostic consequence $Y$ (e.g. system status, failure severity, incident alert), the leakage $L_Y(W) = I(X; Y \mid W)$ measures whether a chosen abstraction screens off form from consequence:
-   $$H(Y \mid X) = H(Y \mid W) - I(X; Y \mid W) = H(Y \mid W) - L_Y(W)$$
-   Meaning is adequate if and only if $L_Y(W) = 0$. If an ad-hoc grouping leaks more than threshold $\varepsilon$, Razobill's gate rejects the grouping with mathematical certitude.
-
-4. **The Latitude Channel & Steganographic Capacity (Theorem 4c)**:
-   Because variable slots possess latitude $\Lambda = H(X \mid W)$, variable slots constitute an exact covert or overt transmission channel. Under zero doubt, the channel capacity is given by:
-   $$C_{\text{channel}} = \max_{P_W} I(W; X) = \log_2 |\mathcal{W}|$$
-   Razobill implements exact channel capacity profiling, payload embedding, and extraction via `Channel.hpp` and Python `channelEmbed` / `channelDecode`.
-
-5. **The Vocabulary Law (Corollary 2) & Information Distance (Proposition 3)**:
-   The total variable latitude is strictly upper-bounded by the token slot alphabets $\mathcal{V}_k$:
-   $$\Lambda \le \sum_{k=1}^K \log_2 |\mathcal{V}_k|$$
-   The true metric distance between form and message is given by the variation of information:
-   $$D(W, X) = \Lambda + \Delta = E + C - 2I$$
-
----
-
-## 3. The Three Pillars of Razobill
-
-Razobill translates this mathematical foundation into production-grade systems reality across three unified pillars:
-
-```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                                 THE RAZOBILL TRINITY                               │
-└───────────────────────────────────────────────────────────────────────────────────┘
-         ▲                                   ▲                                  ▲
-         │                                   │                                  │
-┌──────────────────────┐        ┌─────────────────────────┐       ┌────────────────────────┐
-│      PILLAR I        │        │        PILLAR II        │       │       PILLAR III       │
-│  Information Theory  │        │     Systems Engine      │       │  Analytical Databases  │
-│  & Semantic Ledger   │        │   & Hardware Vector     │       │   & Compaction Plane   │
-├──────────────────────┤        ├─────────────────────────┤       ├────────────────────────┤
-│ • Shannon Ledger     │        │ • AVX-512 / AVX2 / NEON │       │ • DuckDB Community     │
-│ • Stratified Miller- │        │ • Dynamic CPUID Dispatch│       │   rbDecompose (STRUCT) │
-│   Madow Bias Adj.    │        │ • Bump Arena Block List │       │ • ClickHouse chDB      │
-│ • Zero Doubt (Δ = 0) │        │ • Heterogeneous Hash    │       │ • 45%+ Lossless Disk   │
-│ • Latitude Channel & │        │ • Sub-microsecond hot   │       │   Columnar Compaction  │
-│   Capacity Profiler  │        │   path latency          │       │ • Zero Intermediate   │
-│ • Proposition 10 CIs │        │ • Zero per-row heap alloc│      │   S3 Parquet Streaming │
-└──────────────────────┘        └─────────────────────────┘       └────────────────────────┘
+# Reconstruct the exact original string bit-for-bit
+restored = rz.RzJoin(*record)
+assert restored == line
 ```
 
-### Pillar I: The Mathematical Information Ledger
-Traditional logging tools count lines. Razobill balances an **exact information-theoretic ledger**. For every log stream, Razobill computes the exact Shannon entropy of Expression ($E$), Content ($C$), Latitude ($\Lambda$), and Doubt ($\Delta$). With certified distribution-free intervals (Proposition 10; Devroye et al. 1996), and the Latitude Channel module (`Channel.hpp`, `channelAnalyzeCapacity`), you can mathematically prove whether your telemetry taxonomy is losing information, collapsing critical states, or leaking diagnostic signals.
+> [!TIP]
+> **Try it**: Run `python -c "import pyrazobill as rz; print(rz.RzSplit('port 22 open'))"` in your shell.
 
-### Pillar II: Zero-Overhead C++20 Systems Engine
-Where heuristic miners parse at 50,000 to 200,000 logs/second and bottleneck your CPU, Razobill's C++20 core engine (`librazobill`):
-* Utilizes **AVX-512, AVX2, SSE4.2, and ARM NEON SIMD vectorization** with **dynamic CPUID multiversion dispatch** to classify and segment delimiter boundaries 16 to 64 bytes at a time across x86-64, Apple Silicon, and AWS Graviton.
-* Allocates memory strictly through a **64-byte aligned monotonic bump arena with chunk block-reuse freelist (`MemoryArena`)**, eliminating `malloc`, `new`, and string allocations in hot per-row loops.
-* Delivers sustained multi-core throughput of **18.2M – 26.5M logs/second (1.6 – 3.1 GB/s)** across 12 hardware threads on real Loghub workloads (see committed reproducible benchmark artifact `bench/results/benchmarks.json`, with peak burst up to 69.4M on short synthetic strings).
-* Achieves median latency of **$0.1\,\mu\text{s} - 0.8\,\mu\text{s}$** and $p_{99}$ tail latency under **$5.7\,\mu\text{s}$** (compared to $11.2\,\mu\text{s} - 529.0\,\mu\text{s}$ measured for Drain3).
+### In DuckDB SQL
+Decompose and query logs directly using analytical SQL:
 
-### Pillar III: Native Analytical Database Integration & Cloud Object Storage
-Razobill does not store logs in opaque proprietary formats. It integrates directly into the modern analytical database stack:
-* **DuckDB Community Extension (`razobill`)**: Run vectorized parsing and reconstruction directly within SQL queries via native scalar functions:
-  * `rbDecompose(msg)`: **Single-pass composite struct function** returning `STRUCT(form VARCHAR, ints BIGINT[], strs VARCHAR[])`. Decomposes logs in a single scan, cutting CPU cycles by **66%** compared to separate function invocations!
-  * `rbForm(msg)`, `rbInts(msg)`, `rbStrs(msg)`, `rbReconstruct(form, ints, strs)`.
-  * `rbDecomposeSemantic(msg)`: Alphanumeric-aware token preservation.
-  * `rbEntropy(msg)`: Inline Shannon bit-entropy calculation.
-* **Columnar Compaction**: Decomposes bloated raw text into dictionary-encoded forms, typed 64-bit integer vectors, and string pools. Achieves **45%+ physical disk compaction** in native DuckDB tables compared to raw text while allowing analytical queries (e.g. `AVG(ints[1])`) to execute directly over compressed columnar data at memory-bus speeds.
-* **Direct AWS S3 & Cloud Object Storage Streaming**: Stream decomposed columns directly to Parquet on AWS S3, Cloudflare R2, or MinIO with zero intermediate disk writes:
-  ```sql
-  INSTALL httpfs; LOAD httpfs;
-  SET s3_region = 'us-east-1';
+```sql
+-- 1. Decompose a message into a structured composite struct
+SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS parsed;
+-- Output struct:
+-- {'template': 'Failed password for {s} from {s} port {i}', 'ints': [22], 'strs': ['root', '192.168.1.100']}
 
-  COPY (
-      SELECT
-          d.form,
-          d.ints,
-          d.strs
-      FROM (
-          SELECT rbDecompose(msg) AS d FROM incoming_logs
-      )
-  ) TO 's3://your-bucket-name/logs.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
-  ```
-  This reduces S3 Parquet storage bytes by up to **93.8%** compared to uncompressed raw ASCII, and cuts Athena columnar query scan volume by up to **88%** by scanning only referenced variable columns. (Illustrative pricing impact: at 1 TB/month with standard AWS S3 storage at $0.023/GB and Athena query scans at $5/TB, reducing stored bytes to ~62 GB reduces storage from ~$23.50/mo to ~$1.43/mo, with scan savings scaling with query frequency).
+-- 2. Aggregate log frequencies across millions of rows by template
+SELECT
+    RzTemplate(message) AS template,
+    COUNT(*) AS frequency
+FROM system_logs
+GROUP BY 1
+ORDER BY frequency DESC;
 
----
-
-## 4. The Razobill Ecosystem
-
-The Razobill project is organized into modular, purpose-built components sharing a strict **zero-underscore naming convention**:
-
-| Component | Description | Portal / Guide |
-|---|---|---|
-| **`librazobill`** | Core C++20 engine, dynamic SIMD scanners (AVX-512, AVX2 & ARM NEON), bump arenas, Latitude Channel (`Channel.hpp`), and universal C ABI (`RazobillC.h`). | [C++ Architecture Guide](RAZOBILL.md) • [C++ API Reference](docs/reference/CPlusPlusApiReference.md) • [ARM NEON Guide](docs/guides/ArmNeonOptimization.md) |
-| **`razobill` DuckDB Extension** | Native loadable extension for DuckDB (`rbDecompose`, `rbForm`, `rbInts`, `rbStrs`, `rbReconstruct`, `rbEntropy`). | [DuckDB Extension README](ext/duckdb/README.md) • [Community Submission Manual](docs/guides/DuckDbCommunityPublishing.md) |
-| **`pyrazobill`** | Zero-friction Python library (`decompose`, `decomposeBatch`, `reconstruct`, `computeLedger`, `consequenceDecomposition`, `channelEmbed`, `channelDecode`) with GIL-free parallel batch operations. | [Python Package README](lib/python/README.md) • [Python Developer Guide](lib/python/Guide.md) |
-| **Universal C ABI** | Clean `extern "C"` linkage layer (`RzDecompose`, `RzReconstructSlots`, `RzComputeLedger`, `RzMillerMadow`, `RzComputeCertifiedInterval`) callable from Rust, Go, Zig, C#, Java, Swift. | [Universal C API Reference](docs/reference/UniversalCApiReference.md) |
-| **OpenTelemetry Processor** | In-process Go collector component (`ext/otel/go.mod`) with turnkey Cgo linking eliminating 92%+ of log bytes at host emission boundary. | [OTel Extension README](ext/otel/README.md) • [OTel Collector Guide](docs/guides/OpenTelemetryIntegration.md) |
-| **Vector Remap Transform** | Native Rust FFI / VRL transform crate (`ext/vector/Cargo.toml`) streaming compact columnar logs to S3 and ClickHouse. | [Vector Extension README](ext/vector/README.md) • [Vector Integration Guide](docs/guides/VectorIntegration.md) |
-| **Empirical Evidence** | Formal verification suite, scripts, and logs substantiating all published theorems. | [Evidence & Provenance README](evidence/README.md) • [Drain Benchmark](docs/benchmarks/DrainComparison.md) • [AWS S3 Compaction](docs/benchmarks/AwsS3CompactionReport.md) • [Drain3 vs S3](docs/benchmarks/Drain3VsRazobillS3.md) |
-
----
-
-## 5. Empirical Verification: By the Numbers
-
-Razobill was evaluated against the entire Loghub standard benchmark suite and massive production telemetry:
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Production_Logs_Audited-4%2C861_files-blue" alt="4,861 Files">
-  <img src="https://img.shields.io/badge/Total_Events_Processed-69%2C612%2C488-blue" alt="69.6M Events">
-  <img src="https://img.shields.io/badge/Bit--Level_Mismatches-0_(100.000%25)-brightgreen" alt="0 Mismatches">
-  <img src="https://img.shields.io/badge/Sustained_12T_Throughput-29.02M_msg%2Fs-brightgreen" alt="29.02M msg/s">
-  <img src="https://img.shields.io/badge/AWS_S3_Storage_Reduction-93.8%25-brightgreen" alt="93.8% S3 Reduction">
-</p>
-
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                   THROUGHPUT COMPARISON ACROSS PRODUCTION LOG DATASETS                 │
-├───────────────────┬──────────────┬─────────────────────────────────────────────────────┤
-│ Execution Engine  │ Concurrency  │ Throughput (logs / second)                          │
-├───────────────────┼──────────────┼─────────────────────────────────────────────────────┤
-│ Drain3 (Python)   │ 1 Core       │ █▌ 171k                                             │
-│ Drain3 (Python)   │ 4 Cores      │ █▌ 171k (GIL / Lock Bound)                          │
-│ pyrazobill (Py)   │ 1 Core       │ █████ 515k (3.0× vs Drain3)                         │
-│ pyrazobill (Py)   │ 4 Cores      │ ███████ 737k (4.3× vs Drain3)                       │
-│ librazobill (C++) │ 1 Core       │ ████████████████████████ 2.54M-4.27M (Avg) / 5.68M  │
-│ librazobill (C++) │ 12 Cores     │ ████████████████████████████████████ 29.02M Sustained│
-│                   │              │ (Peak burst: 69.45M on short synthetic strings)     │
-└───────────────────┴──────────────┴─────────────────────────────────────────────────────┘
-```
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   EMPIRICAL BENCHMARK COMPARISON HIGHLIGHTS                                             │
-├─────────────────────────┬──────────────────────┬────────────────────────┬───────────────────────┬──────────────────────┤
-│ Metric / Execution Mode │ Drain3 (He et al.)   │ Razobill Python (1T/4T)│ Razobill C++20 / SIMD │ Razobill Advantage   │
-├─────────────────────────┼──────────────────────┼────────────────────────┼───────────────────────┼──────────────────────┤
-│ Throughput (1 Thread)   │ 169k - 173k logs/sec │ 515,107 logs/sec       │ 2.54M - 4.27M logs/sec│ 3.0× (Py) / 15-33× C++│
-│ Throughput (4 Threads)  │ N/A (GIL / Lock bound│ 737,376 logs/sec       │ 7.56M logs/sec        │ 4.3× (Py) / 44× (C++)│
-│ Throughput (12 Threads) │ N/A (Tree contention)│ N/A (Python threadpool)│ 29.02M logs/sec (sust)│ ~168× faster (12T)   │
-│ Median Latency (p50)    │ 1.4 μs - 2.4 μs      │ 0.8 μs - 1.2 μs        │ 0.1 μs - 0.8 μs       │ Up to 18× Lower      │
-│ Tail Latency (p99)      │ 11.2 μs - 529.0 μs   │ 1.8 μs - 3.9 μs        │ 0.7 μs - 5.7 μs       │ 2.0× - 93× Lower     │
-│ S3 Storage Compaction   │ 0% (Must store raw)  │ 92.2% - 93.8% (Columnar│ 92.2% - 93.8% (ZSTD)  │ Invariant to Threads │
-│ In-S3 Query Scan (QPS)  │ N/A (Full raw scans) │ 83.5 QPS (1 Client)    │ 171.8 QPS (4 Clients) │ Instant S3 Pushdown  │
-│ Invertibility Guarantee │ 0% (Destructive <*>) │ 100.000% Exact Lossless│ 100.000% Exact Round  │ Zero bit-level loss  │
-│ S3 Bytes Stored (1 TB)  │ 1,000 GB (Raw text)  │ ~62 GB (ZSTD Parquet)  │ ~62 GB (ZSTD Parquet) │ 93.8% Fewer Bytes    │
-│ Information Doubt (Δ)   │ 0.0940 bits (heurs.) │ 0.0000 bits (exact)    │ 0.0000 bits (exact)   │ Δ=0 by construction  │
-└─────────────────────────┴──────────────────────┴────────────────────────┴───────────────────────┴──────────────────────┘
+-- 3. Reconstruct raw messages on demand
+SELECT RzJoin(parsed.template, parsed.ints, parsed.strs) AS reconstructed
+FROM (SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS parsed);
 ```
 
 ---
 
-## 6. Documentation Map
+## Core capabilities
 
-* **Architecture & Theory**:
-  * [Architecture Overview](docs/architecture/ArchitectureOverview.md) — Monolithic memory layout and dataflow.
-  * [Data-Oriented Design](docs/architecture/DataOrientedDesign.md) — DOD layout of `SlotRecord` and cache locality.
-  * [SIMD Vectorization](docs/architecture/SimdVectorization.md) — AVX2 and SSE4.2 character classification.
-  * [The Information Ledger](docs/theory/InformationLedger.md) — Detailed derivation of $E = I + \Lambda$.
-  * [Semantic Gating & Leakage](docs/theory/SemanticGating.md) — Proof of Theorem 5 and purpose adequacy.
-* **Developer Guides**:
-  * [Getting Started](docs/guides/GettingStarted.md) — Toolchain setup and local verification.
-  * [C++ Developer Guide](docs/guides/CPlusPlusDeveloperGuide.md) — Embedding `librazobill` in systems software.
-  * [Python Developer Guide](docs/guides/PythonDeveloperGuide.md) — High-throughput telemetry pipelines in Python.
-  * [DuckDB Extension Guide](docs/guides/DuckDbExtensionGuide.md) — In-database SQL analytics.
-  * [DuckDB Community Publishing Manual](docs/guides/DuckDbCommunityPublishing.md) — Official extension submission.
-  * [ClickHouse chDB Guide](docs/guides/ClickHouseChdbGuide.md) — Embedded ClickHouse queries with ADBC.
-  * [AWS S3 & Cloud Storage Guide](docs/guides/AwsS3Integration.md) — S3 Parquet export, cost optimization, MinIO local testing, and multi-threaded scaling.
-  * [ARM NEON Optimization Guide](docs/guides/ArmNeonOptimization.md) — 128-bit SIMD specialization for Apple Silicon & AWS Graviton.
-  * [OpenTelemetry Collector Guide](docs/guides/OpenTelemetryIntegration.md) — In-process host edge compaction with `razobillprocessor`.
-  * [Vector Integration Guide](docs/guides/VectorIntegration.md) — Rust FFI and VRL DaemonSet edge compaction pipelines.
-* **Empirical Benchmarks & Storage**:
-  * [Drain3 vs Razobill Benchmark](docs/benchmarks/DrainComparison.md) — Throughput, tail jitter, and accuracy.
-  * [Drain3 vs Razobill on AWS S3](docs/benchmarks/Drain3VsRazobillS3.md) — S3 columnar compaction, scan latency, and losslessness.
-  * [Disk Columnar Compaction](docs/benchmarks/StorageCompaction.md) — Embedded columnar storage efficiency.
-  * [AWS S3 Compaction & Stress Report](docs/benchmarks/AwsS3CompactionReport.md) — 93.8% S3 reduction, 100k LocalStack stress test, and 1 TB/mo + 30 TB/mo cloud cost savings.
-  * [Multi-Core Stress Audit](docs/benchmarks/MultiCoreStressAudit.md) — 69.4M logs/sec parallel scaling.
-* **API Specifications**:
-  * [C++ API Reference](docs/reference/CPlusPlusApiReference.md)
-  * [Python API Reference](docs/reference/PythonApiReference.md)
-  * [DuckDB SQL Function Reference](docs/reference/SqlFunctionsReference.md)
-  * [Universal C API Reference](docs/reference/UniversalCApiReference.md)
+Razobill provides a uniform data model across all supported environments.
+
+| Environment | Primary Functions | Description |
+| :--- | :--- | :--- |
+| **Python** (`pyrazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzSplitMany` | High-throughput parsing releasing the Python GIL for multithreaded processing. |
+| **DuckDB** (`ext/duckdb`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzHash` | Vectorized SQL functions operating directly on database string pointers without copies. |
+| **C ABI** (`include/librazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzFree` | Zero-allocation C ABI with stable binary layout and zero-copy string views. |
+| **OTel Collector** (`ext/otel`) | `razobillprocessor` | Edge processor replacing string bodies with templates and slice attributes. |
+| **Vector** (`ext/vector`) | `razobill-vector` | High-speed Rust crate transform streaming columnar stripes to object storage. |
 
 ---
 
-## 7. License & Academic Attribution
+## Lossless invertibility
 
-Razobill is open-source software licensed under the **[Apache License, Version 2.0](LICENSE)**.
+Traditional log parsers discard formatting, alter timestamps, or leak unseen variable tokens into cluster definitions.
+Razobill enforces an algebraic invariant across every parse:
 
-### Academic Citation & Priority
-The theoretical foundations, mathematical invariants, and information ledgers in this project are based on the foundational research publication:
+$$\text{RzJoin}(\text{RzSplit}(x)) = x$$
 
-> **Atta, Moustafa Mahmoud (2026).** *Latitude and Doubt: An exact ledger of meaning in messages with measurements on the genetic code and on English.*
-> Zenodo. DOI: [10.5281/zenodo.23287286](https://doi.org/10.5281/zenodo.23287286) | Record: [zenodo.org/records/23287286](https://zenodo.org/records/23287286) | Repository: [github.com/4t1a/Latitude-Doubt](https://github.com/4t1a/Latitude-Doubt)
+Every byte of whitespace, delimiter punctuation, and parameter data is preserved.
+You can store logs as compact columnar Parquet files and restore the exact original raw byte stream during compliance audits or security forensics.
 
-Pursuant to Section 4(d) of the Apache License 2.0, if you use, embed, modify, or evaluate this software in academic, scientific, benchmark, or industrial publications, you must retain the accompanying **[`NOTICE`](NOTICE)** file and cite the foundational paper:
+> [!NOTE]
+> **Real-world impact**: Eliminates up to 92% of raw log storage bytes in Parquet ZSTD stripes while preserving 100% of forensic raw bytes.
 
-```bibtex
-@article{atta2026latitude,
-  author    = {Atta, Moustafa Mahmoud},
-  title     = {Latitude and Doubt: An exact ledger of meaning in messages with measurements on the genetic code and on English},
-  year      = {2026},
-  journal   = {Zenodo Preprint},
-  doi       = {10.5281/zenodo.23287286},
-  url       = {https://doi.org/10.5281/zenodo.23287286}
-}
-```
+---
+
+## Where to go next
+
+Navigate the documentation system:
+
+- **Tutorials**: [Getting started in 5 minutes](docs/guides/GettingStarted.md)
+- **How-to guides**:
+  - [DuckDB extension guide](docs/guides/DuckDbExtensionGuide.md)
+  - [Python developer guide](docs/guides/PythonDeveloperGuide.md)
+  - [OpenTelemetry integration](docs/guides/OpenTelemetryIntegration.md)
+  - [Vector integration](docs/guides/VectorIntegration.md)
+  - [AWS S3 storage compaction](docs/guides/AwsS3Integration.md)
+- **Reference**:
+  - [DuckDB SQL reference](docs/reference/SqlFunctionsReference.md)
+  - [Python API reference](docs/reference/PythonApiReference.md)
+  - [Universal C ABI reference](docs/reference/UniversalCApiReference.md)
+  - [C++ API reference](docs/reference/CPlusPlusApiReference.md)
+- **Explanations**:
+  - [Architecture overview](docs/architecture/ArchitectureOverview.md)
+  - [Data-oriented design](docs/architecture/DataOrientedDesign.md)
+  - [SIMD vectorization](docs/architecture/SimdVectorization.md)
+  - [Concurrency model](docs/architecture/ConcurrencyModel.md)
