@@ -64,10 +64,10 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
     t0 = time.perf_counter()
     for line in lines:
         tS = time.perf_counter_ns()
-        form, ints, strs = pyrazobill.decompose(line, pyrazobill.ScanMode.Semantic)
+        rec = pyrazobill.RzSplit(line)
         tE = time.perf_counter_ns()
         latenciesNs.append(tE - tS)
-        decomposedRecords.append((form, ints, strs))
+        decomposedRecords.append((rec.template, rec.ints, rec.strs))
     totalSec = time.perf_counter() - t0
 
     latenciesNs.sort()
@@ -148,7 +148,7 @@ def runEdgeCollectorBenchmark(logPath: str, maxEvents: int = 50000):
 
     # 3. Verify Exact Lossless Invertibility
     for (form, ints, strs), rawLine in zip(decomposedRecords, lines):
-        rebuilt = pyrazobill.reconstruct(form, ints, strs)
+        rebuilt = pyrazobill.RzJoin(form, ints, strs)
         if rebuilt != rawLine:
             mismatches += 1
 

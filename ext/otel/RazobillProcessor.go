@@ -18,31 +18,35 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 )
 
-type razobillProcessor struct {
+type RazobillProcessor struct {
 	cfg          *Config
 	nextConsumer consumer.Logs
 }
 
-func newRazobillProcessor(cfg *Config, next consumer.Logs) (*razobillProcessor, error) {
-	return &razobillProcessor{
+func NewRazobillProcessor(cfg *Config, next consumer.Logs) (*RazobillProcessor, error) {
+	return &RazobillProcessor{
 		cfg:          cfg,
 		nextConsumer: next,
 	}, nil
 }
 
-func (p *razobillProcessor) Start(_ context.Context, _ component.Host) error {
+func newRazobillProcessor(cfg *Config, next consumer.Logs) (*RazobillProcessor, error) {
+	return NewRazobillProcessor(cfg, next)
+}
+
+func (p *RazobillProcessor) Start(_ context.Context, _ component.Host) error {
 	return nil
 }
 
-func (p *razobillProcessor) Shutdown(_ context.Context) error {
+func (p *RazobillProcessor) Shutdown(_ context.Context) error {
 	return nil
 }
 
-func (p *razobillProcessor) Capabilities() consumer.Capabilities {
+func (p *RazobillProcessor) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: true}
 }
 
-func (p *razobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
+func (p *RazobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	rls := ld.ResourceLogs()
 	for i := 0; i < rls.Len(); i++ {
 		sls := rls.At(i).ScopeLogs()

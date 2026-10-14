@@ -1,20 +1,21 @@
-package razobillprocessor
+package tests
 
 import (
 	"context"
 	"testing"
 
+	rz "github.com/razobill/razobill/ext/otel"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/plog"
 )
 
 func TestRazobillProcessor_ConsumeLogs(t *testing.T) {
 	sink := new(consumertest.LogsSink)
-	cfg := createDefaultConfig()
+	cfg := rz.CreateDefaultConfig()
 	cfg.DropRawBody = true
 	cfg.IncludeHash = true
 
-	proc, err := newRazobillProcessor(cfg, sink)
+	proc, err := rz.NewRazobillProcessor(cfg, sink)
 	if err != nil {
 		t.Fatalf("Failed to initialize razobill processor: %v", err)
 	}

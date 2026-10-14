@@ -84,17 +84,17 @@ def runRazobillDecompose1T(lines):
     forms = set()
     for line in lines:
         tStart = time.perf_counter_ns()
-        form, ints, strs = pyrazobill.decompose(line, pyrazobill.ScanMode.Semantic)
+        rec = pyrazobill.RzSplit(line)
         tEnd = time.perf_counter_ns()
         latencies.append(tEnd - tStart)
-        forms.add(form)
+        forms.add(rec.template)
     elapsed = time.perf_counter() - t0
     return elapsed, len(forms), latencies
 
 
 def runRazobillDecomposeBatch1T(lines):
     t0 = time.perf_counter()
-    res = pyrazobill.decomposeBatch(lines, pyrazobill.ScanMode.Semantic)
+    res = pyrazobill.RzSplitMany(lines)
     elapsed = time.perf_counter() - t0
     return elapsed, len(res)
 
@@ -110,7 +110,7 @@ def runRazobillDecomposeBatchThreads(lines, numThreads):
     total = 0
     with ThreadPoolExecutor(max_workers=numThreads) as pool:
         for batchRes in pool.map(
-            lambda c: pyrazobill.decomposeBatch(c, pyrazobill.ScanMode.Semantic), chunks
+            lambda c: pyrazobill.RzSplitMany(c), chunks
         ):
             total += len(batchRes)
     elapsed = time.perf_counter() - t0

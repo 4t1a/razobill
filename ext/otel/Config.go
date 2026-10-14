@@ -6,12 +6,16 @@ type Config struct {
 	IncludeHash bool   `mapstructure:"include_hash"`
 }
 
-func createDefaultConfig() *Config {
+func CreateDefaultConfig() *Config {
 	return &Config{
 		Mode:        "semantic",
 		DropRawBody: true,
 		IncludeHash: true,
 	}
+}
+
+func createDefaultConfig() *Config {
+	return CreateDefaultConfig()
 }
 
 func (cfg *Config) Validate() error {

@@ -4,7 +4,7 @@
 
 # Before loading, scalar function should not exist
 statement error
-SELECT rbForm('User 1042 authenticated');
+SELECT RzSplit('User 1042 authenticated');
 ----
 Catalog Error
 
@@ -13,11 +13,11 @@ require razobill
 
 # Confirm extension decomposition and reconstruction
 query T
-SELECT rbReconstruct(form, ints, strs) FROM (SELECT (rbDecompose('User 1042 authenticated')).*);
+SELECT RzJoin(template, ints, strs) FROM (SELECT (RzSplit('User 1042 authenticated')).*);
 ----
 User 1042 authenticated
 
 query I
-SELECT rbInts('User 1042 authenticated')[1];
+SELECT (RzSplit('User 1042 authenticated')).ints[1];
 ----
 1042

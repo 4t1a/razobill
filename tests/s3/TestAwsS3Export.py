@@ -46,7 +46,8 @@ def parseRazobill(msg: str):
     when available, or the pure-Python reference implementation as fallback.
     """
     if HAS_PYRAZOBILL:
-        return pyrazobill.decompose(msg)
+        rec = pyrazobill.RzSplit(msg)
+        return rec.template, rec.ints, rec.strs
 
     # Fallback tokenizer
     tokens = []
@@ -108,7 +109,7 @@ def reconstructRazobill(form: str, ints: list, strs: list) -> str:
     using the C++ core (pyrazobill) when available, or pure Python fallback.
     """
     if HAS_PYRAZOBILL:
-        return pyrazobill.reconstruct(form, ints, strs)
+        return pyrazobill.RzJoin(form, ints, strs)
     sep_idx = form.rfind(kTypeSeparator)
     if sep_idx == -1:
         return form

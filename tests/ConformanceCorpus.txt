@@ -1,0 +1,12 @@
+Failed password for admin from 10.0.0.1 port 5432 ssh2
+Receiving block blk_-1073741829 src: /10.250.19.102:54106 dest: /10.250.19.102:50010
+User admin logged in from 192.168.1.1 port 8080
+日本語 ログ 42 ünïcödé3
+007 0 00 -5 1.5 1e5
+9223372036854775807 1234567890123456789
+tabs	and  double  spaces   7
+Template with {{escaped}} braces and {raw} placeholders 100
+ leading 1 and trailing 2 
+it's a "quoted" 1
+simple text without numbers
+127.0.0.1 - - [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326

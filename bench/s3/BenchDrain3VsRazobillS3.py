@@ -249,7 +249,8 @@ def runHeadToHeadBenchmark(
         # 2A. Single-threaded Python batch
         t0 = time.perf_counter()
         if HAS_PYRAZOBILL:
-            decomposed_1t = pyrazobill.decomposeBatch(corpus)
+            recs = pyrazobill.RzSplitMany(corpus)
+            decomposed_1t = [(r.template, r.ints, r.strs) for r in recs]
             t_rb_1t = time.perf_counter() - t0
             rb_tput_1t = count / t_rb_1t if t_rb_1t > 0 else 0
         else:
@@ -268,8 +269,8 @@ def runHeadToHeadBenchmark(
             chunks = [c for c in chunks if c]
             decomposed_mt = []
             with ThreadPoolExecutor(max_workers=threads) as executor:
-                for chunk_res in executor.map(pyrazobill.decomposeBatch, chunks):
-                    decomposed_mt.extend(chunk_res)
+                for chunk_res in executor.map(pyrazobill.RzSplitMany, chunks):
+                    decomposed_mt.extend([(r.template, r.ints, r.strs) for r in chunk_res])
             t_rb_mt = time.perf_counter() - t0
             rb_tput_mt = count / t_rb_mt if t_rb_mt > 0 else 0
             razobill_records = [
@@ -283,7 +284,7 @@ def runHeadToHeadBenchmark(
             ]
 
         # 2C. Native Multi-Core C++20 SIMD Core
-        if HAS_PYRAZOBILL:
+        if HAS_PYRAZOBILL and hasattr(pyrazobill, "auditParallel"):
             audit_res = pyrazobill.auditParallel(corpus, numThreads=threads)
             cpp_tput = audit_res.msgsPerSec
         else:

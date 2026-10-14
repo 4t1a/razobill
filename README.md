@@ -6,9 +6,8 @@
   <p align="center">
     <strong>Logs Are Born Structured. It's Time We Stopped Treating Them as Garbage Strings.</strong>
   </p>
-  <p align="center">
-    An exact, lossless mathematical foundation, high-performance C++20 engine, and analytical database architecture for telemetry.<br/>
-    Grounded in the information-theoretic framework of <em>Latitude and Doubt: An exact ledger of meaning in messages</em> (M. M. Atta, 2026).
+    Split a log line into a template plus numbers and words, and join them back to the exact original bytes.<br/>
+    High-performance C++20 engine, Python package, and analytical database extension for telemetry.
   </p>
   <p align="center">
     <a href="https://razobill.github.io/razobill/"><img src="https://img.shields.io/badge/Website-razobill.github.io%2Frazobill-5F96AB.svg" alt="Website"></a>
@@ -114,66 +113,39 @@ Lossless decomposition and exact reconstruction:
 ```python
 import pyrazobill as rz
 
-raw = "2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
-
-# 1. High-speed single-pass decomposition (releasing GIL for multi-threading)
-form, ints, strs = rz.decompose(raw)
-print("Form: ", form)
-# -> "{}-{}-{} {}:{}:{} [{}] Connection to {}.{}.{}.{}:{} timed out after {} retries"
-print("Ints: ", ints)
-# -> [2026, 10, 7, 14, 2, 11, 10, 0, 0, 1, 5432, 3]
-print("Strs: ", strs)
-# -> ['WARN']
-
-# 2. Exact 100% byte-for-byte lossless reconstruction
-recovered = rz.reconstruct(form, ints, strs)
-assert recovered == raw
-
-# 3. Exact Shannon information ledger & confidence interval (Atta 2026)
-ledger = rz.computeLedger([raw] * 1000)
-print(f"Expression: {ledger.expression:.4f} bits, Content: {ledger.content:.4f} bits, Doubt: {ledger.doubt:.4f} bits")
+line = "2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries"
+tmpl, ints, strs = rz.RzSplit(line)
+recovered = rz.RzJoin(tmpl, ints, strs)
+assert recovered == line
 ```
 
 ### DuckDB Extension (`razobill`)
 Vectorized in-database execution over columnar tables:
 ```sql
--- Install & load official community extension
 INSTALL razobill FROM community;
 LOAD razobill;
 
--- Single-pass composite struct decomposition: STRUCT(form VARCHAR, ints BIGINT[], strs VARCHAR[])
-SELECT rbDecompose('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries') AS d;
+-- Single-pass decomposition into template, numbers, and word strings:
+SELECT (RzSplit('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries')).*;
 
--- Columnar S3 Parquet export with 93.8% storage compaction
-COPY (
-    SELECT (rbDecompose(log_line)).* FROM raw_telemetry
-) TO 's3://production-lakehouse/compact_logs.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
-
--- Exact bit-for-bit lossless log reconstruction in SQL
-SELECT rbReconstruct(d.form, d.ints, d.strs) AS original_log
-FROM (SELECT rbDecompose(log_line) AS d FROM raw_telemetry);
+-- Exact bit-for-bit lossless log reconstruction in SQL:
+SELECT RzJoin(template, ints, strs)
+FROM (SELECT (RzSplit('2026-10-07 14:02:11 [WARN] Connection to 10.0.0.1:5432 timed out after 3 retries')).*);
 ```
 
-### C++20 Core Engine (`librazobill`)
-Zero-allocation monotonic arena bump parsing:
-```cpp
-#include <librazobill/Razobill.hpp>
-#include <iostream>
+### C ABI (`include/librazobill/RazobillC.h`)
+Zero-allocation C ABI with exact byte-level recovery:
+```c
+#include <librazobill/RazobillC.h>
+#include <assert.h>
+#include <string.h>
 
-using namespace razobill::core;
-
-int main() {
-    MemoryArena arena(1024 * 1024);
-    SlotRecord slots(&arena);
-
-    std::string_view msg = "2026-10-07 14:02:11 [WARN] Worker 42 timeout";
-    if (parse(msg, slots, ScanMode::Exact) == razobill::Status::Ok) {
-        std::string form;
-        slots.formKey(form);
-        std::cout << "Form: " << form << std::endl;
-    }
-    return 0;
-}
+RzRecord rec;
+RzSplit(msg, len, &rec);
+char buf[256]; size_t out_len = 0;
+RzJoin(&rec, buf, sizeof(buf), &out_len);
+assert(memcmp(buf, msg, len) == 0);
+RzFree(&rec);
 ```
 
 ---

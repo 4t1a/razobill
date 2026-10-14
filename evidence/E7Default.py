@@ -123,7 +123,11 @@ def main():
         HAS_PYRAZOBILL = False
 
     if HAS_PYRAZOBILL:
-        parsedTuples = pyrazobill.decomposeBatch(msgs)
+        if hasattr(pyrazobill, "RzSplitMany"):
+            recs = pyrazobill.RzSplitMany(msgs)
+            parsedTuples = [(r.template, r.ints, r.strs) for r in recs]
+        else:
+            parsedTuples = pyrazobill.decomposeBatch(msgs)
     else:
         parsedTuples = [split(m) for m in msgs]
 
