@@ -4,6 +4,7 @@
 
 #include "librazobill/RazobillC.h"
 #include "librazobill/Slots.hpp"
+#include "librazobill/Version.hpp"
 
 #include <cstring>
 #include <exception>
@@ -202,7 +203,7 @@ RZ_API const char* RzStatusMessage(RzStatus status) {
 }
 
 RZ_API const char* RzVersion(void) {
-    return "2.0.0";
+    return LIBRAZOBILL_VERSION_STRING;
 }
 
 } // extern "C"

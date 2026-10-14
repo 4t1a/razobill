@@ -254,7 +254,7 @@ def RzSplitMany(lines: Iterable[Union[str, bytes]], mode: str = "semantic") -> L
         raise RzError(str(exc)) from exc
 
 
-__version__ = "2.0.0"
+__version__ = "1.1.1"
 
 __all__ = [
     "RzSplit",
