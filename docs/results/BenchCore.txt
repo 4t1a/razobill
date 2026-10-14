@@ -1,6 +1,0 @@
-messages=134815 bytes=11546137 mean=85.6 B
-parse (form + slots)                  116.1 ns/msg    737.9 MB/s    8.62 M msg/s  (sink 0)
-parse + form_key                      123.9 ns/msg    691.3 MB/s    8.07 M msg/s  (sink 0)
-parse + form_key + xxh64              133.2 ns/msg    642.8 MB/s    7.51 M msg/s  (sink 0)
-parse + join (round trip)             248.1 ns/msg    345.1 MB/s    4.03 M msg/s  (sink 0)
-xxh64 of the message only              26.4 ns/msg   3240.4 MB/s   37.84 M msg/s  (sink 0)

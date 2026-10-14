@@ -1,16 +1,17 @@
-## Summary of Changes
+## Summary of changes
 
 A clear and concise explanation of what this pull request changes and why.
 
 ---
 
-## Architectural & Safety Checklist
+## Safety and quality checklist
 
-- [ ] **Zero-Underscore Convention**: All public symbols, functions, types, and files strictly follow PascalCase / camelCase.
-- [ ] **Lossless Invertibility**: Any changes to parsing or tokenization preserve exact roundtrip reconstruction (`reconstruct(parse(s)) == s`).
-- [ ] **Memory Safety**: No raw heap allocations (`malloc`, `new`, `std::string` allocations) added in hot per-row loops.
+- [ ] **Lossless invertibility**: Any changes to parsing preserve exact roundtrip reconstruction (`RzJoin(*RzSplit(s)) == s`).
+- [ ] **Zero allocation on hot path**: No heap allocations (`malloc`, `new`, `std::string` reallocations) added in per-event loops.
 - [ ] **Testing**:
-  - [ ] Core unit tests pass (`build/UnitTests.exe` or `ctest`)
+  - [ ] Core unit tests pass (`build/UnitTests.exe`)
   - [ ] DuckDB integration tests pass (`build/IntegrationDuckdb.exe`)
-  - [ ] Python verification tests pass (`python lib/python/tests/TestPyRazobill.py`)
-- [ ] **Documentation**: Updated public documentation in `docs/` and header comments where appropriate.
+  - [ ] Python unit tests pass (`python -m unittest discover -s lib/python/tests`)
+- [ ] **Documentation**:
+  - [ ] Documentation updated in `docs/` according to `docs/STYLE.md`.
+  - [ ] Documentation linter passes cleanly (`python tools/LintDocs.py`).

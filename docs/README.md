@@ -26,8 +26,6 @@ Task-oriented recipes for solving specific engineering problems.
 - [Writing compact Parquet to Amazon S3](how-to/s3-compaction.md): Compress telemetry streams into S3 object storage with ZSTD compression.
 - [Embedding librazobill in C++](how-to/cpp-developer.md): CMake integration, compiler flags, and direct C++20 header usage.
 - [Hardware acceleration with SIMD](how-to/neon-simd.md): Configure AVX-512, AVX2, and ARM NEON hardware acceleration.
-- [Publishing DuckDB extensions](how-to/duckdb-community.md): vcpkg ports, community extension manifests, and distribution.
-- [Querying via ClickHouse chDB](how-to/chdb.md): In-process ClickHouse SQL log decomposition using Python.
 
 ---
 
@@ -56,8 +54,6 @@ Understanding-oriented articles explaining design choices, theoretical foundatio
 - [SIMD vectorization](explanation/simd-vectorization.md): Branchless delimiter scanning using AVX-512, AVX2, and ARM NEON hardware instructions.
 - [Concurrency model](explanation/concurrency-model.md): Work-stealing thread pool and lock-free thread-local working buffers.
 - [Benchmark methodology](explanation/benchmarks.md): Reproducible performance measurements, corpus details, and comparison benchmarks.
-- [S3 storage compaction analysis](explanation/s3-benchmarks.md): Measured storage reduction ratios and network egress impact.
-- [Multi-core stress audit](explanation/stress-audit.md): Stability audit over 69.6 million real-world log events across multiple threads.
 
 ---
 

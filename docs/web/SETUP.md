@@ -1,4 +1,4 @@
-# Publish the Razobill site on GitHub Pages
+# Publishing the website on GitHub pages
 
 These files live in `docs/web/` of github.com/razobill/razobill. The workflow `.github/workflows/pages.yml` deploys that folder.
 

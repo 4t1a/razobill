@@ -147,7 +147,7 @@ Quantifies disk, bandwidth, or latency impact with verifiable production metrics
 - **Average sentence length**: Maximum 20 words per sentence.
 - **Stable anchors**: Do not change heading anchors without leaving backward-compatible stubs.
 - **Tagged code fences**: Every code block must declare its language tag (e.g. ````python````, ````sql````, ````bash````, ````cpp````).
-- **Descriptive links**: Write `[Python quickstart](docs/tutorials/python.md)`, never `[click here](...)`.
+- **Descriptive links**: Write `[Python developer guide](how-to/python.md)`, never `[click here](...)`.
 
 ---
 

@@ -1,0 +1,34 @@
+name: Documentation Lint
+
+on:
+  push:
+    branches: [main, docs/identity-refactor]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'CHANGELOG.md'
+      - 'tools/LintDocs.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'CHANGELOG.md'
+      - 'tools/LintDocs.py'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run documentation style and structure linter
+        run: |
+          python tools/LintDocs.py README.md CONTRIBUTING.md docs/

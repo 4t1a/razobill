@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ---
 
+## [1.1.1] - 2026-10-14
+
+### Changed
+- **Unified Public Surface Across Ecosystem**:
+  - Streamlined DuckDB SQL surface to exactly 4 canonical functions with zero aliases: `RzSplit`, `RzJoin`, `RzTemplate`, and `RzHash`.
+  - Streamlined Python package (`pyrazobill`) to canonical `RzSplit`, `RzJoin`, `RzTemplate`, `RzSplitMany`, `RzRecord`, and `RzError`.
+  - Streamlined Universal C ABI (`RazobillC.h`) to 6 functions (`RzSplit`, `RzJoin`, `RzTemplate`, `RzFree`, `RzStatusMessage`, `RzVersion`) and 2 types (`RzRecord`, `RzStatus`).
+  - Standardized template placeholders on `{i}` (integers) and `{s}` (strings), with `{{` and `}}` for literal braces.
+- **Modern Diataxis Documentation System**:
+  - Overhauled documentation into four Diataxis quadrants (`tutorials/`, `how-to/`, `reference/`, `explanation/`).
+  - Added centralized navigation index (`docs/README.md`), controlled glossary (`docs/glossary.md`), and error-string troubleshooting guide (`docs/troubleshooting.md`).
+  - Added automated documentation style linter (`tools/LintDocs.py`).
+
+---
+
 ## [1.0.1] - 2026-10-11
 
 ### Added
