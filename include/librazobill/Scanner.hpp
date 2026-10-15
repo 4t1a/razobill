@@ -105,9 +105,20 @@ template <class OnToken>
 
     while (p < end) {
         const auto* const dStart = p;
-        while (p < end && (detail::kClass[*p] & detail::kDelim) &&
-               !(mode == ScanMode::Semantic && (*p == '"' || *p == '\'')))
+        while (p < end && (detail::kClass[*p] & detail::kDelim)) {
+            if (mode == ScanMode::Semantic && (*p == '"' || *p == '\'')) {
+                const unsigned char quote = *p;
+                if ((quote == '"' && p < unclosedDoubleQuoteEnd) || (quote == '\'' && p < unclosedSingleQuoteEnd)) {
+                    // Suffix already confirmed to have no matching unescaped closing quote; treat as regular delimiter
+                    all |= detail::kClass[*p];
+                    ++p;
+                    continue;
+                }
+                break; // Potential quoted string literal
+            }
+            all |= detail::kClass[*p];
             ++p;
+        }
         const auto* const dEnd = p;
         const std::size_t dLen = static_cast<std::size_t>(dEnd - dStart);
         const char lastDelimChar = dLen > 0 ? static_cast<char>(*(dEnd - 1)) : '\0';
@@ -117,10 +128,6 @@ template <class OnToken>
         // Quoted string literal handling in Semantic mode
         if (mode == ScanMode::Semantic && (*p == '"' || *p == '\'')) {
             const unsigned char quote = *p;
-            if ((quote == '"' && p < unclosedDoubleQuoteEnd) || (quote == '\'' && p < unclosedSingleQuoteEnd)) {
-                // Suffix already confirmed to have no matching unescaped closing quote
-                goto regular_scan;
-            }
             const auto* const qStart = p;
             ++p;
             while (p < end && *p != quote && *p != '\n') {
@@ -144,10 +151,11 @@ template <class OnToken>
                     unclosedDoubleQuoteEnd = p;
                 else
                     unclosedSingleQuoteEnd = p;
-                p = qStart + 1; // Unclosed quote: proceed
+                all |= detail::kClass[quote];
+                p = qStart + 1; // Unclosed quote: proceed past qStart
+                continue;
             }
         }
-    regular_scan:
 
         const auto* const start = p;
         unsigned char seen = 0;

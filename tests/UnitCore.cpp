@@ -260,3 +260,11 @@ TEST_CASE("differential scalar vs SIMD delimiter scanner verification") {
         }
     }
 }
+
+TEST_CASE("unclosed quotes with escaped and unescaped characters roundtrip") {
+    // Regression test for fuzzer timeout on unclosed quotes with trailing characters
+    const std::string pathological = "\xca'\xff\xff\\'";
+    CHECK(roundtrip(pathological, nullptr, ScanMode::Semantic) == pathological);
+    CHECK(roundtrip("unclosed 'quote with trailing", nullptr, ScanMode::Semantic) == "unclosed 'quote with trailing");
+    CHECK(roundtrip("unclosed \"double quote with trailing", nullptr, ScanMode::Semantic) == "unclosed \"double quote with trailing");
+}

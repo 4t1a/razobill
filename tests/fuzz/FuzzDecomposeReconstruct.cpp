@@ -129,7 +129,9 @@ int main(int /*argc*/, char** /*argv*/) {
         "",
         "      \t\t\n\r   ",
         "0",
-        "9223372036854775807"};
+        "9223372036854775807",
+        "\xca'\xff\xff\\'",
+        "unclosed 'quote test"};
 
     std::cout << "[FuzzDecomposeReconstruct] Running standalone verification harness...\n";
     for (size_t i = 0; i < testCases.size(); ++i) {
