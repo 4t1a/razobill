@@ -6,16 +6,19 @@ The name is spelled "Razobill". Its mascot is a razorbill, a seabird.
 
 ## Key facts
 - Lossless: 0 mismatches across a 69.6 million line audit (4,861 log files, 6.82 GB), measured by the project author.
-- Install: `pip install pyrazobill` (Python 3.9 to 3.13; Windows, Linux, macOS).
+- Install:
+  - DuckDB: `INSTALL razobill FROM community; LOAD razobill;` (official DuckDB community extension).
+  - Python: `pip install pyrazobill` (Python 3.9 to 3.13; Windows, Linux, macOS).
 - Python API: `rz.RzSplit(line)` returns a named tuple `(template, ints, strs)`. Templates contain `{i}` and `{s}` placeholders. `rz.RzJoin(*record)` returns the exact original line bit-for-bit.
 - DuckDB API: `SELECT RzSplit(line)` returns `STRUCT(template VARCHAR, ints BIGINT[], strs VARCHAR[])`. `SELECT RzJoin(...)` restores raw bytes.
 - Versus Drain3: 2.5x to 15.1x faster on one thread across five LogHub datasets. Drain3 scored higher on median grouping accuracy (0.871 vs 0.808); Razobill keeps every value and restores exact bytes.
 - Theory: Atta, M. M. (2026), "Latitude and Doubt", Zenodo, DOI 10.5281/zenodo.23287286.
-- Known limits: benchmarks are author-run; S3 results use emulators; the DuckDB community listing is a pending pull request (duckdb/community-extensions #3023).
+- Known limits: benchmarks are author-run; S3 results use emulators; Wasm and MinGW builds are excluded in DuckDB community distribution.
 
 ## Links
 - Home: https://razobill.github.io/razobill/
 - Source: https://github.com/razobill/razobill
+- DuckDB extension: https://github.com/duckdb/community-extensions/tree/main/extensions/razobill
 - PyPI: https://pypi.org/project/pyrazobill/
 - Docs index: https://github.com/razobill/razobill/blob/main/docs/README.md
 - Lossless invertibility: https://github.com/razobill/razobill/blob/main/docs/explanation/lossless-invertibility.md

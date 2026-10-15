@@ -10,6 +10,7 @@
 <p align="center">
   <a href="https://github.com/razobill/razobill/actions/workflows/CI.yml"><img src="https://github.com/razobill/razobill/actions/workflows/CI.yml/badge.svg" alt="CI Status"></a>
   <a href="https://github.com/razobill/razobill/actions/workflows/Release.yml"><img src="https://github.com/razobill/razobill/actions/workflows/Release.yml/badge.svg" alt="Release Status"></a>
+  <a href="https://github.com/duckdb/community-extensions/tree/main/extensions/razobill"><img src="https://img.shields.io/badge/DuckDB%20Community-razobill-blue?logo=duckdb" alt="DuckDB Community Extension"></a>
   <a href="https://pypi.org/project/pyrazobill/"><img src="https://img.shields.io/pypi/v/pyrazobill.svg" alt="PyPI Package Version"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
@@ -17,6 +18,8 @@
 Razobill is an exact, invertible telemetry engine that turns unstructured log strings into queryable columnar data.
 It splits every log line into a constant template, an array of 64-bit integers, and an array of variable words.
 Joining those components reconstructs the original raw bytes bit-for-bit with zero data loss.
+
+**Website & Interactive Visualizer**: [razobill.github.io/razobill](https://razobill.github.io/razobill/)
 
 ---
 
@@ -34,7 +37,7 @@ pip install pyrazobill
 
 ### DuckDB extension
 
-Load the extension directly inside your DuckDB shell or client:
+Install and load directly from the official DuckDB Community Repository:
 
 ```sql
 INSTALL razobill FROM community;
@@ -142,6 +145,8 @@ You can store logs as compact columnar Parquet files and restore the exact origi
 
 Navigate the documentation system:
 
+- **Interactive Web Visualizer**: [razobill.github.io/razobill](https://razobill.github.io/razobill/)
+- **DuckDB Community Extension**: [duckdb/community-extensions](https://github.com/duckdb/community-extensions/tree/main/extensions/razobill)
 - **Tutorials**: [Getting started in 5 minutes](docs/tutorials/getting-started.md)
 - **How-to guides**:
   - [DuckDB extension guide](docs/how-to/duckdb.md)
