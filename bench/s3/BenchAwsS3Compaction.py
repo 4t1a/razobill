@@ -73,9 +73,7 @@ def generateCorpus(count: int = 50000):
         t_name, tmpl = templates[i % len(templates)]
         sec = f"{i % 60:02d}"
         if t_name == "auth":
-            line = tmpl.format(
-                sec=sec, uid=i % 100, ip=(i % 254) + 1, port=1024 + (i % 60000)
-            )
+            line = tmpl.format(sec=sec, uid=i % 100, ip=(i % 254) + 1, port=1024 + (i % 60000))
         elif t_name == "api":
             status = 200 if (i % 10 != 0) else (404 if i % 20 != 0 else 500)
             line = tmpl.format(
@@ -95,9 +93,7 @@ def generateCorpus(count: int = 50000):
                 port=30000 + (i % 20000),
             )
         elif t_name == "spark":
-            line = tmpl.format(
-                sec=sec, task_id=i % 128, dur=50 + (i % 1500), spill=1024 * (i % 2048)
-            )
+            line = tmpl.format(sec=sec, task_id=i % 128, dur=50 + (i % 1500), spill=1024 * (i % 2048))
         elif t_name == "db":
             line = tmpl.format(sec=sec, tbl=tables[i % len(tables)], tx=50000 + i)
         elif t_name == "k8s":
@@ -122,9 +118,7 @@ def runS3CompactionBenchmark(
         threads = os.cpu_count() or 4
 
     print("=" * 82)
-    print(
-        f"      RAZOBILL AWS S3 STORAGE COMPACTION & SCAN BENCHMARK ({threads} THREADS)"
-    )
+    print(f"      RAZOBILL AWS S3 STORAGE COMPACTION & SCAN BENCHMARK ({threads} THREADS)")
     print("=" * 82)
 
     mock_server = None
@@ -138,15 +132,9 @@ def runS3CompactionBenchmark(
         con.execute("SET preserve_insertion_order = false;")
 
         # Register Razobill UDFs
-        con.create_function(
-            "rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR"
-        )
-        con.create_function(
-            "rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]"
-        )
-        con.create_function(
-            "rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]"
-        )
+        con.create_function("rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR")
+        con.create_function("rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]")
+        con.create_function("rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]")
         con.create_function(
             "rbReconstruct",
             reconstructRazobill,
@@ -180,14 +168,8 @@ def runS3CompactionBenchmark(
                     return 0
             try:
                 # LocalStack / MinIO HEAD request
-                endpoint_url = (
-                    "http://127.0.0.1:4566"
-                    if "4566" in endpoint_desc
-                    else "http://127.0.0.1:9000"
-                )
-                req = urllib.request.Request(
-                    f"{endpoint_url}/{active_bucket}/{key}", method="HEAD"
-                )
+                endpoint_url = "http://127.0.0.1:4566" if "4566" in endpoint_desc else "http://127.0.0.1:9000"
+                req = urllib.request.Request(f"{endpoint_url}/{active_bucket}/{key}", method="HEAD")
                 with urllib.request.urlopen(req, timeout=2.0) as resp:
                     return int(resp.headers.get("Content-Length", 0))
             except Exception:
@@ -200,32 +182,20 @@ def runS3CompactionBenchmark(
                     return 0
 
         # Phase 1: Stream Raw Parquet
-        print(
-            "\n[Phase 1] Streaming Raw Log Parquet to S3 (Standard Storage Baseline)..."
-        )
+        print("\n[Phase 1] Streaming Raw Log Parquet to S3 (Standard Storage Baseline)...")
         s3_raw_key = "bench/raw_logs.parquet"
         s3_raw_uri = f"s3://{active_bucket}/{s3_raw_key}"
         t0 = time.perf_counter()
-        con.execute(
-            f"COPY raw_logs TO '{s3_raw_uri}' (FORMAT PARQUET, OVERWRITE TRUE, COMPRESSION ZSTD);"
-        )
+        con.execute(f"COPY raw_logs TO '{s3_raw_uri}' (FORMAT PARQUET, OVERWRITE TRUE, COMPRESSION ZSTD);")
         t_raw_put = time.perf_counter() - t0
         raw_pq_bytes = get_s3_size(s3_raw_key)
         raw_pq_mb = raw_pq_bytes / (1024 * 1024)
-        print(
-            f"    - S3 Upload Time:          {t_raw_put:.3f} s ({(raw_mb / t_raw_put):.2f} MB/s wire rate)"
-        )
-        print(
-            f"    - Raw Parquet Size:        {raw_pq_mb:.3f} MB ({raw_pq_bytes:,} bytes)"
-        )
-        print(
-            f"    - Raw Parquet Reduction:   {(1.0 - (raw_pq_bytes / raw_text_bytes)) * 100:.2f}% vs Raw Text"
-        )
+        print(f"    - S3 Upload Time:          {t_raw_put:.3f} s ({(raw_mb / t_raw_put):.2f} MB/s wire rate)")
+        print(f"    - Raw Parquet Size:        {raw_pq_mb:.3f} MB ({raw_pq_bytes:,} bytes)")
+        print(f"    - Raw Parquet Reduction:   {(1.0 - (raw_pq_bytes / raw_text_bytes)) * 100:.2f}% vs Raw Text")
 
         # Phase 2: Stream Razobill Decomposed Columnar Parquet
-        print(
-            "\n[Phase 2] Streaming Razobill Decomposed Parquet to S3 (Structured Slots)..."
-        )
+        print("\n[Phase 2] Streaming Razobill Decomposed Parquet to S3 (Structured Slots)...")
         s3_rb_key = "bench/razobill_logs.parquet"
         s3_rb_uri = f"s3://{active_bucket}/{s3_rb_key}"
         t0 = time.perf_counter()
@@ -243,38 +213,24 @@ def runS3CompactionBenchmark(
         rb_pq_bytes = get_s3_size(s3_rb_key)
         rb_pq_mb = rb_pq_bytes / (1024 * 1024)
         compaction_vs_raw_text = (1.0 - (rb_pq_bytes / raw_text_bytes)) * 100.0
-        compaction_vs_raw_pq = (
-            (1.0 - (rb_pq_bytes / raw_pq_bytes)) * 100.0 if raw_pq_bytes > 0 else 0.0
-        )
+        compaction_vs_raw_pq = (1.0 - (rb_pq_bytes / raw_pq_bytes)) * 100.0 if raw_pq_bytes > 0 else 0.0
 
-        print(
-            f"    - S3 Upload Time:          {t_rb_put:.3f} s ({(raw_mb / t_rb_put):.2f} MB/s wire rate)"
-        )
-        print(
-            f"    - Razobill Parquet Size:   {rb_pq_mb:.3f} MB ({rb_pq_bytes:,} bytes)"
-        )
-        print(
-            f"    - Compaction vs Raw Text:  {compaction_vs_raw_text:.2f}% SPACE SAVED"
-        )
-        print(
-            f"    - Compaction vs Raw Parquet:{compaction_vs_raw_pq:.2f}% ADDITIONAL REDUCTION"
-        )
+        print(f"    - S3 Upload Time:          {t_rb_put:.3f} s ({(raw_mb / t_rb_put):.2f} MB/s wire rate)")
+        print(f"    - Razobill Parquet Size:   {rb_pq_mb:.3f} MB ({rb_pq_bytes:,} bytes)")
+        print(f"    - Compaction vs Raw Text:  {compaction_vs_raw_text:.2f}% SPACE SAVED")
+        print(f"    - Compaction vs Raw Parquet:{compaction_vs_raw_pq:.2f}% ADDITIONAL REDUCTION")
 
         # Phase 3: Analytical Query Scan Latency
         print("\n[Phase 3] In-S3 Analytical Query Scans over the Wire...")
         runs = 5
         t0 = time.perf_counter()
         for _ in range(runs):
-            con.execute(
-                f"SELECT COUNT(*) FROM '{s3_raw_uri}' WHERE msg LIKE '%500%';"
-            ).fetchall()
+            con.execute(f"SELECT COUNT(*) FROM '{s3_raw_uri}' WHERE msg LIKE '%500%';").fetchall()
         t_raw_scan = (time.perf_counter() - t0) / runs
 
         t0 = time.perf_counter()
         for _ in range(runs):
-            con.execute(
-                f"SELECT COUNT(*) FROM '{s3_rb_uri}' WHERE len(ints) >= 2 AND ints[1] = 500;"
-            ).fetchall()
+            con.execute(f"SELECT COUNT(*) FROM '{s3_rb_uri}' WHERE len(ints) >= 2 AND ints[1] = 500;").fetchall()
         t_rb_scan = (time.perf_counter() - t0) / runs
 
         scan_speedup = (t_raw_scan / t_rb_scan) if t_rb_scan > 0 else 1.0
@@ -292,9 +248,7 @@ def runS3CompactionBenchmark(
             if reconstructed != corpus[rid]:
                 mismatches += 1
         print(f"    - Evaluated Rows:          {len(sample_rows):,}")
-        print(
-            f"    - Bit-Level Mismatches:    {mismatches} (100.000% Lossless Guarantee)"
-        )
+        print(f"    - Bit-Level Mismatches:    {mismatches} (100.000% Lossless Guarantee)")
         assert mismatches == 0, f"Found {mismatches} mismatches in S3 data!"
 
         # Phase 5: Cloud Cost Economics
@@ -313,17 +267,13 @@ def runS3CompactionBenchmark(
         t30_rb_storage = t30_raw_storage * (1.0 - (compaction_vs_raw_text / 100.0))
         t30_athena_raw = (30.0 * 1024.0 * 0.3 * 30.0 / 1000.0) * athena_rate * 100.0
         t30_athena_rb = t30_athena_raw * 0.08
-        t30_savings = (t30_raw_storage - t30_rb_storage) + (
-            t30_athena_raw - t30_athena_rb
-        )
+        t30_savings = (t30_raw_storage - t30_rb_storage) + (t30_athena_raw - t30_athena_rb)
 
         # Print Summary Table
         print("\n" + "=" * 82)
         print("                  AWS S3 COMPACTION & PERFORMANCE SUMMARY")
         print("=" * 82)
-        print(
-            f" {'Metric / Dimension':<32} | {'Raw Parquet':<20} | {'Razobill Parquet':<22}"
-        )
+        print(f" {'Metric / Dimension':<32} | {'Raw Parquet':<20} | {'Razobill Parquet':<22}")
         print("-" * 82)
         print(
             f" {'Storage Footprint (S3)':<32} | {f'{raw_pq_mb:.3f} MB':<20} | {f'{rb_pq_mb:.3f} MB ({compaction_vs_raw_text:.1f}% less)':<22}"
@@ -331,15 +281,9 @@ def runS3CompactionBenchmark(
         print(
             f" {'In-S3 Query Scan Latency':<32} | {f'{t_raw_scan * 1000:.2f} ms':<20} | {f'{t_rb_scan * 1000:.2f} ms ({scan_speedup:.2f}x fast)':<22}"
         )
-        print(
-            f" {'Invertibility Guarantee':<32} | {'Exact':<20} | {'100.000% Lossless':<22}"
-        )
-        print(
-            f" {'Common 1 TB/Mo AWS Savings':<32} | {'$0 / mo':<20} | {f'${t1_savings:,.2f} / month':<22}"
-        )
-        print(
-            f" {'Enterprise 30 TB/Mo Savings':<32} | {'$0 / mo':<20} | {f'${t30_savings:,.2f} / month':<22}"
-        )
+        print(f" {'Invertibility Guarantee':<32} | {'Exact':<20} | {'100.000% Lossless':<22}")
+        print(f" {'Common 1 TB/Mo AWS Savings':<32} | {'$0 / mo':<20} | {f'${t1_savings:,.2f} / month':<22}")
+        print(f" {'Enterprise 30 TB/Mo Savings':<32} | {'$0 / mo':<20} | {f'${t30_savings:,.2f} / month':<22}")
         print("=" * 82)
         return True
 
@@ -357,21 +301,11 @@ if __name__ == "__main__":
         default=None,
         help="Number of log records to evaluate (positional)",
     )
-    parser.add_argument(
-        "--count", type=int, default=50000, help="Number of log records to evaluate"
-    )
-    parser.add_argument(
-        "--threads", type=int, default=None, help="Number of worker threads"
-    )
-    parser.add_argument(
-        "--endpoint", type=str, default=None, help="Custom S3 endpoint or 'aws'"
-    )
-    parser.add_argument(
-        "--bucket", type=str, default="telemetry", help="Target S3 bucket"
-    )
+    parser.add_argument("--count", type=int, default=50000, help="Number of log records to evaluate")
+    parser.add_argument("--threads", type=int, default=None, help="Number of worker threads")
+    parser.add_argument("--endpoint", type=str, default=None, help="Custom S3 endpoint or 'aws'")
+    parser.add_argument("--bucket", type=str, default="telemetry", help="Target S3 bucket")
     args = parser.parse_args()
 
     n = args.positional_count if args.positional_count is not None else args.count
-    runS3CompactionBenchmark(
-        count=n, threads=args.threads, endpoint=args.endpoint, bucket=args.bucket
-    )
+    runS3CompactionBenchmark(count=n, threads=args.threads, endpoint=args.endpoint, bucket=args.bucket)

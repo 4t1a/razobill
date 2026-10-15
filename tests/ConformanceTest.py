@@ -48,7 +48,13 @@ c_lib.RzSplit.restype = ctypes.c_int
 c_lib.RzJoin.argtypes = [ctypes.POINTER(CRzRecord), ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
 c_lib.RzJoin.restype = ctypes.c_int
 
-c_lib.RzTemplate.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
+c_lib.RzTemplate.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_size_t,
+    ctypes.c_char_p,
+    ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_size_t),
+]
 c_lib.RzTemplate.restype = ctypes.c_int
 
 c_lib.RzFree.argtypes = [ctypes.POINTER(CRzRecord)]
@@ -56,6 +62,7 @@ c_lib.RzFree.restype = None
 
 # Connect to DuckDB
 import duckdb
+
 con = duckdb.connect(config={"allow_unsigned_extensions": "true"})
 ext_path = str(root_dir / "build" / "razobill.duckdb_extension").replace("\\", "/")
 con.load_extension(ext_path)
@@ -95,9 +102,13 @@ def run_c(msg_bytes: bytes):
 def run_duckdb(msg: str):
     # Escape single quotes for SQL
     sql_msg = msg.replace("'", "''")
-    res = con.execute(f"SELECT (RzSplit('{sql_msg}')).template, (RzSplit('{sql_msg}')).ints, (RzSplit('{sql_msg}')).strs").fetchall()
+    res = con.execute(
+        f"SELECT (RzSplit('{sql_msg}')).template, (RzSplit('{sql_msg}')).ints, (RzSplit('{sql_msg}')).strs"
+    ).fetchall()
     tmpl, ints, strs = res[0]
-    join_res = con.execute(f"SELECT RzJoin((RzSplit('{sql_msg}')).template, (RzSplit('{sql_msg}')).ints, (RzSplit('{sql_msg}')).strs)").fetchall()
+    join_res = con.execute(
+        f"SELECT RzJoin((RzSplit('{sql_msg}')).template, (RzSplit('{sql_msg}')).ints, (RzSplit('{sql_msg}')).strs)"
+    ).fetchall()
     reconstructed = join_res[0][0]
     return tmpl, list(ints), list(strs), reconstructed
 
@@ -126,22 +137,13 @@ def main():
 
         # Cross-language conformance assertions
         assert py_rec.template == c_tmpl == db_tmpl, (
-            f"Template mismatch on line {idx}:\n"
-            f"  Python: {py_rec.template}\n"
-            f"  C ABI:  {c_tmpl}\n"
-            f"  DuckDB: {db_tmpl}"
+            f"Template mismatch on line {idx}:\n  Python: {py_rec.template}\n  C ABI:  {c_tmpl}\n  DuckDB: {db_tmpl}"
         )
         assert py_rec.ints == c_ints == db_ints, (
-            f"Ints mismatch on line {idx}:\n"
-            f"  Python: {py_rec.ints}\n"
-            f"  C ABI:  {c_ints}\n"
-            f"  DuckDB: {db_ints}"
+            f"Ints mismatch on line {idx}:\n  Python: {py_rec.ints}\n  C ABI:  {c_ints}\n  DuckDB: {db_ints}"
         )
         assert py_rec.strs == c_strs == db_strs, (
-            f"Strs mismatch on line {idx}:\n"
-            f"  Python: {py_rec.strs}\n"
-            f"  C ABI:  {c_strs}\n"
-            f"  DuckDB: {db_strs}"
+            f"Strs mismatch on line {idx}:\n  Python: {py_rec.strs}\n  C ABI:  {c_strs}\n  DuckDB: {db_strs}"
         )
 
     print(f"SUCCESS: All {len(lines)} lines produced 100% byte-identical results across Python, C, and DuckDB SQL!")

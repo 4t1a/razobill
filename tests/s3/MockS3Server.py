@@ -17,9 +17,7 @@ class MockS3Storage:
         self.lock = threading.Lock()
         self.buckets = {"telemetry": {}, "test-bucket": {}}
         self.etags = {"telemetry": {}, "test-bucket": {}}
-        self.multipart_uploads = (
-            {}
-        )  # upload_id -> {"bucket": b, "key": k, "parts": {part_num: data}}
+        self.multipart_uploads = {}  # upload_id -> {"bucket": b, "key": k, "parts": {part_num: data}}
 
     def ensure_bucket(self, bucket):
         with self.lock:
@@ -279,9 +277,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
     <Bucket>{bucket}</Bucket>
     <Key>{key}</Key>
     <UploadId>{upload_id}</UploadId>
-</InitiateMultipartUploadResult>""".encode(
-                "utf-8"
-            )
+</InitiateMultipartUploadResult>""".encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml")
             self.send_header("Content-Length", str(len(xml_resp)))
@@ -301,9 +297,7 @@ class MockS3Handler(BaseHTTPRequestHandler):
     <Bucket>{b}</Bucket>
     <Key>{k}</Key>
     <ETag>"{etag}"</ETag>
-</CompleteMultipartUploadResult>""".encode(
-                    "utf-8"
-                )
+</CompleteMultipartUploadResult>""".encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/xml")
                 self.send_header("Content-Length", str(len(xml_resp)))
@@ -349,9 +343,7 @@ class MockS3Server:
         sock.close()
         if result == 0:
             # Port is in use, could be an already running MinIO or mock
-            print(
-                f"[*] Port {self.port} already in use. Attempting to bind next available port..."
-            )
+            print(f"[*] Port {self.port} already in use. Attempting to bind next available port...")
             self.port = 9100
 
         self.httpd = HTTPServer((self.host, self.port), MockS3Handler)

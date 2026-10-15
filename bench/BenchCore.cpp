@@ -256,11 +256,11 @@ int main(int argc, char** argv) {
         if (numThreads == 1) baselineThroughput = megaMsgsPerSec;
         const double speedup = baselineThroughput > 0 ? (megaMsgsPerSec / baselineThroughput) : 1.0;
         std::printf("%2zu Cores (%2zu Threads)                 %7.1f MB/s  %6.2f M msg/s  (Speedup %5.2fx, sink %zu)\n",
-                    numThreads, numThreads, mbPerSec, megaMsgsPerSec, speedup, parallelSink.load(std::memory_order_relaxed) & 1);
+                    numThreads, numThreads, mbPerSec, megaMsgsPerSec, speedup,
+                    parallelSink.load(std::memory_order_relaxed) & 1);
     }
 
     std::printf(
         "===================================================================================================\n");
     return 0;
 }
-

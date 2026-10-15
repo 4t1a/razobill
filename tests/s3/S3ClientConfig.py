@@ -44,9 +44,7 @@ def isRealAwsEnvironment() -> bool:
     Detects whether the environment is running against live AWS S3.
     """
     endpoint = os.environ.get("AWS_ENDPOINT_URL", "").lower()
-    if endpoint and (
-        "localhost" in endpoint or "127.0.0.1" in endpoint or "localstack" in endpoint
-    ):
+    if endpoint and ("localhost" in endpoint or "127.0.0.1" in endpoint or "localstack" in endpoint):
         return False
 
     # Check for AWS compute runtime indicators
@@ -84,18 +82,11 @@ def configureDuckDbS3(
 
     # 2. Resolve Environment Variables
     env_endpoint = endpointOverride or os.environ.get("AWS_ENDPOINT_URL", "").strip()
-    env_bucket = (
-        os.environ.get("S3_BUCKET", "").strip()
-        or os.environ.get("RAZOBILL_S3_BUCKET", "").strip()
-    )
+    env_bucket = os.environ.get("S3_BUCKET", "").strip() or os.environ.get("RAZOBILL_S3_BUCKET", "").strip()
     if env_bucket:
         bucket = env_bucket
 
-    region = (
-        regionOverride
-        or os.environ.get("AWS_REGION")
-        or os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-    )
+    region = regionOverride or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
     access_key = os.environ.get("AWS_ACCESS_KEY_ID", "").strip()
     secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip()
     session_token = os.environ.get("AWS_SESSION_TOKEN", "").strip()
@@ -105,9 +96,7 @@ def configureDuckDbS3(
     endpoint_desc = ""
 
     # Case A: Explicit or Detected Real AWS S3
-    if env_endpoint in ("aws", "real-aws", "s3.amazonaws.com") or (
-        isRealAwsEnvironment() and not env_endpoint
-    ):
+    if env_endpoint in ("aws", "real-aws", "s3.amazonaws.com") or (isRealAwsEnvironment() and not env_endpoint):
         is_real_aws = True
         endpoint_desc = f"AWS S3 Production ({region})"
         print(f"[*] Configuring DuckDB for Live AWS S3 in region '{region}'...")
@@ -123,14 +112,10 @@ def configureDuckDbS3(
 
     # Case B: Explicit Custom Endpoint (e.g. http://localhost:4566)
     if env_endpoint and env_endpoint not in ("mock", "none"):
-        clean_endpoint = (
-            env_endpoint.replace("http://", "").replace("https://", "").rstrip("/")
-        )
+        clean_endpoint = env_endpoint.replace("http://", "").replace("https://", "").rstrip("/")
         use_ssl = env_endpoint.startswith("https://")
         endpoint_desc = f"Custom S3 Endpoint ({env_endpoint})"
-        print(
-            f"[*] Configuring DuckDB for custom S3 endpoint: {clean_endpoint} (SSL={use_ssl})..."
-        )
+        print(f"[*] Configuring DuckDB for custom S3 endpoint: {clean_endpoint} (SSL={use_ssl})...")
         con.execute(f"SET s3_endpoint = '{clean_endpoint}';")
         con.execute(f"SET s3_use_ssl = {'true' if use_ssl else 'false'};")
         con.execute("SET s3_url_style = 'path';")
@@ -147,9 +132,7 @@ def configureDuckDbS3(
         print("[*] Detected active LocalStack AWS Emulator on 127.0.0.1:4566.")
         # Ensure bucket exists in LocalStack
         try:
-            req = urllib.request.Request(
-                f"http://127.0.0.1:4566/{bucket}", method="PUT"
-            )
+            req = urllib.request.Request(f"http://127.0.0.1:4566/{bucket}", method="PUT")
             urllib.request.urlopen(req, timeout=1.0)
         except Exception:
             # Bucket may already exist or LocalStack emulator returned an error; continue configuration
@@ -180,9 +163,7 @@ def configureDuckDbS3(
 
     # Case E: Automated MockS3Server Fallback
     if MockS3Server is not None:
-        print(
-            "[*] Launching zero-dependency MockS3Server for local offline validation..."
-        )
+        print("[*] Launching zero-dependency MockS3Server for local offline validation...")
         mock_server = MockS3Server(host="127.0.0.1", port=9000)
         port = mock_server.start()
         endpoint_desc = f"MockS3Server (127.0.0.1:{port})"

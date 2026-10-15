@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
 
 import pyrazobill
+
 assert getattr(pyrazobill, "_NATIVE", False), "FATAL: pyrazobill native C++ extension must be loaded for benchmarks!"
 
 DATASETS = [
@@ -112,7 +113,7 @@ def unpin_cores():
 def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
     """Profiles individual stages of the Razobill pipeline on Core 0."""
     pin_to_core(0)
-    total_bytes = sum(len(l) for l in lines)
+    total_bytes = sum(len(line) for line in lines)
     n = len(lines)
 
     stages = [
@@ -126,8 +127,8 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
         durations = []
         for r in range(runs):
             t0 = time.perf_counter()
-            for l in lines:
-                pyrazobill.RzSplit(l, mode=mode)
+            for line in lines:
+                pyrazobill.RzSplit(line, mode=mode)
             durations.append(time.perf_counter() - t0)
 
         med_sec = median(durations)
@@ -141,7 +142,7 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
 
     # Breakdown: parse + formKey vs reconstruct
     reconstruct_durations = []
-    records = [pyrazobill.RzSplit(l) for l in lines]
+    records = [pyrazobill.RzSplit(line) for line in lines]
     for r in range(runs):
         t0 = time.perf_counter()
         for rec in records:
@@ -161,8 +162,8 @@ def profile_component_breakdown(lines: list[str], runs: int = 5) -> dict:
     rt_durations = []
     for r in range(runs):
         t0 = time.perf_counter()
-        for l in lines:
-            rec = pyrazobill.RzSplit(l)
+        for line in lines:
+            rec = pyrazobill.RzSplit(line)
             _ = pyrazobill.RzJoin(rec.template, rec.ints, rec.strs)
         rt_durations.append(time.perf_counter() - t0)
 
@@ -191,7 +192,7 @@ def benchmark_multicore_scaling(lines: list[str], thread_counts: list[int], runs
         chunk_size = (len(lines) + t - 1) // t
         chunks = [lines[i * chunk_size : min((i + 1) * chunk_size, len(lines))] for i in range(t)]
         chunks = [c for c in chunks if c]
-        total_bytes = sum(len(l) for l in lines)
+        total_bytes = sum(len(line) for line in lines)
         n = len(lines)
 
         from concurrent.futures import ThreadPoolExecutor
@@ -218,7 +219,9 @@ def benchmark_multicore_scaling(lines: list[str], thread_counts: list[int], runs
             "median_mb_per_sec": med_mb_per_sec,
             "min_msgs_per_sec": min(run_rates),
             "max_msgs_per_sec": max(run_rates),
-            "spread_pct": ((max(run_rates) - min(run_rates)) / med_msgs_per_sec) * 100.0 if med_msgs_per_sec > 0 else 0.0,
+            "spread_pct": ((max(run_rates) - min(run_rates)) / med_msgs_per_sec) * 100.0
+            if med_msgs_per_sec > 0
+            else 0.0,
             "speedup": speedup,
             "efficiency_pct": efficiency,
         }
@@ -253,6 +256,7 @@ def run_benchcore_executable(corpus_path: str, max_lines: int) -> str:
 
 def parse_benchcore_output(stdout: str) -> dict:
     import re
+
     metrics = {
         "single_core_ops": {},
         "parallel_scaling": {},
@@ -268,7 +272,10 @@ def parse_benchcore_output(stdout: str) -> dict:
                 "mega_msgs_per_sec": float(m_op.group(4)),
             }
             continue
-        m_sc = re.match(r"^(\d+)\s+Cores\s*\(\s*(\d+)\s+Threads\)\s+([\d\.]+)\s+MB/s\s+([\d\.]+)\s+M msg/s\s+\(Speedup\s+([\d\.]+)x(?:,\s*sink\s+\d+)?\)", line)
+        m_sc = re.match(
+            r"^(\d+)\s+Cores\s*\(\s*(\d+)\s+Threads\)\s+([\d\.]+)\s+MB/s\s+([\d\.]+)\s+M msg/s\s+\(Speedup\s+([\d\.]+)x(?:,\s*sink\s+\d+)?\)",
+            line,
+        )
         if m_sc:
             cores = int(m_sc.group(1))
             threads = int(m_sc.group(2))
@@ -330,22 +337,22 @@ def main():
         print(f"SHA-256: {sha256}")
 
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            lines = [l.rstrip("\r\n") for l in f if l.strip()][: d["sample_lines"]]
+            lines = [line.rstrip("\r\n") for line in f if line.strip()][: d["sample_lines"]]
 
         print(f"Benchmark slice: {len(lines)} lines loaded")
 
         # 1. Cold vs Warm Parsing on Core 0
         pin_to_core(0)
         t_cold_start = time.perf_counter()
-        for l in lines:
-            _ = pyrazobill.RzSplit(l)
+        for line in lines:
+            _ = pyrazobill.RzSplit(line)
         cold_sec = time.perf_counter() - t_cold_start
 
         warm_durations = []
         for _ in range(5):
             t_w = time.perf_counter()
-            for l in lines:
-                _ = pyrazobill.RzSplit(l)
+            for line in lines:
+                _ = pyrazobill.RzSplit(line)
             warm_durations.append(time.perf_counter() - t_w)
         warm_sec = median(warm_durations)
         unpin_cores()
@@ -393,12 +400,16 @@ def main():
 
         # Display concise summary
         print(f"\n  Summary for {d['name']}:")
-        print(f"    Cold parse throughput  : {cold_warm_metrics['cold_msgs_per_sec']/1e6:.2f} M msg/s")
-        print(f"    Warm parse throughput  : {cold_warm_metrics['warm_msgs_per_sec']/1e6:.2f} M msg/s")
-        print(f"    Reconstruct throughput : {breakdown['reconstruct_only']['msgs_per_sec']/1e6:.2f} M msg/s")
-        print(f"    Full Round-Trip        : {breakdown['round_trip_parse_reconstruct']['msgs_per_sec']/1e6:.2f} M msg/s")
+        print(f"    Cold parse throughput  : {cold_warm_metrics['cold_msgs_per_sec'] / 1e6:.2f} M msg/s")
+        print(f"    Warm parse throughput  : {cold_warm_metrics['warm_msgs_per_sec'] / 1e6:.2f} M msg/s")
+        print(f"    Reconstruct throughput : {breakdown['reconstruct_only']['msgs_per_sec'] / 1e6:.2f} M msg/s")
+        print(
+            f"    Full Round-Trip        : {breakdown['round_trip_parse_reconstruct']['msgs_per_sec'] / 1e6:.2f} M msg/s"
+        )
         for k, v in multicore.items():
-            print(f"    Multi-core {v['threads']:2d} threads  : {v['median_msgs_per_sec']/1e6:.2f} M msg/s ({v['median_mb_per_sec']:.1f} MB/s) | Speedup {v['speedup']:.2f}x ({v['efficiency_pct']:.1f}%)")
+            print(
+                f"    Multi-core {v['threads']:2d} threads  : {v['median_msgs_per_sec'] / 1e6:.2f} M msg/s ({v['median_mb_per_sec']:.1f} MB/s) | Speedup {v['speedup']:.2f}x ({v['efficiency_pct']:.1f}%)"
+            )
 
     # Save JSON report
     out_dir = REPO_ROOT / "bench" / "results"

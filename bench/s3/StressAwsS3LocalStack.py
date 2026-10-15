@@ -124,9 +124,7 @@ def runStressTest(
         threads = os.cpu_count() or 4
 
     print("=" * 82)
-    print(
-        f"      RAZOBILL HIGH-THROUGHPUT STRESS TEST ON AWS S3 / LOCALSTACK ({threads} THREADS)"
-    )
+    print(f"      RAZOBILL HIGH-THROUGHPUT STRESS TEST ON AWS S3 / LOCALSTACK ({threads} THREADS)")
     print("=" * 82)
 
     mock_server = None
@@ -140,15 +138,9 @@ def runStressTest(
         con.execute("SET preserve_insertion_order = false;")
 
         # Register scalar UDFs
-        con.create_function(
-            "rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR"
-        )
-        con.create_function(
-            "rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]"
-        )
-        con.create_function(
-            "rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]"
-        )
+        con.create_function("rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR")
+        con.create_function("rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]")
+        con.create_function("rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]")
         con.create_function(
             "rbReconstruct",
             reconstructRazobill,
@@ -156,32 +148,24 @@ def runStressTest(
             "VARCHAR",
         )
 
-        print(
-            f"[*] Synthesizing {total_events:,} enterprise log events across 6 services..."
-        )
+        print(f"[*] Synthesizing {total_events:,} enterprise log events across 6 services...")
         t0 = time.perf_counter()
         dataset = generateStressDataset(total_events)
         t_gen = time.perf_counter() - t0
         raw_bytes = sum(len(d[2].encode("utf-8")) + 1 for d in dataset)
         raw_mb = raw_bytes / (1024 * 1024)
-        print(
-            f"[+] Dataset generated in {t_gen:.2f} s: {raw_mb:.2f} MB ({raw_bytes:,} bytes)"
-        )
+        print(f"[+] Dataset generated in {t_gen:.2f} s: {raw_mb:.2f} MB ({raw_bytes:,} bytes)")
 
         # Stage in DuckDB table
         print("[*] Staging logs in memory table staging_stress...")
         t0 = time.perf_counter()
-        con.execute(
-            "CREATE TABLE staging_stress (eid INT, service VARCHAR, msg VARCHAR);"
-        )
+        con.execute("CREATE TABLE staging_stress (eid INT, service VARCHAR, msg VARCHAR);")
         con.executemany("INSERT INTO staging_stress VALUES (?, ?, ?);", dataset)
         print(f"[+] Staged {total_events:,} events in {time.perf_counter() - t0:.2f} s")
 
         # Stream partitioned parquet to S3
         s3_partition_dir = f"s3://{active_bucket}/stress_partitions"
-        print(
-            f"\n[*] Streaming partitioned columnar Parquet to S3: {s3_partition_dir}..."
-        )
+        print(f"\n[*] Streaming partitioned columnar Parquet to S3: {s3_partition_dir}...")
         t0 = time.perf_counter()
         export_sql = f"""
         COPY (
@@ -227,17 +211,13 @@ def runStressTest(
             t_q0 = time.perf_counter()
             res = con.execute(q_sql).fetchall()
             dt_q = (time.perf_counter() - t_q0) * 1000
-            print(
-                f"    - {q_name:<42}: {dt_q:6.2f} ms (Result: {res[0] if len(res) == 1 else len(res)})"
-            )
+            print(f"    - {q_name:<42}: {dt_q:6.2f} ms (Result: {res[0] if len(res) == 1 else len(res)})")
 
         # Concurrent Multi-Client Analytical Stress
         from concurrent.futures import ThreadPoolExecutor
 
         concurrency = min(8, threads * 2)
-        print(
-            f"\n[*] Simulating {concurrency} Concurrent Dashboard Queries across S3 Partitions..."
-        )
+        print(f"\n[*] Simulating {concurrency} Concurrent Dashboard Queries across S3 Partitions...")
 
         def runConcurrentQuery(idx):
             q_t0 = time.perf_counter()
@@ -253,17 +233,13 @@ def runStressTest(
         total_q_time = time.perf_counter() - t0
         avg_q_lat = (sum(q_times) / len(q_times)) * 1000
         qps = len(q_times) / total_q_time if total_q_time > 0 else 0
-        print(
-            f"[+] Concurrent Query Stress Complete: {len(q_times)} queries in {total_q_time * 1000:.1f} ms"
-        )
+        print(f"[+] Concurrent Query Stress Complete: {len(q_times)} queries in {total_q_time * 1000:.1f} ms")
         print(f"    - Average Query Latency: {avg_q_lat:.2f} ms")
         print(f"    - In-S3 Scan Throughput: {qps:.1f} Queries/second")
 
         # Lossless Invertibility Audit
         sample_audit_count = min(5000, total_events)
-        print(
-            f"\n[*] Performing Lossless Invertibility Audit on {sample_audit_count:,} events from S3..."
-        )
+        print(f"\n[*] Performing Lossless Invertibility Audit on {sample_audit_count:,} events from S3...")
         t0 = time.perf_counter()
         rows = con.execute(
             f"SELECT eid, rbReconstruct(form, ints, strs) FROM '{s3_partition_dir}/*/*.parquet' LIMIT {sample_audit_count};"
@@ -278,9 +254,7 @@ def runStressTest(
         t_audit = time.perf_counter() - t0
         print(f"[+] Audit Complete in {t_audit:.2f} s: {len(rows):,} events verified.")
         print(f"[+] Total Bit-Level Mismatches: {mismatches} (0.00% Error Rate)")
-        assert mismatches == 0, (
-            f"Stress test detected {mismatches} data corruption mismatches!"
-        )
+        assert mismatches == 0, f"Stress test detected {mismatches} data corruption mismatches!"
 
         print("\n" + "=" * 82)
         print("          ALL 100,000 EVENT S3 STRESS TESTS PASSED WITH 0 ERRORS")
@@ -301,21 +275,11 @@ if __name__ == "__main__":
         default=None,
         help="Total number of events to stream (positional)",
     )
-    parser.add_argument(
-        "--count", type=int, default=100000, help="Total number of events to stream"
-    )
-    parser.add_argument(
-        "--threads", type=int, default=None, help="Number of worker threads"
-    )
-    parser.add_argument(
-        "--endpoint", type=str, default=None, help="Custom S3 endpoint or 'aws'"
-    )
-    parser.add_argument(
-        "--bucket", type=str, default="telemetry", help="Target S3 bucket"
-    )
+    parser.add_argument("--count", type=int, default=100000, help="Total number of events to stream")
+    parser.add_argument("--threads", type=int, default=None, help="Number of worker threads")
+    parser.add_argument("--endpoint", type=str, default=None, help="Custom S3 endpoint or 'aws'")
+    parser.add_argument("--bucket", type=str, default="telemetry", help="Target S3 bucket")
     args = parser.parse_args()
 
     n = args.positional_count if args.positional_count is not None else args.count
-    runStressTest(
-        total_events=n, threads=args.threads, endpoint=args.endpoint, bucket=args.bucket
-    )
+    runStressTest(total_events=n, threads=args.threads, endpoint=args.endpoint, bucket=args.bucket)

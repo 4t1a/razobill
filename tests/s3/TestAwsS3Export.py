@@ -156,24 +156,16 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
         print(f"[*] S3 Storage Target: s3://{active_bucket}/ ({endpoint_desc})")
 
         # Register Razobill scalar functions
-        con.create_function(
-            "rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR"
-        )
-        con.create_function(
-            "rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]"
-        )
-        con.create_function(
-            "rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]"
-        )
+        con.create_function("rbForm", lambda m: parseRazobill(m)[0], ["VARCHAR"], "VARCHAR")
+        con.create_function("rbInts", lambda m: parseRazobill(m)[1], ["VARCHAR"], "BIGINT[]")
+        con.create_function("rbStrs", lambda m: parseRazobill(m)[2], ["VARCHAR"], "VARCHAR[]")
         con.create_function(
             "rbReconstruct",
             reconstructRazobill,
             ["VARCHAR", "BIGINT[]", "VARCHAR[]"],
             "VARCHAR",
         )
-        print(
-            "[*] Registered Razobill scalar functions: rbForm, rbInts, rbStrs, rbReconstruct"
-        )
+        print("[*] Registered Razobill scalar functions: rbForm, rbInts, rbStrs, rbReconstruct")
 
         # Synthesize production logs
         templates = [
@@ -215,9 +207,7 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
             sample_logs.append(msg)
 
         con.execute("CREATE TABLE staging_logs (id INT, msg VARCHAR);")
-        con.executemany(
-            "INSERT INTO staging_logs VALUES (?, ?);", list(enumerate(sample_logs))
-        )
+        con.executemany("INSERT INTO staging_logs VALUES (?, ?);", list(enumerate(sample_logs)))
         print(f"[*] Staged {count:,} log events in memory table.")
 
         s3_target_uri = f"s3://{active_bucket}/year=2026/month=10/logs.parquet"
@@ -239,9 +229,7 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
         print("[*] Reading and querying Parquet file directly from S3...")
         cnt_row = con.execute(f"SELECT COUNT(*) FROM '{s3_target_uri}';").fetchone()
         row_count = cnt_row[0]
-        print(
-            f"[+] Total rows verified in S3 Parquet: {row_count:,} (Expected: {count:,})"
-        )
+        print(f"[+] Total rows verified in S3 Parquet: {row_count:,} (Expected: {count:,})")
         assert row_count == count, f"Expected {count} rows in S3, found {row_count}"
 
         print("[*] Running analytical query over S3 integer slots (ints[1] > 200)...")
@@ -260,12 +248,8 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
         ).fetchall()
         print(f"[+] Top aggregated forms from S3:\n    {res}")
 
-        print(
-            "[*] Verifying byte-for-byte lossless reconstruction for all rows from S3..."
-        )
-        rows = con.execute(
-            f"SELECT id, rbReconstruct(form, ints, strs) FROM '{s3_target_uri}' ORDER BY id;"
-        ).fetchall()
+        print("[*] Verifying byte-for-byte lossless reconstruction for all rows from S3...")
+        rows = con.execute(f"SELECT id, rbReconstruct(form, ints, strs) FROM '{s3_target_uri}' ORDER BY id;").fetchall()
 
         mismatches = 0
         for row_id, reconstructed_msg in rows:
@@ -278,12 +262,8 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
                     print(f"    RECN: {reconstructed_msg}")
 
         print(f"[+] Bit-level verification complete: {len(rows):,} rows evaluated.")
-        print(
-            f"[+] Total Mismatches: {mismatches} (Invertibility: {((count - mismatches) / count) * 100:.3f}%)"
-        )
-        assert (
-            mismatches == 0
-        ), f"Encountered {mismatches} mismatches in S3 Parquet reconstruction!"
+        print(f"[+] Total Mismatches: {mismatches} (Invertibility: {((count - mismatches) / count) * 100:.3f}%)")
+        assert mismatches == 0, f"Encountered {mismatches} mismatches in S3 Parquet reconstruction!"
 
         print("=" * 78)
         print("  ALL AWS S3 PARQUET EXPORT & LOSSLESS TESTS PASSED (100.000% EXACT)")
@@ -296,21 +276,15 @@ def testAwsS3Export(endpoint: str = None, bucket: str = "telemetry", count: int 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Razobill AWS S3 Parquet Export Validation"
-    )
+    parser = argparse.ArgumentParser(description="Razobill AWS S3 Parquet Export Validation")
     parser.add_argument(
         "--endpoint",
         type=str,
         default=None,
         help="Custom S3 endpoint URL (or 'aws' for live AWS)",
     )
-    parser.add_argument(
-        "--bucket", type=str, default="telemetry", help="Target S3 bucket name"
-    )
-    parser.add_argument(
-        "--count", type=int, default=2000, help="Number of log events to test"
-    )
+    parser.add_argument("--bucket", type=str, default="telemetry", help="Target S3 bucket name")
+    parser.add_argument("--count", type=int, default=2000, help="Number of log events to test")
     args = parser.parse_args()
 
     testAwsS3Export(endpoint=args.endpoint, bucket=args.bucket, count=args.count)

@@ -24,11 +24,11 @@ namespace {
 core::ScanMode parseMode(const std::string& mode) {
     if (mode == "semantic") return core::ScanMode::Semantic;
     if (mode == "exact") return core::ScanMode::Exact;
-    throw py::value_error(
-        "[razobill] What happened: Invalid scan mode. "
-        "Why: Expected 'semantic' or 'exact', got '" + mode + "'. "
-        "What to do: Pass mode='semantic' (default) or mode='exact'."
-    );
+    throw py::value_error("[razobill] What happened: Invalid scan mode. "
+                          "Why: Expected 'semantic' or 'exact', got '" +
+                          mode +
+                          "'. "
+                          "What to do: Pass mode='semantic' (default) or mode='exact'.");
 }
 
 std::string truncateOffending(std::string_view sv, size_t maxLen = 80) {
@@ -53,9 +53,12 @@ std::string formatJoinError(Status st, std::string_view tmpl) {
         break;
     }
     return "[razobill] What happened: Failed to join log components. "
-           "Why: " + why + ". "
+           "Why: " +
+           why +
+           ". "
            "What to do: Verify that {i} and {s} placeholders match the provided integers and strings. "
-           "Offending template: '" + truncateOffending(tmpl) + "'.";
+           "Offending template: '" +
+           truncateOffending(tmpl) + "'.";
 }
 
 py::tuple splitOne(const py::object& input, const std::string& modeStr) {
@@ -76,15 +79,16 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
         Status st = core::parse(sv, slots, mode);
         if (st != Status::Ok) {
             throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
-                                  std::string(razobill::describe(st)) +
-                                  ". What to do: Check input data integrity.");
+                                  std::string(razobill::describe(st)) + ". What to do: Check input data integrity.");
         }
 
         py::bytes tmpl(slots.templateStr.data(), slots.templateStr.size());
         py::list intList;
-        for (int64_t v : slots.ints) intList.append(v);
+        for (int64_t v : slots.ints)
+            intList.append(v);
         py::list strList;
-        for (const auto& s : slots.strs) strList.append(py::bytes(s.data(), s.size()));
+        for (const auto& s : slots.strs)
+            strList.append(py::bytes(s.data(), s.size()));
 
         return py::make_tuple(tmpl, intList, strList);
     }
@@ -107,13 +111,11 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
         if (st != Status::Ok) {
             Py_DECREF(encoded);
             throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
-                                  std::string(razobill::describe(st)) +
-                                  ". What to do: Check input data integrity.");
+                                  std::string(razobill::describe(st)) + ". What to do: Check input data integrity.");
         }
 
         PyObject* pyTmpl = PyUnicode_DecodeUTF8(slots.templateStr.data(),
-                                                static_cast<Py_ssize_t>(slots.templateStr.size()),
-                                                "surrogateescape");
+                                                static_cast<Py_ssize_t>(slots.templateStr.size()), "surrogateescape");
         if (!pyTmpl) {
             Py_DECREF(encoded);
             throw py::error_already_set();
@@ -121,7 +123,8 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
         py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
 
         py::list intList;
-        for (int64_t v : slots.ints) intList.append(v);
+        for (int64_t v : slots.ints)
+            intList.append(v);
 
         py::list strList;
         for (const auto& s : slots.strs) {
@@ -139,7 +142,9 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
 
     std::string typeName = py::str(input.get_type());
     throw py::type_error("[razobill] What happened: Unsupported input type. "
-                         "Why: Expected str or bytes, got " + typeName + ". "
+                         "Why: Expected str or bytes, got " +
+                         typeName +
+                         ". "
                          "What to do: Pass a str or bytes object.");
 }
 
@@ -159,8 +164,7 @@ py::object templateOne(const py::object& input, const std::string& modeStr) {
         Status st = core::parse(sv, slots, mode);
         if (st != Status::Ok) {
             throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
-                                  std::string(razobill::describe(st)) +
-                                  ". What to do: Check input data integrity.");
+                                  std::string(razobill::describe(st)) + ". What to do: Check input data integrity.");
         }
         return py::bytes(slots.templateStr.data(), slots.templateStr.size());
     }
@@ -183,13 +187,11 @@ py::object templateOne(const py::object& input, const std::string& modeStr) {
         if (st != Status::Ok) {
             Py_DECREF(encoded);
             throw py::value_error("[razobill] What happened: Parsing failed. Why: " +
-                                  std::string(razobill::describe(st)) +
-                                  ". What to do: Check input data integrity.");
+                                  std::string(razobill::describe(st)) + ". What to do: Check input data integrity.");
         }
 
         PyObject* pyTmpl = PyUnicode_DecodeUTF8(slots.templateStr.data(),
-                                                static_cast<Py_ssize_t>(slots.templateStr.size()),
-                                                "surrogateescape");
+                                                static_cast<Py_ssize_t>(slots.templateStr.size()), "surrogateescape");
         Py_DECREF(encoded);
         if (!pyTmpl) throw py::error_already_set();
         return py::reinterpret_steal<py::object>(pyTmpl);
@@ -197,7 +199,9 @@ py::object templateOne(const py::object& input, const std::string& modeStr) {
 
     std::string typeName = py::str(input.get_type());
     throw py::type_error("[razobill] What happened: Unsupported input type. "
-                         "Why: Expected str or bytes, got " + typeName + ". "
+                         "Why: Expected str or bytes, got " +
+                         typeName +
+                         ". "
                          "What to do: Pass a str or bytes object.");
 }
 
@@ -208,7 +212,9 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
     if (!isBytes && !isStr) {
         std::string typeName = py::str(tmplObj.get_type());
         throw py::type_error("[razobill] What happened: Unsupported template type. "
-                             "Why: Expected str or bytes, got " + typeName + ". "
+                             "Why: Expected str or bytes, got " +
+                             typeName +
+                             ". "
                              "What to do: Pass a str or bytes template.");
     }
 
@@ -262,7 +268,9 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
             cleanup();
             std::string tn = py::str(item.get_type());
             throw py::type_error("[razobill] What happened: Unsupported string slot element type. "
-                                 "Why: Expected str or bytes in strs list, got " + tn + ". "
+                                 "Why: Expected str or bytes in strs list, got " +
+                                 tn +
+                                 ". "
                                  "What to do: Ensure all elements in strs are str or bytes.");
         }
     }
@@ -279,7 +287,8 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
         cleanup();
         return py::bytes(result.data(), result.size());
     } else {
-        PyObject* pyRes = PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
+        PyObject* pyRes =
+            PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
         cleanup();
         if (!pyRes) throw py::error_already_set();
         return py::reinterpret_steal<py::object>(pyRes);
@@ -308,12 +317,14 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
         } else if (py::isinstance<py::str>(item)) {
             PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
             if (!enc) throw py::error_already_set();
-            rawInputs.push_back(InputItem{std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))), false});
+            rawInputs.push_back(
+                InputItem{std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))), false});
             Py_DECREF(enc);
         } else {
             std::string tn = py::str(item.get_type());
             throw py::type_error("[razobill] What happened: Unsupported item type in split_many at index " +
-                                 std::to_string(i) + ". Why: Expected str or bytes, got " + tn + ". "
+                                 std::to_string(i) + ". Why: Expected str or bytes, got " + tn +
+                                 ". "
                                  "What to do: Pass an iterable of str or bytes.");
         }
     }
@@ -348,7 +359,8 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
         const bool itemIsBytes = rawInputs[i].isBytes;
 
         py::list intList;
-        for (int64_t v : rec.ints) intList.append(v);
+        for (int64_t v : rec.ints)
+            intList.append(v);
 
         if (itemIsBytes) {
             py::bytes tmpl(rec.templateStr.data(), rec.templateStr.size());
@@ -359,8 +371,7 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             outList.append(py::make_tuple(tmpl, intList, strList));
         } else {
             PyObject* pyTmpl = PyUnicode_DecodeUTF8(rec.templateStr.data(),
-                                                    static_cast<Py_ssize_t>(rec.templateStr.size()),
-                                                    "surrogateescape");
+                                                    static_cast<Py_ssize_t>(rec.templateStr.size()), "surrogateescape");
             if (!pyTmpl) throw py::error_already_set();
             py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
 
@@ -390,6 +401,5 @@ PYBIND11_MODULE(Core, m) {
           "Reconstructs original log line from template, ints, and strs");
     m.def("split_many", &splitMany, py::arg("inputs"), py::arg("mode") = "semantic",
           "Splits an iterable of log lines with GIL release across worker threads");
-    m.def("version", []() { return std::string(LIBRAZOBILL_VERSION_STRING); },
-          "Returns semantic library version");
+    m.def("version", []() { return std::string(LIBRAZOBILL_VERSION_STRING); }, "Returns semantic library version");
 }
