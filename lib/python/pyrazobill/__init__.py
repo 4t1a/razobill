@@ -260,12 +260,50 @@ def RzSplitMany(lines: Iterable[Union[str, bytes]], mode: str = "semantic") -> L
         raise RzError(str(exc)) from exc
 
 
+def RzHash(line: Union[str, bytes]) -> int:
+    """Compute deterministic 64-bit template or message hash (xxHash64, seed 0).
+
+    Matches DuckDB's RzHash() and ClickHouse's xxHash64() exactly bit-for-bit.
+
+    Parameters
+    ----------
+    line : str or bytes
+        The template or message string or bytes to hash.
+
+    Returns
+    -------
+    int
+        64-bit unsigned integer hash.
+
+    Examples
+    --------
+    >>> import pyrazobill as rz
+    >>> rec = rz.RzSplit("Failed password for root from 192.168.1.100 port 22")
+    >>> rz.RzHash(rec.template)
+    54855824174769941
+    """
+    if not isinstance(line, (str, bytes)):
+        raise RzError(
+            f"[razobill] What happened: Unsupported input type. "
+            f"Why: Expected str or bytes, got {type(line).__name__}. "
+            f"What to do: Pass a str or bytes object. "
+            f"Offending input: {repr(line)[:60]}."
+        )
+    try:
+        return _core.hash(line)
+    except RzError:
+        raise
+    except (ValueError, TypeError) as exc:
+        raise RzError(str(exc)) from exc
+
+
 __version__ = "1.1.1"
 
 __all__ = [
     "RzSplit",
     "RzJoin",
     "RzTemplate",
+    "RzHash",
     "RzSplitMany",
     "RzRecord",
     "RzError",
@@ -277,6 +315,7 @@ _ALIASES = {
     "split": RzSplit,
     "join": RzJoin,
     "template": RzTemplate,
+    "hash": RzHash,
     "split_many": RzSplitMany,
     "Record": RzRecord,
     "Error": RzError,

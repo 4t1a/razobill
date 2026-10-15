@@ -8,19 +8,20 @@ Skip this reference if you need an introductory guide.
 
 ## Overview
 
-The `pyrazobill` module exports four primary functions, two container classes, and one version constant.
+The `pyrazobill` module exports five primary functions, two container classes, and one version constant.
 
 | Symbol | Type | Description |
 | :--- | :--- | :--- |
 | `RzSplit` | Function | Decomposes a log line into an `RzRecord`. |
 | `RzJoin` | Function | Reconstructs the exact original line from decomposed components. |
 | `RzTemplate` | Function | Extracts the template string or bytes without allocating value lists. |
+| `RzHash` | Function | Computes a fast 64-bit template hash (xxHash64) for indexing. |
 | `RzSplitMany` | Function | Parses an iterable of messages in parallel releasing the GIL. |
 | `RzRecord` | Named Tuple | Structured return container with `(template, ints, strs)`. |
 | `RzError` | Exception | Base exception class (subclass of `ValueError`) raised on failures. |
 | `__version__` | String | Package semantic version string (`"1.1.1"`). |
 
-Ergonomic aliases are also exported: `split`, `join`, `template`, `split_many`, `Record`, `Error`.
+Ergonomic aliases are also exported: `split`, `join`, `template`, `hash`, `split_many`, `Record`, `Error`.
 
 ---
 
@@ -78,6 +79,34 @@ Extracts only the structural template without allocating numeric or string value
   - `mode` (*str*): Token scanning mode.
 - **Returns**:
   - The template string or bytes.
+- **Example**:
+
+  ```python
+  import pyrazobill as rz
+  tmpl = rz.RzTemplate("port 22 open")
+  # tmpl == 'port {i} open'
+  ```
+
+---
+
+### `RzHash(line: Union[str, bytes]) -> int`
+
+Computes a deterministic 64-bit hash (xxHash64, seed 0) of the input template or message.
+
+- **Parameters**:
+  - `line` (*str* or *bytes*): Input template or message.
+- **Returns**:
+  - `int`: 64-bit unsigned integer matching DuckDB `RzHash()` and ClickHouse `xxHash64()` bit-for-bit.
+- **Raises**:
+  - `RzError`: If `line` is not `str` or `bytes`.
+- **Example**:
+
+  ```python
+  import pyrazobill as rz
+  rec = rz.RzSplit("Failed password for root from 192.168.1.100 port 22")
+  h = rz.RzHash(rec.template)
+  # h == 54855824174769941
+  ```
 
 ---
 

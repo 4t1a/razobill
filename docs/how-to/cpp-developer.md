@@ -35,7 +35,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(path/to/razobill)
 
 add_executable(my_service main.cpp)
-target_link_libraries(my_service PRIVATE razobill_core)
+target_link_libraries(my_service PRIVATE librazobill::librazobill)
 ```
 
 ### Option B: universal C ABI linking

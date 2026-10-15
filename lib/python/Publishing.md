@@ -1,6 +1,6 @@
 # Publishing `pyrazobill` to PyPI
 
-This guide provides the official release instructions for building, validating, and publishing the `pyrazobill 1.0.0` distribution packages to the Python Package Index (PyPI) and TestPyPI.
+This guide provides the official release instructions for building, validating, and publishing the `pyrazobill 1.1.1` distribution packages to the Python Package Index (PyPI) and TestPyPI.
 
 ---
 
@@ -36,8 +36,8 @@ python -m build
 
 Expected output in `lib/python/dist/`:
 
-- `pyrazobill-1.0.0.tar.gz`: Universal source distribution bundled with C++20 core engine headers
-- `pyrazobill-1.0.0-cp313-cp313-win_amd64.whl`: Platform-specific native binary wheel
+- `pyrazobill-1.1.1.tar.gz`: Universal source distribution bundled with C++20 core engine headers
+- `pyrazobill-1.1.1-cp313-cp313-win_amd64.whl`: Platform-specific native binary wheel
 
 ---
 
@@ -73,8 +73,8 @@ twine check dist/*
 Expected output:
 
 ```text
-Checking dist/pyrazobill-1.0.0.tar.gz: PASSED
-Checking dist/pyrazobill-1.0.0-cp313-cp313-win_amd64.whl: PASSED
+Checking dist/pyrazobill-1.1.1.tar.gz: PASSED
+Checking dist/pyrazobill-1.1.1-cp313-cp313-win_amd64.whl: PASSED
 ```
 
 ---
@@ -98,7 +98,7 @@ source test_env/bin/activate  # On Windows: test_env\Scripts\activate
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ pyrazobill
 
 # Verify runtime imports and lossless parsing
-python -c "import pyrazobill; rec = pyrazobill.parse('User 1042 authenticated'); assert rec.reconstruct() == 'User 1042 authenticated'; print('TestPyPI Verification Passed! Version:', pyrazobill.version())"
+python -c "import pyrazobill as rz; rec = rz.RzSplit('User 1042 authenticated'); assert rz.RzJoin(*rec) == 'User 1042 authenticated'; print('TestPyPI Verification Passed! Version:', rz.__version__)"
 ```
 
 ---
@@ -120,5 +120,5 @@ pip install pyrazobill
 ### Post-Release Smoke Test
 
 ```bash
-python -c "import pyrazobill; print('pyrazobill successfully installed. ABI Version:', pyrazobill.abiVersion())"
+python -c "import pyrazobill as rz; print('pyrazobill successfully installed. Version:', rz.__version__)"
 ```

@@ -30,8 +30,8 @@ flowchart TD
     Raw["Log Event: 'Connection lost to 10.0.0.1 after 3 retries'"]
     Raw --> Core["librazobill C++ / pyrazobill"]
     Raw --> CHSQL["ClickHouse / chDB SQL"]
-    Core --> CoreHash["xxh64(formKey) = 0x8f4d92a17b0c34e5"]
-    CHSQL --> CHHash["xxHash64(formKey) = 0x8f4d92a17b0c34e5"]
+    Core --> CoreHash["xxh64(template) = 0x8546dcdb7cf5de36"]
+    CHSQL --> CHHash["xxHash64(template) = 0x8546dcdb7cf5de36"]
     CoreHash -. Exact Bit-for-Bit Parity .-> CHHash
     CHHash --> MT["MergeTree Storage (Additive form_id Column)"]
 ```
@@ -46,8 +46,8 @@ Both implementations generate bit-identical 64-bit unsigned integers across all 
 
 ```sql
 SELECT xxHash64('Failed password for {s} from {s} port {i}') AS template_hash;
--- Result: 10326074811804136677 (UInt64)
--- Matches pyrazobill.RzHash('Failed password for {s} from {s} port {i}') exactly.
+-- Result: 54855824174769941 (UInt64)
+-- Matches pyrazobill.RzHash('Failed password for {s} from {s} port {i}') and DuckDB RzHash() exactly.
 ```
 
 > [!NOTE]
@@ -57,27 +57,22 @@ SELECT xxHash64('Failed password for {s} from {s} port {i}') AS template_hash;
 
 ## Step 2: Configure additive layout on MergeTree tables
 
-Add a `MATERIALIZED` form identifier column to your ClickHouse log table:
+Add a 64-bit form identifier column (`form_id UInt64`) to your ClickHouse log table:
 
 ```sql
--- Create raw logs table with ZSTD compression
+-- Create log table with an additive form_id column populated during ingestion
 CREATE TABLE system_logs (
     timestamp DateTime,
     level LowCardinality(String),
     service LowCardinality(String),
+    form_id UInt64 CODEC(ZSTD(3)),
     msg String CODEC(ZSTD(3))
 ) ENGINE = MergeTree()
-ORDER BY (service, timestamp);
+ORDER BY (service, form_id, timestamp);
 
--- Add materialized 64-bit template hash column
+-- Or add form_id to an existing table populated by Razobill ingestion pipelines:
 ALTER TABLE system_logs
-ADD COLUMN form_id UInt64 MATERIALIZED xxHash64(
-    replaceRegexpAll(msg, '[^\\s=,;:()\\[\\]{}"\'<>|/]*[0-9][^\\s=,;:()\\[\\]{}"\'<>|/]*', '{s}')
-) CODEC(ZSTD(3));
-
--- Materialize existing rows synchronously
-ALTER TABLE system_logs
-MATERIALIZE COLUMN form_id SETTINGS mutations_sync = 2;
+ADD COLUMN form_id UInt64 DEFAULT 0 CODEC(ZSTD(3));
 ```
 
 This additive index introduces only **+6% disk storage overhead** over raw ZSTD text.

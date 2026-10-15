@@ -114,7 +114,24 @@ assert rz.RzJoin(*record) == raw_bytes
 
 ---
 
-### Step 6: Error handling
+### Step 6: Fast 64-bit template hashing with `RzHash`
+
+Compute deterministic 64-bit template hashes for database indexing or partition keys:
+
+```python
+line = "Failed password for root from 192.168.1.100 port 22"
+rec = rz.RzSplit(line)
+form_hash = rz.RzHash(rec.template)
+
+print("Template hash:", form_hash)
+# 54855824174769941
+```
+
+The resulting hash matches ClickHouse `xxHash64()` and DuckDB `RzHash()` bit-for-bit.
+
+---
+
+### Step 7: Error handling
 
 When malformed inputs or invalid arguments are supplied, `pyrazobill` raises an `RzError` (a subclass of `ValueError`):
 

@@ -64,6 +64,17 @@ class TestPyRazobill(unittest.TestCase):
         tmpl_bytes = rz.RzTemplate(b_msg)
         self.assertEqual(tmpl_bytes, b"Accepted publickey for {s} from {s} port {i} {s}")
 
+    def test_hash_xxh64(self):
+        tmpl = "Failed password for {s} from {s} port {i}"
+        expected_hash = 54855824174769941
+        self.assertEqual(rz.RzHash(tmpl), expected_hash)
+        self.assertEqual(rz.RzHash(tmpl.encode("utf-8")), expected_hash)
+        self.assertEqual(rz.hash(tmpl), expected_hash)
+
+        # Invalid type check
+        with self.assertRaises(rz.RzError):
+            rz.RzHash(12345)  # type: ignore
+
     def test_split_many_batch(self):
         lines = [f"Receiving block blk_{i} src: /10.0.0.1:{50000 + i} dest: /10.0.0.2:50010" for i in range(500)]
         records = rz.RzSplitMany(lines)
@@ -156,6 +167,7 @@ class TestPyRazobill(unittest.TestCase):
             "RzSplit",
             "RzJoin",
             "RzTemplate",
+            "RzHash",
             "RzSplitMany",
             "RzRecord",
             "RzError",
@@ -167,6 +179,7 @@ class TestPyRazobill(unittest.TestCase):
         self.assertIs(rz.split, rz.RzSplit)
         self.assertIs(rz.join, rz.RzJoin)
         self.assertIs(rz.template, rz.RzTemplate)
+        self.assertIs(rz.hash, rz.RzHash)
         self.assertIs(rz.split_many, rz.RzSplitMany)
         self.assertIs(rz.Record, rz.RzRecord)
         self.assertIs(rz.Error, rz.RzError)

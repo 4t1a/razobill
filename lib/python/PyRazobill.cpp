@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "librazobill/Hash.hpp"
 #include "librazobill/Slots.hpp"
 #include "librazobill/ThreadPool.hpp"
 #include "librazobill/Version.hpp"
@@ -388,6 +389,31 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
     return outList;
 }
 
+uint64_t hashOne(const py::object& input) {
+    if (py::isinstance<py::bytes>(input)) {
+        py::bytes b = input.cast<py::bytes>();
+        char* buf = nullptr;
+        Py_ssize_t len = 0;
+        PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
+        return core::xxh64(std::string_view(buf, static_cast<size_t>(len)));
+    }
+    if (py::isinstance<py::str>(input)) {
+        PyObject* encoded = PyUnicode_AsEncodedString(input.ptr(), "utf-8", "surrogateescape");
+        if (!encoded) throw py::error_already_set();
+        char* buf = PyBytes_AS_STRING(encoded);
+        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
+        uint64_t h = core::xxh64(std::string_view(buf, static_cast<size_t>(len)));
+        Py_DECREF(encoded);
+        return h;
+    }
+    std::string tn = py::str(input.get_type());
+    throw py::type_error("[razobill] What happened: Unsupported input type in RzHash. "
+                         "Why: Expected str or bytes, got " +
+                         tn +
+                         ". "
+                         "What to do: Pass str or bytes.");
+}
+
 } // namespace
 
 PYBIND11_MODULE(Core, m) {
@@ -401,5 +427,6 @@ PYBIND11_MODULE(Core, m) {
           "Reconstructs original log line from template, ints, and strs");
     m.def("split_many", &splitMany, py::arg("inputs"), py::arg("mode") = "semantic",
           "Splits an iterable of log lines with GIL release across worker threads");
+    m.def("hash", &hashOne, py::arg("input"), "Computes 64-bit xxHash64 (seed 0) of a string or bytes input");
     m.def("version", []() { return std::string(LIBRAZOBILL_VERSION_STRING); }, "Returns semantic library version");
 }

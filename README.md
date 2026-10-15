@@ -117,7 +117,7 @@ Razobill provides a uniform data model across all supported environments.
 
 | Environment | Primary Functions | Description |
 | :--- | :--- | :--- |
-| **Python** (`pyrazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzSplitMany` | High-throughput parsing releasing the Python GIL for multithreaded processing. |
+| **Python** (`pyrazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzHash`, `RzSplitMany` | High-throughput parsing releasing the Python GIL for multithreaded processing. |
 | **DuckDB** (`ext/duckdb`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzHash` | Vectorized SQL functions operating directly on database string pointers without copies. |
 | **ClickHouse & chDB** | `xxHash64`, Python ADBC | Bit-identical xxHash64 partition keys and additive MergeTree form indexing. |
 | **C ABI** (`include/librazobill`) | `RzSplit`, `RzJoin`, `RzTemplate`, `RzFree` | Zero-allocation C ABI with stable binary layout and zero-copy string views. |

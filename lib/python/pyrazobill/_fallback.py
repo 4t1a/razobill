@@ -248,5 +248,93 @@ def split_many(
     return [split(item, mode) for item in inputs]
 
 
+def hash(input_val: Union[str, bytes]) -> int:
+    """Compute 64-bit xxHash64 (seed 0) of string or bytes."""
+    if isinstance(input_val, str):
+        data = input_val.encode("utf-8", "surrogateescape")
+    elif isinstance(input_val, bytes):
+        data = input_val
+    else:
+        raise TypeError(
+            f"[razobill] What happened: Unsupported input type in hash. "
+            f"Why: Expected str or bytes, got {type(input_val).__name__}. "
+            f"What to do: Pass str or bytes."
+        )
+
+    try:
+        import xxhash
+
+        return xxhash.xxh64_intdigest(data, seed=0)
+    except ImportError:
+        pass
+
+    import struct
+
+    P1 = 11400714785074694791
+    P2 = 14029467366897019727
+    P3 = 1609587929392839161
+    P4 = 9650029242287828579
+    P5 = 2870177450012600261
+    MASK64 = 0xFFFFFFFFFFFFFFFF
+
+    def rotl(x: int, r: int) -> int:
+        return ((x << r) & MASK64) | (x >> (64 - r))
+
+    def round_fn(acc: int, v: int) -> int:
+        return (rotl((acc + v * P2) & MASK64, 31) * P1) & MASK64
+
+    def merge_fn(h_val: int, v: int) -> int:
+        return ((h_val ^ round_fn(0, v)) * P1 + P4) & MASK64
+
+    n = len(data)
+    p = 0
+    if n >= 32:
+        v1 = (P1 + P2) & MASK64
+        v2 = P2
+        v3 = 0
+        v4 = (0 - P1) & MASK64
+        limit = n - 32
+        while p <= limit:
+            k1, k2, k3, k4 = struct.unpack_from("<QQQQ", data, p)
+            v1 = round_fn(v1, k1)
+            v2 = round_fn(v2, k2)
+            v3 = round_fn(v3, k3)
+            v4 = round_fn(v4, k4)
+            p += 32
+        h_acc = (rotl(v1, 1) + rotl(v2, 7) + rotl(v3, 12) + rotl(v4, 18)) & MASK64
+        h_acc = merge_fn(h_acc, v1)
+        h_acc = merge_fn(h_acc, v2)
+        h_acc = merge_fn(h_acc, v3)
+        h_acc = merge_fn(h_acc, v4)
+    else:
+        h_acc = P5
+
+    h_acc = (h_acc + n) & MASK64
+
+    while p + 8 <= n:
+        (k1,) = struct.unpack_from("<Q", data, p)
+        k1 = round_fn(0, k1)
+        h_acc = (rotl(h_acc ^ k1, 27) * P1 + P4) & MASK64
+        p += 8
+
+    if p + 4 <= n:
+        (k1,) = struct.unpack_from("<I", data, p)
+        h_acc = (rotl(h_acc ^ ((k1 * P1) & MASK64), 23) * P2 + P3) & MASK64
+        p += 4
+
+    while p < n:
+        k1 = data[p]
+        h_acc = (rotl(h_acc ^ ((k1 * P5) & MASK64), 11) * P1) & MASK64
+        p += 1
+
+    h_acc ^= h_acc >> 33
+    h_acc = (h_acc * P2) & MASK64
+    h_acc ^= h_acc >> 29
+    h_acc = (h_acc * P3) & MASK64
+    h_acc ^= h_acc >> 32
+
+    return h_acc & MASK64
+
+
 def version() -> str:
-    return "2.0.0"
+    return "1.1.1"
