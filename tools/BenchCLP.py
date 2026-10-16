@@ -300,10 +300,7 @@ class ClpRazobillBenchmark:
         con.execute("CHECKPOINT")
         con.close()
         rz_duckdb_bytes = duckdb_fpath.stat().st_size
-        try:
-            duckdb_fpath.unlink()
-        except OSError:
-            pass
+        duckdb_fpath.unlink(missing_ok=True)
 
         def _fmt(size: int) -> Dict[str, Any]:
             ratio = round(raw_bytes / size, 2) if size > 0 else 0.0
@@ -630,10 +627,7 @@ class ClpRazobillBenchmark:
         h_std.close()
         t_std = time.perf_counter() - t0
         size_std = fpath_std.stat().st_size
-        try:
-            fpath_std.unlink()
-        except OSError:
-            pass
+        fpath_std.unlink(missing_ok=True)
 
         # 2. CLP FileHandler (clp_logging.handlers.CLPFileHandler)
         with tempfile.NamedTemporaryFile(suffix=".clp", delete=False) as tf:
@@ -650,10 +644,7 @@ class ClpRazobillBenchmark:
         h_clp.close()
         t_clp = time.perf_counter() - t0
         size_clp = fpath_clp.stat().st_size
-        try:
-            fpath_clp.unlink()
-        except OSError:
-            pass
+        fpath_clp.unlink(missing_ok=True)
 
         # 3. Razobill Logging Handler
         with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tf:
@@ -670,10 +661,7 @@ class ClpRazobillBenchmark:
         size_rz = h_rz.write_to_parquet(fpath_rz, compression="zstd")
         h_rz.close()
         t_rz = time.perf_counter() - t0
-        try:
-            fpath_rz.unlink()
-        except OSError:
-            pass
+        fpath_rz.unlink(missing_ok=True)
 
         return {
             "num_events": num_events,

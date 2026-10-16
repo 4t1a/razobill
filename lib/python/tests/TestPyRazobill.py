@@ -26,6 +26,7 @@ pkg_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(pkg_dir))
 
 import pyrazobill as rz
+import pyrazobill._fallback as _fallback
 
 
 class TestPyRazobill(unittest.TestCase):
@@ -109,8 +110,6 @@ class TestPyRazobill(unittest.TestCase):
         self.assertEqual(rz.RzJoin(rec_bytes), b"")
 
     def test_edge_cases_quoted_backslashes(self):
-        from pyrazobill import _fallback
-
         cases = [
             '"\\"',
             "'\\'",
