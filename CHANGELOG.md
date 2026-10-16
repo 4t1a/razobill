@@ -16,13 +16,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - Added regression test suites across C++ unit tests (`tests/UnitCore.cpp`) and Python unit tests (`lib/python/tests/TestPyRazobill.py`).
 - **Citation notice**:
   - Replaced overreaching legal interpretation of Apache 2.0 Section 4(d) in `NOTICE`, `lib/python/NOTICE`, and documentation with standard academic citation language ("please cite").
+- **Absolute URLs in package documentation**:
+  - Converted relative Markdown links and logo paths in `lib/python/README.md` and `ext/duckdb/README.md` to absolute URLs to prevent 404s on PyPI and DuckDB community documentation indexers.
 
 ### Added
 
+- **Standard Citation File Format (`CITATION.cff`)**:
+  - Added root CFF 1.2.0 metadata separating the foundational theory paper citation (`atta2026latitude`, DOI 10.5281/zenodo.23287286) from the software implementation citation (`razobill2026`).
 - **Python `RzHash`**:
   - Added `RzHash` (and `rz.hash` alias) to the Python API (`pyrazobill`), exposing bit-exact xxHash64 log template hashing matching DuckDB SQL `RzHash` and chDB/ClickHouse `xxHash64`.
 - **Architectural comparison with CLP**:
   - Added dedicated comparison in `README.md` clarifying structural differences between Razobill (in-database relational decomposition into standard SQL columns) and YScope CLP (custom compressed archive format and IR).
+- **Technical postmortem**:
+  - Added in-depth architectural explanation and reproducer dissection in `docs/issues&fixes/blog-1-1-2-parser-hang.md`.
 
 ### Changed
 

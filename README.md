@@ -39,7 +39,7 @@ Pre-compiled binary wheels cover Python 3.9 through 3.13 on Windows (x86-64), Li
 
 ### DuckDB extension
 
-Install and load directly from the official DuckDB Community Repository (DuckDB 1.1.x):
+Install and load directly from the official DuckDB Community Repository (DuckDB 1.2+ and upcoming 2.0):
 
 ```sql
 INSTALL razobill FROM community;
@@ -52,7 +52,7 @@ For offline environments or custom builds, load the compiled binary extension di
 LOAD 'build/razobill.duckdb_extension';
 ```
 
-*(Note: The community build currently targets DuckDB 1.1.x; compatibility tracking for DuckDB 2.0.0 is tracked under community issue #3081).*
+*(Both current stable DuckDB and the upcoming DuckDB 2.0.0 release are continuously built and validated in the official DuckDB community extensions matrix via `ref` and `ref_next`).*
 
 ### C ABI shared library
 
@@ -243,3 +243,30 @@ Navigate the documentation system:
   - [SIMD vectorization](docs/explanation/simd-vectorization.md)
   - [Concurrency model](docs/explanation/concurrency-model.md)
   - [Benchmark methodology](docs/explanation/benchmarks.md)
+
+---
+
+## Citation
+
+If you use Razobill in academic research, benchmarks, or systems software, please cite both the foundational theory paper and the software implementation:
+
+```bibtex
+@article{atta2026latitude,
+  author  = {Atta, Moustafa Mahmoud},
+  title   = {Latitude and Doubt: An exact ledger of meaning in messages with measurements on the genetic code and on English},
+  journal = {Zenodo Preprint},
+  year    = {2026},
+  doi     = {10.5281/zenodo.23287286},
+  url     = {https://doi.org/10.5281/zenodo.23287286}
+}
+
+@software{razobill2026,
+  author    = {Atta, M. M. and contributors},
+  title     = {Razobill: In-Database Telemetry Decomposition and Exact Lossless Compaction},
+  year      = {2026},
+  publisher = {GitHub},
+  url       = {https://github.com/razobill/razobill}
+}
+```
+
+A machine-readable [CITATION.cff](CITATION.cff) is provided in the repository root.

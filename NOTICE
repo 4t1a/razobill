@@ -22,18 +22,24 @@ If you use, embed, modify, or redistribute this software (or any derivative work
 thereof) in academic, scientific, or benchmark publications, please retain this
 notice and cite the foundational work:
 
-BibTeX:
-@software{atta2026razobill,
-  author       = {Atta, M. M.},
-  title        = {librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine},
+Foundational Paper (Theory):
+@article{atta2026latitude,
+  author       = {Atta, Moustafa Mahmoud},
+  title        = {Latitude and Doubt: An exact ledger of meaning in messages with measurements on the genetic code and on English},
+  journal      = {Zenodo Preprint},
   year         = {2026},
-  publisher    = {Zenodo},
   doi          = {10.5281/zenodo.23287286},
   url          = {https://doi.org/10.5281/zenodo.23287286}
 }
 
-APA:
-Atta, M. M. (2026). librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine. Zenodo. https://doi.org/10.5281/zenodo.23287286
+Software Implementation:
+@software{razobill2026,
+  author       = {Atta, M. M. and contributors},
+  title        = {Razobill: In-Database Telemetry Decomposition and Exact Lossless Compaction},
+  year         = {2026},
+  publisher    = {GitHub},
+  url          = {https://github.com/razobill/razobill}
+}
 
 ================================================================================
 Included Third-Party Works

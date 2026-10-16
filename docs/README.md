@@ -58,7 +58,13 @@ Understanding-oriented articles explaining design choices, theoretical foundatio
 
 ---
 
-## 5. Troubleshooting and support
+## 5. Issues & fixes
+
+- [Parser loop invariants and quote-backslash hang](issues&fixes/blog-1-1-2-parser-hang.md): Postmortem of the quote-backslash edge-case hang and verification invariants.
+
+---
+
+## 6. Troubleshooting and support
 
 - [Troubleshooting guide](troubleshooting.md): Solutions indexed by exact compiler errors and runtime status codes.
 - [Documentation style guide](STYLE.md): Style rules, component templates, and writing standards.

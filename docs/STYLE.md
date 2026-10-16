@@ -33,7 +33,7 @@ Every command, function signature, and code block must execute cleanly and produ
 Include hardware context and corpus parameters when reporting benchmarks.
 
 - **Before**: "Our algorithm runs in sub-microsecond time with basically zero overhead."
-- **After**: "On an AMD Ryzen 9 7950X, `RzSplit` processes a 120-byte SSH authentication line in 0.38 microseconds without heap allocations on the hot path."
+- **After**: "On Windows 11 with 12 logical cores, `RzSplit` averages 331,000 lines/s on SSH authentication logs without heap allocations on the hot path."
 - **What it never sounds like**: "It's blisteringly fast and uses minimal resources."
 
 ### Trait 3: Unadorned and respectful of the reader's time

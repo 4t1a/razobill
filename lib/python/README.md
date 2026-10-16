@@ -2,8 +2,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../../assets/Logo.jpeg">
-    <img src="../../assets/Logo-light.jpeg" alt="Razobill Logo" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/razobill/razobill/main/assets/Logo.jpeg">
+    <img src="https://raw.githubusercontent.com/razobill/razobill/main/assets/Logo-light.jpeg" alt="Razobill Logo" width="300">
   </picture>
 </p>
 
@@ -123,7 +123,7 @@ Razobill is grounded in information-theoretic invariants established in:
 
 ## Documentation
 
-- [Python developer guide](../../docs/how-to/python.md)
-- [Python API reference](../../docs/reference/python-api.md)
-- [Lossless invertibility](../../docs/explanation/lossless-invertibility.md)
-- [ClickHouse & chDB guide](../../docs/how-to/chdb.md)
+- [Python developer guide](https://github.com/razobill/razobill/blob/main/docs/how-to/python.md)
+- [Python API reference](https://github.com/razobill/razobill/blob/main/docs/reference/python-api.md)
+- [Lossless invertibility](https://github.com/razobill/razobill/blob/main/docs/explanation/lossless-invertibility.md)
+- [ClickHouse & chDB guide](https://github.com/razobill/razobill/blob/main/docs/how-to/chdb.md)

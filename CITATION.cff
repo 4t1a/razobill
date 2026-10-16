@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software or cite its theorems, please cite both the software and the foundational paper."
+title: "Razobill: In-Database Telemetry Decomposition and Exact Lossless Compaction"
+abstract: "High-performance lossless log parsing, analytical database compaction, and information-theoretic telemetry accounting in C++20, Python, and DuckDB."
+authors:
+  - family-names: "Atta"
+    given-names: "Moustafa Mahmoud"
+    orcid: "https://orcid.org/0009-0008-6724-4698"
+version: 1.1.2
+date-released: "2026-10-16"
+license: Apache-2.0
+repository-code: "https://github.com/razobill/razobill"
+url: "https://razobill.github.io/razobill/"
+keywords:
+  - "log-parsing"
+  - "duckdb"
+  - "information-theory"
+  - "lossless-compression"
+  - "columnar-database"
+  - "cpp20"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Atta"
+      given-names: "Moustafa Mahmoud"
+      orcid: "https://orcid.org/0009-0008-6724-4698"
+  title: "Latitude and Doubt: An exact ledger of meaning in messages with measurements on the genetic code and on English"
+  journal: "Zenodo Preprint"
+  year: 2026
+  month: 10
+  doi: "10.5281/zenodo.23287286"
+  url: "https://doi.org/10.5281/zenodo.23287286"

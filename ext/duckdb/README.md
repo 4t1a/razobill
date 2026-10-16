@@ -2,8 +2,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../../assets/Logo.jpeg">
-    <img src="../../assets/Logo-light.jpeg" alt="Razobill Logo" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/razobill/razobill/main/assets/Logo.jpeg">
+    <img src="https://raw.githubusercontent.com/razobill/razobill/main/assets/Logo-light.jpeg" alt="Razobill Logo" width="300">
   </picture>
 </p>
 
@@ -37,10 +37,14 @@ Every byte of whitespace, delimiter punctuation, and parameter data is preserved
 
 ### From DuckDB community repository
 
+Install and load directly from the official DuckDB Community Repository (DuckDB 1.2+ and upcoming 2.0):
+
 ```sql
 INSTALL razobill FROM community;
 LOAD razobill;
 ```
+
+*(Both current stable DuckDB and upcoming DuckDB 2.0.0 builds are continuously validated via community `ref` and `ref_next`).*
 
 ### From local binary build
 
@@ -97,6 +101,6 @@ Razobill is grounded in information-theoretic invariants established in:
 
 ## Documentation
 
-- [DuckDB extension guide](../../docs/how-to/duckdb.md)
-- [SQL functions reference](../../docs/reference/sql-functions.md)
-- [Lossless invertibility](../../docs/explanation/lossless-invertibility.md)
+- [DuckDB extension guide](https://github.com/razobill/razobill/blob/main/docs/how-to/duckdb.md)
+- [SQL functions reference](https://github.com/razobill/razobill/blob/main/docs/reference/sql-functions.md)
+- [Lossless invertibility](https://github.com/razobill/razobill/blob/main/docs/explanation/lossless-invertibility.md)

@@ -249,7 +249,7 @@ All scripts print their execution matrices directly to standard output and produ
 
 ## 6. Citation & Academic Reference
 
-If you cite these empirical findings or utilize the experimental test harnesses in your research, please attribute the work as follows:
+If you cite these empirical findings or utilize the experimental test harnesses in your research, please attribute both the foundational paper and the software implementation:
 
 ```bibtex
 @article{atta2026latitude,
@@ -259,5 +259,13 @@ If you cite these empirical findings or utilize the experimental test harnesses 
   year      = {2026},
   doi       = {10.5281/zenodo.23287286},
   url       = {https://doi.org/10.5281/zenodo.23287286}
+}
+
+@software{razobill2026,
+  author    = {Atta, M. M. and contributors},
+  title     = {Razobill: In-Database Telemetry Decomposition and Exact Lossless Compaction},
+  year      = {2026},
+  publisher = {GitHub},
+  url       = {https://github.com/razobill/razobill}
 }
 ```
