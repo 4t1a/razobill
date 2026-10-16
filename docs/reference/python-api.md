@@ -19,7 +19,7 @@ The `pyrazobill` module exports five primary functions, two container classes, a
 | `RzSplitMany` | Function | Parses an iterable of messages in parallel releasing the GIL. |
 | `RzRecord` | Named Tuple | Structured return container with `(template, ints, strs)`. |
 | `RzError` | Exception | Base exception class (subclass of `ValueError`) raised on failures. |
-| `__version__` | String | Package semantic version string (`"1.1.1"`). |
+| `__version__` | String | Package semantic version string (`"1.1.2"`). |
 
 Ergonomic aliases are also exported: `split`, `join`, `template`, `hash`, `split_many`, `Record`, `Error`.
 

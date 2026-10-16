@@ -7,7 +7,7 @@
 <meta name="description" content="Razobill splits log lines into a template plus typed values and rebuilds the exact original bytes. Open source C++20 with DuckDB, Python and C APIs.">
 <link rel="canonical" href="https://razobill.github.io/razobill/">
 <meta name="author" content="Moustafa Mahmoud Atta">
-<meta name="keywords" content="Razobill, razorbill, log parsing, lossless log compression, log template mining, Drain3 alternative, DuckDB extension, pyrazobill, C++20, SIMD, Parquet, observability">
+<meta name="keywords" content="Razobill, razorbill, log parsing, lossless log compression, log template mining, Drain3 alternative, CLP comparison, Compressed Log Processor, DuckDB extension, pyrazobill, C++20, SIMD, Parquet, observability">
 <meta name="theme-color" content="#F6F7FB">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Razobill">
 <meta property="og:title" content="Razobill: log parsing that gives every byte back">
@@ -21,8 +21,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[
 {"@type":"WebSite","@id":"https://razobill.github.io/razobill/#site","url":"https://razobill.github.io/razobill/","name":"Razobill","inLanguage":"en"},
-{"@type":"SoftwareApplication","@id":"https://razobill.github.io/razobill/#app","name":"Razobill","alternateName":["librazobill","pyrazobill"],"applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","softwareVersion":"1.1.1","description":"Open-source log parser that splits each line into a template and typed values, then rebuilds the exact original text. C++20 core with Python, DuckDB and C interfaces.","url":"https://razobill.github.io/razobill/","codeRepository":"https://github.com/razobill/razobill","downloadUrl":"https://pypi.org/project/pyrazobill/","programmingLanguage":["C++","Python"],"license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Moustafa Mahmoud Atta","url":"https://github.com/4t1a","identifier":"https://orcid.org/0009-0008-6724-4698"},"citation":"https://doi.org/10.5281/zenodo.23287286","datePublished":"2026-10-07","dateModified":"2026-10-15","image":"https://razobill.github.io/razobill/assets/og-image.png"},
-{"@type": "FAQPage", "@id": "https://razobill.github.io/razobill/#faq", "mainEntity": [{"@type": "Question", "name": "What is Razobill?", "acceptedAnswer": {"@type": "Answer", "text": "Razobill is an open-source log parser written in C++20. It splits each log line into a template and typed values (integers and strings), stores them as columns, and rebuilds the exact original line on demand. It ships as a Python package called pyrazobill, a DuckDB extension and a C API."}}, {"@type": "Question", "name": "Is it really lossless?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.1.1."}}, {"@type": "Question", "name": "How is Razobill different from Drain3?", "acceptedAnswer": {"@type": "Answer", "text": "Drain3 clusters similar lines and replaces changing parts with a wildcard, so the original values are gone. Razobill uses a deterministic scanner and keeps the values, so you can rebuild every line. In the project's benchmarks it is faster, but Drain3 scored higher on median grouping accuracy."}}, {"@type": "Question", "name": "Do I need DuckDB to use it?", "acceptedAnswer": {"@type": "Answer", "text": "No. You can use pyrazobill from Python alone, link the C++ library, or call the C API from another language. DuckDB is one of several integrations."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "In DuckDB, run INSTALL razobill FROM community; LOAD razobill;. In Python, run pip install pyrazobill. Wheels are published for Python 3.9 to 3.13 on Windows, Linux and macOS, and a pure-Python fallback is included."}}, {"@type": "Question", "name": "What license is it under, and how do I cite it?", "acceptedAnswer": {"@type": "Answer", "text": "Apache License 2.0. If you use it in research, cite Atta (2026), Latitude and Doubt, Zenodo, DOI 10.5281/zenodo.23287286. The repository includes a NOTICE file and a BibTeX entry."}}]}]}</script>
+{"@type":"SoftwareApplication","@id":"https://razobill.github.io/razobill/#app","name":"Razobill","alternateName":["librazobill","pyrazobill"],"applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","softwareVersion":"1.1.2","description":"Open-source log parser that splits each line into a template and typed values, then rebuilds the exact original text. C++20 core with Python, DuckDB and C interfaces.","url":"https://razobill.github.io/razobill/","codeRepository":"https://github.com/razobill/razobill","downloadUrl":"https://pypi.org/project/pyrazobill/","programmingLanguage":["C++","Python"],"license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Moustafa Mahmoud Atta","url":"https://github.com/4t1a","identifier":"https://orcid.org/0009-0008-6724-4698"},"citation":"https://doi.org/10.5281/zenodo.23287286","datePublished":"2026-10-07","dateModified":"2026-10-16","image":"https://razobill.github.io/razobill/assets/og-image.png"},
+{"@type": "FAQPage", "@id": "https://razobill.github.io/razobill/#faq", "mainEntity": [{"@type": "Question", "name": "What is Razobill?", "acceptedAnswer": {"@type": "Answer", "text": "Razobill is an open-source log parser written in C++20. It splits each log line into a template and typed values (integers and strings), stores them as columns, and rebuilds the exact original line on demand. It ships as a Python package called pyrazobill, a DuckDB extension and a C API."}}, {"@type": "Question", "name": "Is it really lossless?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.1.2."}}, {"@type": "Question", "name": "How is Razobill different from Drain3?", "acceptedAnswer": {"@type": "Answer", "text": "Drain3 clusters similar lines and replaces changing parts with a wildcard, so the original values are gone. Razobill uses a deterministic scanner and keeps the values, so you can rebuild every line. In the project's benchmarks it is faster, but Drain3 scored higher on median grouping accuracy."}}, {"@type": "Question", "name": "How does Razobill compare to CLP?", "acceptedAnswer": {"@type": "Answer", "text": "YScope's CLP (OSDI 2021) is a mature, lossless log management system using custom archives. Both Razobill and CLP achieve 100% bit-for-bit lossless reconstruction with 0 mismatches. CLP provides fast streaming serialization. Razobill outputs standard relational columns (STRUCT, BIGINT[], VARCHAR[]) that query natively inside DuckDB and ClickHouse via vectorized SQL (31x to 82x faster needle search), and reconstructs lines in memory faster via RzJoin (530k to 593k lines/s vs 332k to 405k lines/s for CLP IR decode)."}}, {"@type": "Question", "name": "Do I need DuckDB to use it?", "acceptedAnswer": {"@type": "Answer", "text": "No. You can use pyrazobill from Python alone, link the C++ library, or call the C API from another language. DuckDB is one of several integrations."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "In DuckDB, run INSTALL razobill FROM community; LOAD razobill;. In Python, run pip install pyrazobill. Wheels are published for Python 3.9 to 3.13 on Windows, Linux and macOS, and a pure-Python fallback is included."}}, {"@type": "Question", "name": "What license is it under, and how do I cite it?", "acceptedAnswer": {"@type": "Answer", "text": "Apache License 2.0. If you use it in research, cite Atta (2026), Latitude and Doubt, Zenodo, DOI 10.5281/zenodo.23287286. The repository includes a NOTICE file and a BibTeX entry."}}]}]}</script>
 <style>
 :root{--ink:#171A24;--deep:#232A3D;--soft:#4A5370;--tide:#5F96AB;--tideDk:#2B6F86;--peri:#A9AEE0;--mist:#E7EAF6;--chalk:#F6F7FB;--lamp:#F2B544;--r:14px;color-scheme:light}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:72px}
@@ -75,14 +75,14 @@ footer{border-top:1px solid #D9DDEE;padding:40px 0;color:var(--soft);font-size:.
 </head>
 <body>
 <nav aria-label="Main"><div class="wrap"><a href="#top"><img src="assets/razobill-logo.webp" alt="Razobill" width="144" height="26"></a>
-<ul><li><a href="#demo">Demo</a></li><li><a href="#install">Install</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#faq">FAQ</a></li><li><a href="https://github.com/razobill/razobill">GitHub</a></li></ul></div></nav>
+<ul><li><a href="#demo">Demo</a></li><li><a href="#install">Install</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#clp">CLP</a></li><li><a href="#faq">FAQ</a></li><li><a href="https://github.com/razobill/razobill">GitHub</a></li></ul></div></nav>
 <main id="top">
 <div class="wrap">
 <header class="hero">
 <div>
 <h1>Logs are born structured. Razobill keeps them that way.</h1>
 <p class="lead">Your code already knows which part of a log line is fixed and which part is a value. Razobill takes the line apart along that seam, stores the values as plain columns, and gives you the original text back, byte for byte.</p>
-<p class="def"><strong>Razobill</strong> is an open-source log parser. It splits each line into a template and typed values, and rebuilds the exact line from them. C++20 core, with a Python package, a DuckDB extension and a C API. Version 1.1.1, Apache 2.0.</p>
+<p class="def"><strong>Razobill</strong> is an open-source log parser. It splits each line into a template and typed values, and rebuilds the exact line from them. C++20 core, with a Python package, a DuckDB extension and a C API. Version 1.1.2, Apache 2.0.</p>
 <div class="cta"><a class="btn go" href="#install">Install pyrazobill</a><a class="btn" href="https://github.com/razobill/razobill">View on GitHub</a></div>
 </div>
 <div class="mascot"><div class="stage"><video id="hv" autoplay muted loop playsinline preload="auto" width="576" height="512" poster="assets/razobill-hero-poster.webp" aria-label="Razobill's razorbill mascot waves and opens its beak to say hello"><source src="assets/razobill-hero.mp4" type="video/mp4"><source src="assets/razobill-hero.webm" type="video/webm"><img src="assets/razobill-hero-poster.webp" width="576" height="512" alt="Razobill's razorbill mascot standing upright"></video><button class="snd" id="snd" type="button" aria-pressed="false">Play with sound</button></div><div class="tide"></div></div>
@@ -91,7 +91,7 @@ footer{border-top:1px solid #D9DDEE;padding:40px 0;color:var(--soft);font-size:.
 
 <section id="demo"><div class="wrap"><div class="panel" id="stage" data-s="0">
 <h2>Watch one line come apart</h2>
-<p>Pick a log line. The template, integers and strings below are real output from <span class="mono">pyrazobill 1.1.1</span>. The rebuilt line is computed in your browser from those columns.</p>
+<p>Pick a log line. The template, integers and strings below are real output from <span class="mono">pyrazobill 1.1.2</span>. The rebuilt line is computed in your browser from those columns.</p>
 <div class="pick" role="group" aria-label="Choose a log line" id="pick"></div>
 <div class="row"><b>Original</b><div class="v" id="raw"></div></div>
 <div class="row lane"><b>Template</b><div class="v" id="tpl"></div></div>
@@ -144,22 +144,52 @@ if (RzSplit(raw, length, &rec) == RZ_OK) {
     printf("Template: %.*s\n", (int)rec.templateLength, rec.templateStr);
     RzFree(&rec);
 }</code></pre></div>
-<p style="margin-top:18px">Python examples were run against pyrazobill 1.1.1. The SQL and C snippets come from the project docs. Wheels cover Python 3.9 to 3.13 on Windows, Linux and macOS.</p>
+<p style="margin-top:18px">Python examples were run against pyrazobill 1.1.2. The SQL and C snippets come from the project docs. Wheels cover Python 3.9 to 3.13 on Windows, Linux and macOS.</p>
 </div></section>
 
 <section id="numbers"><div class="wrap">
 <div class="head"><div><h2>What was measured, and how</h2>
-<p>All figures come from the project's own benchmarks on one Windows 11 machine with 12 logical cores. The scripts are in the repo if you want to rerun them.</p></div><figure class="fig"><img src="assets/bill-lab.webp" width="646" height="860" loading="lazy" alt="Razobill's razorbill mascot in a lab coat and safety goggles, taking notes on a clipboard"></figure></div>
+<p>All figures come from the project's own benchmarks on one Windows 11 machine with 12 logical cores. Reproduction scripts (<span class="mono">tools/BenchDrain.py</span>, <span class="mono">tools/BenchCLP.py</span>) and raw artifacts are in the repo if you want to rerun them.</p></div><figure class="fig"><img src="assets/bill-lab.webp" width="646" height="860" loading="lazy" alt="Razobill's razorbill mascot in a lab coat and safety goggles, taking notes on a clipboard"></figure></div>
 <div class="tw"><table>
 <thead><tr><th>Result</th><th>Number</th><th>Context</th></tr></thead><tbody>
-<tr><td>Round trip</td><td>0 mismatches</td><td>69.6 million lines, 4,861 log files, 6.82 GB</td></tr>
-<tr><td>Speed, one thread</td><td>2.5× to 15.1× faster than Drain3</td><td>Five Loghub datasets, average 5.6×</td></tr>
-<tr><td>Speed, long run</td><td>0.09 s vs 26.5 s</td><td>100,000 SSH lines. Drain3 slowed to 3,779 lines/s.</td></tr>
-<tr><td>Speed, 12 threads</td><td>29 million lines/s average</td><td>Peak 69.4 million on the SSH set</td></tr>
-<tr><td>On disk in DuckDB</td><td>6.29 MB to 2.88 MB</td><td>134,815 events, 0.46× the raw table</td></tr>
-<tr><td>Parquet on S3</td><td>93.8% smaller than raw text</td><td>20,000 events. 27.3% smaller than plain Parquet.</td></tr>
+<tr><td>Round trip fidelity</td><td>0 mismatches (100.0%)</td><td>69.6 million lines, 4,861 log files, 6.82 GB audit</td></tr>
+<tr><td>Speed, one thread</td><td>2.5× to 15.1× faster than Drain3</td><td>Five LogHub datasets (SSH, Linux, Proxifier, Zookeeper, BGL), average 5.6×</td></tr>
+<tr><td>Speed, long run (100k lines)</td><td>0.30 s vs 26.5 s (88× faster)</td><td>100,000 SSH lines in Python. Drain3 slowed to 3,779 lines/s, Razobill held 331,761 lines/s</td></tr>
+<tr><td>Speed, 12 threads (C++)</td><td>29 million lines/s average</td><td>Peak 69.4 million lines/s on the SSH dataset</td></tr>
+<tr><td>Reconstruction vs CLP IR</td><td>530k–593k vs 332k–405k lines/s</td><td>In-memory string reconstruction via RzJoin is ~1.5× faster than CLP IR decode</td></tr>
+<tr><td>Needle search vs CLP IR</td><td>31× to 82× faster search</td><td>DuckDB columnar SQL executes in 0.18–0.52 ms vs 11–16 ms for CLP IR streaming scan</td></tr>
+<tr><td>On disk in DuckDB</td><td>6.29 MB to 2.88 MB</td><td>134,815 events, 0.46× the raw table size</td></tr>
+<tr><td>Parquet on S3</td><td>93.8% smaller than raw text</td><td>20,000 events. 27.3% smaller than plain Parquet</td></tr>
 </tbody></table></div>
-<p style="margin-top:18px"><a href="https://github.com/razobill/razobill/blob/main/docs/explanation/benchmarks.md">Read the Drain3 comparison</a> or <a href="https://github.com/razobill/razobill/blob/main/evidence/README.md">see how each experiment is reproduced</a>.</p>
+<p style="margin-top:18px"><a href="https://github.com/razobill/razobill/blob/main/docs/explanation/benchmarks.md">Read the full Drain3 and CLP benchmarks</a> or <a href="https://github.com/razobill/razobill/blob/main/evidence/README.md">see how each experiment is reproduced</a>.</p>
+</div></section>
+
+<section id="clp"><div class="wrap two">
+<div>
+<h2>Razobill and CLP</h2>
+<p>YScope's <a href="https://github.com/y-scope/clp" target="_blank" rel="noopener">Compressed Log Processor (CLP, OSDI 2021)</a> is an established system used at companies like Uber that also splits logs into log types and variable values to achieve lossless compression.</p>
+<p>Razobill shares that lossless motivation, but targets relational databases rather than custom archive files:</p>
+<ul style="padding-left:1.2em;margin-top:0.6em">
+<li style="margin-bottom:0.6em"><strong>Standard columnar storage:</strong> CLP encodes into custom <span class="mono">.clp</span> binary archives. Razobill outputs standard relational arrays and structs that write to Parquet, DuckDB, or ClickHouse with standard Zstandard compression.</li>
+<li style="margin-bottom:0.6em"><strong>Vectorized SQL analytics:</strong> Because Razobill values live in standard columns, DuckDB and ClickHouse run vectorized SQL filters 31× to 83× faster and group-by aggregations 40× to 50× faster than scanning CLP stream archives.</li>
+<li style="margin-bottom:0.6em"><strong>Fast in-memory reconstruction:</strong> Razobill's <span class="mono">RzJoin</span> restores original lines at 530,000 to 593,000 lines/s in memory, roughly 1.5× faster than CLP IR decompression.</li>
+</ul>
+</div>
+<div>
+<h2>Head-to-head on 100,000 lines</h2>
+<div class="tw"><table>
+<thead><tr><th>Dataset / Metric</th><th>CLP (FourByte)</th><th>Razobill</th></tr></thead>
+<tbody>
+<tr><td>Round trip fidelity</td><td>100.0% (0 mismatches)</td><td>100.0% (0 mismatches)</td></tr>
+<tr><td>SSH compressed size</td><td>0.61 MB (94.1% saved)</td><td>0.58 MB Parquet (94.4% saved)</td></tr>
+<tr><td>BGL compressed size</td><td>0.92 MB (92.7% saved)</td><td>0.86 MB Parquet (93.1% saved)</td></tr>
+<tr><td>Zookeeper compressed size</td><td>0.69 MB (92.9% saved)</td><td>0.74 MB Parquet (92.4% saved)</td></tr>
+<tr><td>Reconstruction speed</td><td>332k–405k lines/s</td><td>530k–593k lines/s (1.5×)</td></tr>
+<tr><td>Needle search latency</td><td>11.2–16.4 ms (IR scan)</td><td>0.18–0.52 ms (DuckDB SQL, 31×–82×)</td></tr>
+<tr><td>Template aggregation</td><td>14.1–19.5 ms (IR freq)</td><td>0.28–0.49 ms (DuckDB SQL, 40×–50×)</td></tr>
+</tbody></table></div>
+<p class="note">Measured with <a href="https://github.com/razobill/razobill/blob/main/tools/BenchCLP.py">tools/BenchCLP.py</a> on Windows 11 (12 cores) with clp-ffi-py 0.0.14 and DuckDB 1.5.5.</p>
+</div>
 </div></section>
 
 <section><div class="wrap"><h2>It already gets along with your database</h2><div class="pair">
@@ -187,14 +217,15 @@ if (RzSplit(raw, length, &rec) == RZ_OK) {
 
 <section id="faq"><div class="wrap"><h2>Questions people ask</h2>
 <details><summary>What is Razobill?</summary><p>Razobill is an open-source log parser written in C++20. It splits each log line into a template and typed values (integers and strings), stores them as columns, and rebuilds the exact original line on demand. It ships as a Python package called pyrazobill, a DuckDB extension and a C API.</p></details>
-<details><summary>Is it really lossless?</summary><p>Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.1.1.</p></details>
+<details><summary>Is it really lossless?</summary><p>Yes, by design and by test. Every line in the project's 69.6 million line audit was rebuilt and compared to the original with zero mismatches. Empty lines, emoji and control characters round-trip too when run through pyrazobill 1.1.2.</p></details>
 <details><summary>How is Razobill different from Drain3?</summary><p>Drain3 clusters similar lines and replaces changing parts with a wildcard, so the original values are gone. Razobill uses a deterministic scanner and keeps the values, so you can rebuild every line. In the project's benchmarks it is faster, but Drain3 scored higher on median grouping accuracy.</p></details>
+<details><summary>How does Razobill compare to CLP?</summary><p>YScope's Compressed Log Processor (OSDI 2021) is a mature log management system that splits logs into a log type and variables inside a custom archive format. Both Razobill and CLP achieve 100% bit-for-bit lossless reconstruction with zero mismatches. CLP provides very fast streaming serialization (up to 738,000 lines/s in Python) into custom IR archives. Razobill decomposes logs into standard relational columns (STRUCT, BIGINT[], VARCHAR[]) that integrate directly into analytical SQL engines like DuckDB and ClickHouse. In our calibrated benchmarks, DuckDB vectorized SQL executed searches 31× to 82× faster than CLP streaming search, and Razobill's RzJoin rebuilt original lines in memory 1.5× faster than CLP IR decoding (530k–593k lines/s vs 332k–405k lines/s).</p></details>
 <details><summary>Do I need DuckDB to use it?</summary><p>No. You can use pyrazobill from Python alone, link the C++ library, or call the C API from another language. DuckDB is one of several integrations.</p></details>
 <details><summary>How do I install it?</summary><p>In DuckDB, run <code>INSTALL razobill FROM community; LOAD razobill;</code>. In Python, run <code>pip install pyrazobill</code>. Wheels are published for Python 3.9 to 3.13 on Windows, Linux and macOS, and a pure-Python fallback is included.</p></details>
 <details><summary>What license is it under, and how do I cite it?</summary><p>Apache License 2.0. If you use it in research, cite Atta (2026), Latitude and Doubt, Zenodo, DOI 10.5281/zenodo.23287286. The repository includes a NOTICE file and a BibTeX entry.</p></details>
 </div></section>
 </main>
-<footer><div class="wrap"><div>Razobill 1.1.1 · Apache 2.0 · updated <time datetime="2026-10-15">15 October 2026</time></div>
+<footer><div class="wrap"><div>Razobill 1.1.2 · Apache 2.0 · updated <time datetime="2026-10-16">16 October 2026</time></div>
 <div><a href="https://github.com/razobill/razobill">GitHub</a> · <a href="https://pypi.org/project/pyrazobill/">PyPI</a> · <a href="https://github.com/razobill/razobill/blob/main/docs/README.md">Docs</a> · <a href="https://github.com/razobill/razobill/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://doi.org/10.5281/zenodo.23287286">Paper</a> · <a href="llms.txt">llms.txt</a></div></div></footer>
 <div class="run" aria-hidden="true"><i></i><span></span></div>
 <script>

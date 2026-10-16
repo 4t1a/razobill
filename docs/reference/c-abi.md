@@ -18,7 +18,7 @@ It provides zero-allocation log decomposition with stable binary layout.
 | `RzTemplate` | Function | Writes the structural template into caller buffer. |
 | `RzFree` | Function | Releases heap memory allocated by `RzSplit`. |
 | `RzStatusMessage` | Function | Returns human-readable description for any `RzStatus`. |
-| `RzVersion` | Function | Returns the semantic version string (`"1.1.1"`). |
+| `RzVersion` | Function | Returns the semantic version string (`"1.1.2"`). |
 | `RzRecord` | Struct | Container for decomposed message data. |
 | `RzStatus` | Enum | Numeric status code indicating success or error reason. |
 

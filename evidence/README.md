@@ -65,6 +65,8 @@ Where:
 | **[`BenchAwsS3Compaction.py`](../bench/s3/BenchAwsS3Compaction.py)** | **Cloud Object Storage Compaction & Scan Law**<br/>$$\text{Scan}(\text{Columnar}) \ll \text{Scan}(\text{Raw})$$ | 20,000 multi-system production telemetry events | **93.8% S3 Space Reduction & 3.60× Scan Speedup**: Decomposing logs to Parquet cuts S3 wire bytes by $> 93\%$ and accelerates in-S3 predicate scans by $3.60\times$, saving over $\$1,300$/mo (1 TB) to $\$40,000$/mo (30 TB). |
 | **[`StressAwsS3LocalStack.py`](../bench/s3/StressAwsS3LocalStack.py)** | **Multi-Partition Cloud Streaming & Zero-Drift Law**<br/>$$\text{Lossless}(\text{Stream}) \equiv 100.000\%$$ | 100,000 enterprise telemetry events across 6 service domains | **8,349 logs/sec Streaming & 0 Bit Drift**: Streams multi-partition Parquet into live LocalStack S3 at 8,349 logs/sec with 16.84 ms average query scan latency and 100.000% exact bit-level lossless reconstruction. |
 | **[`BenchDrain3VsRazobillS3.py`](../bench/s3/BenchDrain3VsRazobillS3.py)** | **Cloud Object Storage Head-to-Head: Drain3 vs Razobill** | 20,000 production events on LocalStack S3 | **92.2% - 93.8% S3 Reduction, Multi-Threaded Scaling & Invertibility**: Proves that Drain3 requires storing bloated raw strings alongside lossy templates, whereas Razobill scales linearly across worker threads and saves \$1.3k to \$40k/month on AWS S3 & Athena. |
+| **[`BenchDrain.py`](../tools/BenchDrain.py)** | **Lossless Invertibility vs. Heuristic Trees** | 5 LogHub corpora (100k events) | **88× Faster on Long Runs & Zero Degradation**: In Python, `RzSplit` sustains 331,761 lines/s while Drain3 degrades to 3,779 lines/s. Razobill guarantees 100% lossless bit-for-bit inversion ($\Delta = 0.000$) while Drain3 destroys variable payloads. |
+| **[`BenchCLP.py`](../tools/BenchCLP.py)** | **Relational Columnar vs. Custom Archive Format** | SSH, BGL, Zookeeper (100k events each) | **Lossless Parity, 1.5× Reconstruction, 31×–83× SQL Speedup**: Both achieve 100.0% lossless roundtripping (0 mismatches). Razobill reconstructs strings in memory faster via `RzJoin` (530k–593k vs 332k–405k lines/s) and DuckDB columnar SQL queries execute 31×–83× faster than CLP IR stream scans. |
 
 ---
 
@@ -216,6 +218,12 @@ python bench/s3/BenchDrain3VsRazobillS3.py 20000 --threads 4
 
 # 8. Verify 100,000-event multi-partition cloud streaming stress test:
 python bench/s3/StressAwsS3LocalStack.py 100000 --threads 4
+
+# 9. Verify canonical Drain3 vs Razobill benchmarks (throughput, percentiles, degradation):
+python tools/BenchDrain.py
+
+# 10. Verify CLP vs Razobill head-to-head (compression, fidelity, SQL search, logging handlers):
+python tools/BenchCLP.py
 ```
 
 All scripts print their execution matrices directly to standard output and produce byte-identical results matching the checked-in proof artifacts:
@@ -234,6 +242,8 @@ All scripts print their execution matrices directly to standard output and produ
 * **[`rbtok.py`](rbtok.py)**: The pure-Python golden reference model of the CLP variable lexer. Implements the exact ASCII `\x11`/`\x12` sentinel protocol, delimiter tokenization, and constructive inversion algorithm.
 * **[`E7Lib.py`](E7Lib.py)**: Canonical multi-system dataset ingestion pipeline that standardizes 134,815 events across 16 heterogenous enterprise systems into a unified Arrow/DuckDB testing table.
 * **[`ChStore.py`](ChStore.py)**: Embedded ClickHouse MergeTree storage validation script, proving that Seed 0 `xxHash64` produces bit-identical partition keys between C++, Python, and ClickHouse SQL.
+* **[`BenchDrain.py`](../tools/BenchDrain.py)**: Comprehensive multi-dataset throughput and degradation suite benchmarking canonical 1.1.x Razobill against Drain3.
+* **[`BenchCLP.py`](../tools/BenchCLP.py)**: Lossless compression, reconstruction, DuckDB SQL query, and Python logging benchmark comparing Razobill directly against YScope CLP (`clp-ffi-py` and `clp-logging`).
 
 ---
 

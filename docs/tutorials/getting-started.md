@@ -30,7 +30,7 @@ python -c "import pyrazobill as rz; print(rz.__version__)"
 Expected output:
 
 ```text
-1.1.1
+1.1.2
 ```
 
 ---

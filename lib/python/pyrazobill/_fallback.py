@@ -58,7 +58,8 @@ def _scan(msg: str, mode: str):
         if mode == "semantic" and msg[p] in ('"', "'"):
             q = msg[p]
             if (q == '"' and p < unclosed_dquote_end) or (q == "'" and p < unclosed_squote_end):
-                pass
+                p += 1
+                continue
             else:
                 q_start = p
                 p += 1
@@ -80,6 +81,7 @@ def _scan(msg: str, mode: str):
                     else:
                         unclosed_squote_end = p
                     p = q_start + 1
+                    continue
 
         start = p
         seen_digit = False
@@ -337,4 +339,4 @@ def hash(input_val: Union[str, bytes]) -> int:
 
 
 def version() -> str:
-    return "1.1.1"
+    return "1.1.2"

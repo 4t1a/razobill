@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ---
 
+## [1.1.2] - 2026-10-16
+
+### Fixed
+
+- **Infinite loop on quoted tokens with backslashes**:
+  - Fixed infinite loop in `RzSplit` (affecting native scanner and pure-Python `_fallback.py`) when parsing inputs containing quoted tokens ending with a backslash before the quote delimiter (such as `opened "C:\Users\bob\" ok` or `"\"`).
+  - Added regression test suites across C++ unit tests (`tests/UnitCore.cpp`) and Python unit tests (`lib/python/tests/TestPyRazobill.py`).
+- **Citation notice**:
+  - Replaced overreaching legal interpretation of Apache 2.0 Section 4(d) in `NOTICE`, `lib/python/NOTICE`, and documentation with standard academic citation language ("please cite").
+
+### Added
+
+- **Python `RzHash`**:
+  - Added `RzHash` (and `rz.hash` alias) to the Python API (`pyrazobill`), exposing bit-exact xxHash64 log template hashing matching DuckDB SQL `RzHash` and chDB/ClickHouse `xxHash64`.
+- **Architectural comparison with CLP**:
+  - Added dedicated comparison in `README.md` clarifying structural differences between Razobill (in-database relational decomposition into standard SQL columns) and YScope CLP (custom compressed archive format and IR).
+
+### Changed
+
+- **Calibrated documentation and quickstart**:
+  - Synchronized `README.md` quickstart to canonical 1.1.x API (`RzSplit`, `RzJoin`, `RzTemplate`, `RzHash`, `RzSplitMany`). Removed references to retired or non-exported symbols.
+  - Unified benchmark numbers across the repository and site to a single calibrated LogHub run (5 datasets, 2.5×–15.1× / average 5.6× vs Drain3) with links to raw evidence scripts (`tools/BenchDrain.py`).
+  - Clarified wheel binary platform availability (Linux x86-64, Windows x86-64, macOS; Linux ARM via source distribution).
+  - Clarified DuckDB extension installation options: community repository (`INSTALL razobill FROM community;`) and local binary fallback (`LOAD 'build/razobill.duckdb_extension';`), noting ongoing compatibility verification for DuckDB 2.0.0.
+
+---
+
 ## [1.1.1] - 2026-10-14
 
 ### Changed

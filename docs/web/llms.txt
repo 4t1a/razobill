@@ -1,6 +1,6 @@
 # Razobill
 
-> Razobill is an open-source log parser (C++20, Apache 2.0) that splits each log line into a template plus typed values (integers and strings) and rebuilds the exact original line from them. It ships as pyrazobill (Python), a DuckDB extension, and a C API. Current version: 1.1.1.
+> Razobill is an open-source log parser (C++20, Apache 2.0) that splits each log line into a template plus typed values (integers and strings) and rebuilds the exact original line from them. It ships as pyrazobill (Python), a DuckDB extension, and a C API. Current version: 1.1.2.
 
 The name is spelled "Razobill". Its mascot is a razorbill, a seabird.
 
@@ -12,6 +12,7 @@ The name is spelled "Razobill". Its mascot is a razorbill, a seabird.
 - Python API: `rz.RzSplit(line)` returns a named tuple `(template, ints, strs)`. Templates contain `{i}` and `{s}` placeholders. `rz.RzJoin(*record)` returns the exact original line bit-for-bit.
 - DuckDB API: `SELECT RzSplit(line)` returns `STRUCT(template VARCHAR, ints BIGINT[], strs VARCHAR[])`. `SELECT RzJoin(...)` restores raw bytes.
 - Versus Drain3: 2.5x to 15.1x faster on one thread across five LogHub datasets. Drain3 scored higher on median grouping accuracy (0.871 vs 0.808); Razobill keeps every value and restores exact bytes.
+- Versus CLP: YScope's CLP (OSDI 2021) achieves faster streaming ingestion (up to 738,000 lines/s in Python) and compact custom archives. Both engines achieve 100% lossless bit-for-bit reconstruction. Razobill decomposes into standard relational columns (Parquet / DuckDB / ClickHouse) rather than custom archive streams, reconstructs lines in memory faster via RzJoin (530k–593k lines/s vs 332k–405k lines/s), and executes SQL needle searches 31× to 82× faster via DuckDB vectorized columnar execution.
 - Theory: Atta, M. M. (2026), "Latitude and Doubt", Zenodo, DOI 10.5281/zenodo.23287286.
 - Known limits: benchmarks are author-run; S3 results use emulators; Wasm and MinGW builds are excluded in DuckDB community distribution.
 

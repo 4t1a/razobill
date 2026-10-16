@@ -187,11 +187,11 @@ TEST_CASE("semantic versioning and ABI contract") {
     auto v = razobill::version();
     CHECK(v.major == 1);
     CHECK(v.minor == 1);
-    CHECK(v.patch == 1);
+    CHECK(v.patch == 2);
     CHECK(v.abi == 1);
-    CHECK(std::string_view(v.string) == "1.1.1");
+    CHECK(std::string_view(v.string) == "1.1.2");
     CHECK(razobill::abiVersion() == 1);
-    CHECK(razobill::versionString() == "1.1.1");
+    CHECK(razobill::versionString() == "1.1.2");
 }
 
 TEST_CASE("hardware vector SIMD scanner and dynamic CPUID dispatcher") {
@@ -268,4 +268,24 @@ TEST_CASE("unclosed quotes with escaped and unescaped characters roundtrip") {
     CHECK(roundtrip("unclosed 'quote with trailing", nullptr, ScanMode::Semantic) == "unclosed 'quote with trailing");
     CHECK(roundtrip("unclosed \"double quote with trailing", nullptr, ScanMode::Semantic) ==
           "unclosed \"double quote with trailing");
+}
+
+TEST_CASE("quote-backslash edge cases and trailing backslashes") {
+    const std::vector<std::string> cases = {
+        "\"\\\"",
+        "'\\'",
+        "\"\\\"\"",
+        "'\\''",
+        "\"\\\\\"",
+        "\"\\\\\\\"",
+        "opened \"C:\\Users\\bob\\\" ok",
+        "opened 'C:\\Users\\bob\\' ok",
+        "foo \"bar\\\" baz",
+        "\"\"\"",
+        "'''",
+        "\"\\\\\\\"\"",
+    };
+    for (const auto& s : cases) {
+        CHECK(roundtrip(s, nullptr, ScanMode::Semantic) == s);
+    }
 }

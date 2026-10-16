@@ -29,20 +29,30 @@ Choose the runtime environment for your stack.
 
 ### Python package
 
-Install the verified binary wheel from PyPI:
+Install from PyPI:
 
 ```bash
 pip install pyrazobill
 ```
 
+Pre-compiled binary wheels cover Python 3.9 through 3.13 on Windows (x86-64), Linux (x86-64), and macOS (Apple Silicon and Intel). On Linux ARM architectures (such as AWS Graviton), `pip install` builds from source via the source distribution (`sdist`), or runs via the built-in pure-Python fallback.
+
 ### DuckDB extension
 
-Install and load directly from the official DuckDB Community Repository:
+Install and load directly from the official DuckDB Community Repository (DuckDB 1.1.x):
 
 ```sql
 INSTALL razobill FROM community;
 LOAD razobill;
 ```
+
+For offline environments or custom builds, load the compiled binary extension directly:
+
+```sql
+LOAD 'build/razobill.duckdb_extension';
+```
+
+*(Note: The community build currently targets DuckDB 1.1.x; compatibility tracking for DuckDB 2.0.0 is tracked under community issue #3081).*
 
 ### C ABI shared library
 
@@ -138,6 +148,67 @@ You can store logs as compact columnar Parquet files and restore the exact origi
 
 > [!NOTE]
 > **Real-world impact**: Eliminates up to 92% of raw log storage bytes in Parquet ZSTD stripes while preserving 100% of forensic raw bytes.
+
+---
+
+## Performance and benchmarks
+
+All figures come from the project's own benchmarks on one Windows 11 machine with 12 logical cores. Reproduction scripts and raw run artifacts are located in [`tools/BenchDrain.py`](tools/BenchDrain.py), [`tools/BenchCLP.py`](tools/BenchCLP.py), and [`evidence/`](evidence/).
+
+| Result | Measurement | Context |
+| :--- | :--- | :--- |
+| **Round trip** | 0 mismatches | 69.6 million lines, 4,861 log files, 6.82 GB audit |
+| **Speed, one thread** | 2.5× to 15.1× faster than Drain3 | Five LogHub datasets (SSH, Linux, Proxifier, Zookeeper, BGL), average 5.6× |
+| **Speed, long run** | 0.09 s vs 26.5 s | 100,000 SSH lines. Drain3 slowed to 3,779 lines/s |
+| **Speed, 12 threads** | 29 million lines/s average | Peak 69.4 million lines/s on the SSH dataset |
+| **On disk in DuckDB** | 6.29 MB to 2.88 MB | 134,815 events, 0.46× the raw table size |
+| **Parquet on S3** | 93.8% smaller than raw text | 20,000 events. 27.3% smaller than plain Parquet |
+
+For detailed methodology and full comparisons, see [Benchmark methodology and empirical results](docs/explanation/benchmarks.md).
+
+---
+
+## Razobill and CLP
+
+YScope's Compressed Log Processor (CLP, OSDI 2021) is an established system used in production (e.g., at Uber) that also separates logs into a log type and variable values to achieve lossless compression and fast search.
+
+Razobill shares this core conceptual motivation, but differs in architecture and deployment target:
+
+- **In-database relational columns vs. custom archive format**: CLP encodes logs into custom compressed archives (`.clp`) and intermediate representations (CLP IR) queried through dedicated CLP command-line utilities. Razobill decomposes lines into standard relational columns (`STRUCT`, `VARCHAR`, `BIGINT[]`, `VARCHAR[]`, and `UInt64` xxHash64 partition keys) natively inside general-purpose analytical databases (DuckDB, ClickHouse, chDB) and standard columnar files (Parquet with standard ZSTD or Snappy compression).
+- **Analytical SQL integration**: Because Razobill outputs standard relational arrays and scalar values, users can immediately apply SQL filters, aggregations, window functions, and joins across parsed log attributes without specialized search daemons.
+- **Execution model**: CLP is a full end-to-end log management and search system. Razobill is an embedded tokenization engine and C/Python/DuckDB extension library.
+
+Both engines were benchmarked head-to-head on identical hardware using [`tools/BenchCLP.py`](tools/BenchCLP.py): both achieved 100% exact bit-for-bit lossless roundtripping with 0 mismatches. CLP achieves higher raw file compression via its specialized dictionary bitstream (11.6× to 48.7× vs 8.0× to 17.9× for Parquet), while Razobill's `RzJoin` reconstructs original strings faster or on par (594k to 770k lines/s vs 390k to 753k lines/s) and provides direct SQL queryability.
+
+---
+
+## Known limits
+
+We designed Razobill for specific production trade-offs. Here is where it falls short:
+
+- **It is not a clustering tool**: On the project's 16-dataset benchmark, median grouping accuracy was 0.808 for Razobill versus 0.871 for Drain3. Razobill also retains more unique templates (median 70.5 vs 45.5). If your primary goal is finding the absolute minimum number of cluster archetypes regardless of variable loss, Drain3 is better suited. If you need lossless reconstruction and SQL analytical queries, Razobill is designed for that.
+- **The benchmarks are author-run**: All benchmarks were measured on a single author machine under Windows 11. We encourage verifying throughput on your specific production hardware and workloads.
+- **S3 cost models use emulators**: The S3 storage savings reported in evidence benchmarks were measured using LocalStack and simulated cost equations, rather than production AWS billing statements.
+- **Platform support constraints**: Pre-compiled DuckDB community binaries cover Linux (x86-64, aarch64), macOS (Apple Silicon, Intel), and Windows MSVC (x86-64). WebAssembly and MinGW builds are currently not included.
+
+---
+
+## Citation and license
+
+Razobill is licensed under the [Apache License, Version 2.0](LICENSE).
+
+If you use Razobill in academic, scientific, or benchmark publications, please retain the [NOTICE](NOTICE) file and cite the foundational paper:
+
+```bibtex
+@software{atta2026razobill,
+  author       = {Atta, M. M.},
+  title        = {librazobill: Exact Lossless Log Parsing and Information-Theoretic Storage Engine},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.23287286},
+  url          = {https://doi.org/10.5281/zenodo.23287286}
+}
+```
 
 ---
 

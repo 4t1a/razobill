@@ -18,10 +18,9 @@ ledgers, and semantic gating models established in:
 Academic & Industrial Citation Notice
 ================================================================================
 
-Pursuant to Section 4(d) of the Apache License, Version 2.0, if you use, embed,
-modify, or redistribute this software (or any derivative works thereof) in academic,
-scientific, benchmark, or industrial publications, you must retain this notice and
-cite the foundational work:
+If you use, embed, modify, or redistribute this software (or any derivative works
+thereof) in academic, scientific, or benchmark publications, please retain this
+notice and cite the foundational work:
 
 BibTeX:
 @software{atta2026razobill,

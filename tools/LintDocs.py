@@ -126,6 +126,8 @@ def lint_file(file_path: Path) -> list:
         "ClickHouse",
         "chDB",
         "MergeTree",
+        "CLP",
+        "IR",
     }
 
     heading_pattern = re.compile(r"^(#{1,6})\s+(.*)$")

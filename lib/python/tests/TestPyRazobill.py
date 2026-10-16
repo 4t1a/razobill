@@ -108,6 +108,33 @@ class TestPyRazobill(unittest.TestCase):
         self.assertEqual(rec_bytes.strs, [])
         self.assertEqual(rz.RzJoin(rec_bytes), b"")
 
+    def test_edge_cases_quoted_backslashes(self):
+        from pyrazobill import _fallback
+
+        cases = [
+            '"\\"',
+            "'\\'",
+            '"\\""',
+            "'\\''",
+            '"\\\\"',
+            '"\\\\\\"',
+            'opened "C:\\Users\\bob\\" ok',
+            "opened 'C:\\Users\\bob\\' ok",
+            'foo "bar\\" baz',
+            '"""',
+            "'''",
+            '"\\\\\\""',
+        ]
+        for s in cases:
+            # Native C++ engine
+            rec = rz.RzSplit(s)
+            self.assertEqual(rz.RzJoin(*rec), s)
+            self.assertEqual(rz.RzJoin(rec), s)
+
+            # Pure-Python fallback engine
+            fb_rec = _fallback.split(s, "semantic")
+            self.assertEqual(_fallback.join(fb_rec[0], fb_rec[1], fb_rec[2]), s)
+
     def test_edge_cases_invalid_utf8_and_nul(self):
         # Arbitrary raw byte strings with invalid UTF-8 and NUL bytes
         raw = b"Log \xff\xfe with \x00 NUL and 12345 value \x80\x81\x82"
