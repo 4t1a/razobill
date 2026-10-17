@@ -55,6 +55,8 @@ public:
     Backend() = default;
     Backend(const Backend&) = delete;
     Backend& operator=(const Backend&) = delete;
+    Backend(Backend&&) = delete;
+    Backend& operator=(Backend&&) = delete;
 
     [[nodiscard]] virtual Flavor flavor() const noexcept = 0;
     virtual void exec(std::string_view sql) = 0;

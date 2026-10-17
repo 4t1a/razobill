@@ -24,11 +24,11 @@ namespace razobill::core {
 [[nodiscard]] inline std::uint64_t xxh64(std::string_view s) noexcept {
     // Prime numbers derived from the golden ratio fractional expansion (Yann Collet).
     // These constants provide maximum bit-diffusion and prime-periodicity.
-    constexpr std::uint64_t P1 = 11400714785074694791ULL, // 0x9E3779B185EBCA87
-        P2 = 14029467366897019727ULL,                     // 0xC2B2AE3D27D4EB4F
-        P3 = 1609587929392839161ULL,                      // 0x165667B19E3779F9
-        P4 = 9650029242287828579ULL,                      // 0x85EBCA77C2B2AE63
-        P5 = 2870177450012600261ULL;                      // 0x27D4EB2F165667C5
+    constexpr std::uint64_t P1 = 11400714785074694791ULL; // 0x9E3779B185EBCA87
+    constexpr std::uint64_t P2 = 14029467366897019727ULL; // 0xC2B2AE3D27D4EB4F
+    constexpr std::uint64_t P3 = 1609587929392839161ULL;  // 0x165667B19E3779F9
+    constexpr std::uint64_t P4 = 9650029242287828579ULL;  // 0x85EBCA77C2B2AE63
+    constexpr std::uint64_t P5 = 2870177450012600261ULL;  // 0x27D4EB2F165667C5
 
     // PERF TRIVIA:
     // We use std::memcpy to read 64-bit and 32-bit words from potentially unaligned char pointers.
@@ -37,7 +37,7 @@ namespace razobill::core {
     // Undefined Behavior (UB) and crashes on ARM. Modern GCC/Clang optimize std::memcpy(&v, p, 8)
     // into a single machine `mov` instruction. Clean, safe, zero-cost!
     auto rd64 = [](const char* p) noexcept -> std::uint64_t {
-        std::uint64_t v;
+        std::uint64_t v = 0;
         std::memcpy(&v, p, 8);
         if constexpr (std::endian::native == std::endian::big) {
 #if defined(_MSC_VER)
@@ -50,7 +50,7 @@ namespace razobill::core {
         }
     };
     auto rd32 = [](const char* p) noexcept -> std::uint32_t {
-        std::uint32_t v;
+        std::uint32_t v = 0;
         std::memcpy(&v, p, 4);
         if constexpr (std::endian::native == std::endian::big) {
 #if defined(_MSC_VER)
@@ -67,19 +67,22 @@ namespace razobill::core {
 
     const char* p = s.data();
     const char* const end = p + s.size();
-    std::uint64_t h;
+    std::uint64_t h = 0;
 
     // Fast 32-byte 4-lane parallel processing loop.
     // Breaks data into 4 independent accumulators (v1..v4) to saturate CPU instruction-level parallelism (ILP).
     if (s.size() >= 32) [[likely]] {
-        std::uint64_t v1 = P1 + P2, v2 = P2, v3 = 0, v4 = 0 - P1;
-        do {
+        std::uint64_t v1 = P1 + P2;
+        std::uint64_t v2 = P2;
+        std::uint64_t v3 = 0;
+        std::uint64_t v4 = 0 - P1;
+        while (p + 32 <= end) {
             v1 = round(v1, rd64(p));
             v2 = round(v2, rd64(p + 8));
             v3 = round(v3, rd64(p + 16));
             v4 = round(v4, rd64(p + 24));
             p += 32;
-        } while (end - p >= 32);
+        }
 
         // Convergence: mix the 4 parallel accumulators into a single 64-bit state
         h = std::rotl(v1, 1) + std::rotl(v2, 7) + std::rotl(v3, 12) + std::rotl(v4, 18);

@@ -13,6 +13,11 @@ namespace razobill {
 class Dialect {
 public:
     virtual ~Dialect() = default;
+    Dialect() = default;
+    Dialect(const Dialect&) = default;
+    Dialect& operator=(const Dialect&) = default;
+    Dialect(Dialect&&) = default;
+    Dialect& operator=(Dialect&&) = default;
 
     [[nodiscard]] virtual Flavor flavor() const noexcept = 0;
     [[nodiscard]] virtual bool supportsCompact() const noexcept = 0;
