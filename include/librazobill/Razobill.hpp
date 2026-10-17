@@ -33,14 +33,14 @@ struct Config {
 struct GateRefused : std::runtime_error {
     GateRefused(const std::string& what, double jsd_, double share_)
         : std::runtime_error(what), jsd(jsd_), share(share_) {}
-    double jsd, share;
+    double jsd = 0.0, share = 0.0;
 };
 
 struct Defined {
-    int version;
-    std::size_t forms;
-    double lossPerMergedEvent;
-    double lossTableWide;
+    int version = 0;
+    std::size_t forms = 0;
+    double lossPerMergedEvent = 0.0;
+    double lossTableWide = 0.0;
 
     // Backward compatibility mappings
     double loss_per_merged_event = 0;
@@ -48,7 +48,7 @@ struct Defined {
 };
 
 struct MeaningOf {
-    std::uint64_t formId;
+    std::uint64_t formId = 0;
     std::optional<std::string> meaning; // nullopt if unresolved or ambiguous
     std::optional<double> doubt;        // nullopt if unresolved
 
