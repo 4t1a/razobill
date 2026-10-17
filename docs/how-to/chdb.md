@@ -1,182 +1,160 @@
-# Compacting and indexing logs in ClickHouse and chDB
+# Indexing logs in ClickHouse and chDB
 
-Integrate Razobill with ClickHouse and embedded chDB using bit-identical xxHash64 partition keys, additive MergeTree indexing, and Python ADBC queries.
-Read this guide if you are querying or partitioning log tables in ClickHouse or embedded chDB.
-Skip this guide if you are working exclusively with DuckDB (see [Compacting logs in DuckDB](duckdb.md)).
+[Docs](../README.md) / [How-to guides](chdb.md) / ClickHouse and chDB
 
----
+This guide shows you how to integrate Razobill with ClickHouse and embedded chDB using xxHash64 template keys and additive MergeTree table indexing.
 
-## Problem
-
-Storing large volumes of raw log text in ClickHouse presents analytical challenges:
-
-1. Scanning raw log strings with repeated regular expressions (`extractAll`, `replaceRegexpAll`) consumes high CPU during template aggregation.
-2. Grouping unstructured strings across distributed clusters requires shuffling large variable-length byte payloads across network boundaries.
-3. While DuckDB achieves over 50% physical compression via slot decomposition, ClickHouse's native `CODEC(ZSTD(3))` already compresses raw log strings to ~0.53x of uncompressed size.
-Decomposing lines into separate slot columns provides diminishing compression returns in ClickHouse MergeTree tables while complicating ad-hoc search.
+- **Who this is for**: Data engineers querying log datasets in ClickHouse or embedded chDB.
+- **What you will have at the end**: An additive MergeTree table schema indexed by template hash for fast analytical aggregations.
+- **Maturity**: Beta.
 
 ---
 
-## Solution
+## The problem
 
-The optimal ClickHouse architecture is **Additive Mode**:
+Querying large volumes of raw log text in ClickHouse presents analytical challenges:
 
-1. Keep the raw log message column intact with `CODEC(ZSTD(3))` for forensic auditing and full-text search.
-2. Add a lightweight 64-bit form hash column (`form_id UInt64`) indexed with `CODEC(ZSTD(3))`.
-3. Leverage Razobill's exact `xxHash64` parity so that hashes computed in C++, Python, and ClickHouse SQL match bit-for-bit without data drift.
+1. Extracting templates with regular expressions (`replaceRegexpAll`) consumes high CPU during dashboard aggregations.
+2. Shuffling variable-length string messages across distributed ClickHouse nodes increases network egress overhead.
+3. Decomposing lines into separate slot columns in ClickHouse MergeTree tables adds schema complexity without significant compression gain, because ClickHouse `CODEC(ZSTD(3))` already compresses raw text columns effectively.
+
+---
+
+## The solution: additive mode
+
+The recommended pattern for ClickHouse is additive indexing:
+
+1. Retain the raw message string column with `CODEC(ZSTD(3))` for full-text queries and audits.
+2. Add a 64-bit template hash column (`template_hash UInt64`) indexed with `CODEC(ZSTD(3))`.
+3. Use Razobill's `hash()` function, which produces an unsigned 64-bit integer bit-identical to ClickHouse `xxHash64()`.
 
 ```mermaid
 flowchart TD
-    Raw["Log Event: 'Connection lost to 10.0.0.1 after 3 retries'"]
-    Raw --> Core["librazobill C++ / pyrazobill"]
-    Raw --> CHSQL["ClickHouse / chDB SQL"]
-    Core --> CoreHash["xxh64(template) = 0x8546dcdb7cf5de36"]
-    CHSQL --> CHHash["xxHash64(template) = 0x8546dcdb7cf5de36"]
-    CoreHash -. Exact Bit-for-Bit Parity .-> CHHash
-    CHHash --> MT["MergeTree Storage (Additive form_id Column)"]
+    Raw["Raw Log: 'Failed password for root from 192.168.1.100 port 22'"]
+    Raw --> RZ["pyrazobill: hash(template)"]
+    Raw --> CH["ClickHouse SQL: xxHash64(template)"]
+    RZ --> H1["Hash: 54855824174769941"]
+    CH --> H2["Hash: 54855824174769941"]
+    H1 -. Bit-identical parity .-> H2
+    H2 --> MT["MergeTree Storage: ORDER BY (template_hash, timestamp)"]
 ```
+
+Hash parity ensures that keys computed at the edge match in-database queries without translation.
 
 ---
 
-## Step 1: Verify cross-engine hash parity
+## Step 1: Verify hash parity
 
-Razobill's C++ core (`include/librazobill/Hash.hpp`) implements Yann Collet's 64-bit xxHash algorithm with Seed 0 (`core::xxh64`).
-ClickHouse provides a native vectorized `xxHash64()` scalar function.
-Both implementations generate bit-identical 64-bit unsigned integers across all input strings:
+Razobill computes a 64-bit unsigned hash (`xxh64` with seed 0).
+ClickHouse provides a native `xxHash64()` scalar function.
+Both generate identical numbers for any input:
 
 ```sql
 SELECT xxHash64('Failed password for {s} from {s} port {i}') AS template_hash;
--- Result: 54855824174769941 (UInt64)
--- Matches pyrazobill.RzHash('Failed password for {s} from {s} port {i}') and DuckDB RzHash() exactly.
 ```
 
-> [!NOTE]
-> **Zero translation overhead**: You can partition distributed ClickHouse clusters directly on Razobill template hashes without FFI conversion.
+Expected output:
 
----
-
-## Step 2: Configure additive layout on MergeTree tables
-
-Add a 64-bit form identifier column (`form_id UInt64`) to your ClickHouse log table:
-
-```sql
--- Create log table with an additive form_id column populated during ingestion
-CREATE TABLE system_logs (
-    timestamp DateTime,
-    level LowCardinality(String),
-    service LowCardinality(String),
-    form_id UInt64 CODEC(ZSTD(3)),
-    msg String CODEC(ZSTD(3))
-) ENGINE = MergeTree()
-ORDER BY (service, form_id, timestamp);
-
--- Or add form_id to an existing table populated by Razobill ingestion pipelines:
-ALTER TABLE system_logs
-ADD COLUMN form_id UInt64 DEFAULT 0 CODEC(ZSTD(3));
+```text
+54855824174769941
 ```
 
-This additive index introduces only **+6% disk storage overhead** over raw ZSTD text.
-It delivers instant `GROUP BY form_id` aggregations without scanning string bytes.
-
----
-
-## Step 3: Run embedded chDB queries in Python
-
-Embedded chDB runs ClickHouse's vectorized SQL execution engine directly in-process without an external server daemon:
+In Python:
 
 ```python
-import chdb.session as chs
 import pyrazobill as rz
 
-# 1. Initialize an in-process chDB session
-session = chs.Session("/tmp/chdb_session")
-session.query("CREATE DATABASE IF NOT EXISTS logs")
-
-# 2. Create the target MergeTree table
-session.query("""
-    CREATE TABLE logs.events (
-        service LowCardinality(String),
-        form_id UInt64,
-        msg String CODEC(ZSTD(3))
-    ) ENGINE = MergeTree()
-    ORDER BY (service, form_id)
-""")
-
-# 3. Ingest log lines with precomputed Razobill hashes
-raw_lines = [
-    "Connection lost to 10.0.0.1 after 3 retries",
-    "Connection lost to 10.0.0.2 after 5 retries",
-    "User admin authenticated from 192.168.1.50"
-]
-
-for line in raw_lines:
-    rec = rz.RzSplit(line)
-    form_hash = rz.RzHash(rec.template)
-    session.query(f"""
-        INSERT INTO logs.events VALUES ('auth', {form_hash}, '{line}')
-    """)
-
-# 4. Aggregate log volume by template hash
-result = session.query("""
-    SELECT form_id, count() AS occurrences
-    FROM logs.events
-    GROUP BY form_id
-    ORDER BY occurrences DESC
-""", "CSV").bytes().decode()
-
-print(result)
-```
-
-> [!TIP]
-> **Try it**: Install chDB in your Python environment with `pip install chdb`.
-
----
-
-## Step 4: Connect via C++ ADBC backend
-
-For high-throughput C++ pipelines, `librazobill` provides dynamic Arrow Database Connectivity (ADBC) binding for chDB:
-
-```cpp
-#include <iostream>
-#include "librazobill/Backend.hpp"
-#include "librazobill/Razobill.hpp"
-
-int main() {
-    razobill::AdbcOptions options;
-    options.flavor = razobill::Flavor::ClickHouse;
-    options.driverPath = "/usr/local/lib/python3.12/dist-packages/chdb/_chdb.abi3.so";
-    options.entrypoint = "AdbcDriverInit";
-    options.deepbind = true; // Isolates C++ runtime symbols on Linux
-
-    auto backend = razobill::makeAdbcBackend(options);
-    backend->exec("CREATE TABLE IF NOT EXISTS audit (msg String) ENGINE = MergeTree ORDER BY tuple()");
-
-    std::cout << "Connected to embedded chDB backend successfully.\n";
-    return 0;
-}
+h = rz.hash("Failed password for {s} from {s} port {i}")
+print(h)
+# Output: 54855824174769941
 ```
 
 ---
 
-## Step 5: Measure storage compaction with `system.parts`
+## Step 2: Configure MergeTree tables
 
-Verify the physical byte footprint of your ClickHouse tables directly from table metadata:
+Add a `template_hash` column to your ClickHouse table:
 
 ```sql
+CREATE TABLE system_logs (
+    timestamp DateTime,
+    service LowCardinality(String),
+    template_hash UInt64 CODEC(ZSTD(3)),
+    msg String CODEC(ZSTD(3))
+) ENGINE = MergeTree()
+ORDER BY (service, template_hash, timestamp);
+```
+
+Ordering by `template_hash` co-locates rows with the same template on disk, enabling fast group-by aggregations without scanning string bytes.
+
+---
+
+## Step 3: Run queries in chDB
+
+Embedded chDB runs ClickHouse directly inside Python processes without an external database daemon:
+
+```python
+import chdb
+import pyrazobill as rz
+
+# Compute template and hash during ingestion
+line = "Failed password for root from 192.168.1.100 port 22"
+rec = rz.split(line)
+h = rz.hash(rec.template)
+
+# Query using in-memory ClickHouse SQL
+query = f"""
 SELECT
-    table,
-    sum(data_compressed_bytes) AS compressed_bytes,
-    sum(data_uncompressed_bytes) AS uncompressed_bytes,
-    round(sum(data_compressed_bytes) / sum(data_uncompressed_bytes), 3) AS compression_ratio
-FROM system.parts
-WHERE database = 'logs' AND active
-GROUP BY table;
+    count(*) AS total,
+    {h} AS template_hash
+"""
+res = chdb.query(query, "CSV")
+print(res)
 ```
 
 ---
 
-## Next steps
+## How to verify
 
-- [Compacting logs in DuckDB](duckdb.md): Compare additive ClickHouse indexing with DuckDB columnar slot compaction.
-- [Python developer guide](python.md): High-throughput batch processing with `RzSplitMany`.
-- [Lossless invertibility explanation](../explanation/lossless-invertibility.md): The mathematical guarantees behind Razobill tokenization.
+Verify that the hash generated by Razobill matches ClickHouse SQL:
+
+```python
+import chdb
+import pyrazobill as rz
+
+template_str = "Failed password for {s} from {s} port {i}"
+local_hash = rz.hash(template_str)
+
+ch_query = f"SELECT xxHash64('{template_str}')"
+ch_hash = int(chdb.query(ch_query, "TabSeparated").strip())
+
+assert local_hash == ch_hash
+print("Verified: cross-engine hash parity confirmed.")
+```
+
+---
+
+## Troubleshooting
+
+### Missing chDB driver during integration tests
+
+**What happened**:
+Running `./build/IntegrationChdb.exe` prints:
+
+```text
+Skipping chDB test: driver library not present
+```
+
+**Why it occurs**:
+The chDB embedded C driver was not installed in the build path.
+
+**How to resolve**:
+Install the python package `pip install chdb` or build `libchdb` from source if running standalone C++ integration tests.
+
+---
+
+## Related
+
+- [Compacting logs in DuckDB](duckdb.md): relational struct parsing and lossless reconstruction.
+- [Python developer guide](python.md): batch log parsing with `pyrazobill`.
+- [Lossless invertibility](../explanation/lossless-invertibility.md): theoretical foundations.

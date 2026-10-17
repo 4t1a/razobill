@@ -1,33 +1,53 @@
 # Writing compact Parquet to Amazon S3
 
-Compact log archives into Amazon S3 using DuckDB and Parquet ZSTD columnar stripes.
-Read this guide if you are designing a cold-storage or analytical log lakehouse on AWS S3.
-Skip this guide if you only process logs in local memory.
+[Docs](../README.md) / [How-to guides](s3-compaction.md) / S3 compaction
+
+This guide shows you how to stream decomposed log stripes directly into Amazon S3 as columnar Parquet files using DuckDB, cutting cloud storage footprint while preserving exact byte-for-byte reconstruction.
+
+- **Who this is for**: Cloud architects and data engineers designing log lakehouses on Amazon S3 or S3-compatible object stores (MinIO, LocalStack).
+- **What you will have at the end**: A DuckDB SQL pipeline that reads raw log streams, decomposes them into Parquet files with Zstd compression, and queries them over S3.
 
 ---
 
-## Problem
+## The problem
 
-Long-term retention of raw text logs in Amazon S3 or Google Cloud Storage results in high storage bills:
+Long-term retention of raw text or JSON logs in cloud object storage creates compounding costs:
 
-- Uncompressed text requires substantial object storage space.
-- Querying raw JSON or text via Amazon Athena requires scanning gigabytes of data per query.
-- Standard compression (Gzip) compresses well but prevents column pruning during queries.
-
----
-
-## Solution
-
-Decomposing log streams with Razobill produces typed columnar structures that compress efficiently in Parquet format.
-When writing to S3 via DuckDB, you can store structured templates, numbers, and words while preserving 100% bit-exact reconstructibility.
+1. Uncompressed string logs occupy large volumes of storage.
+2. Querying raw text with engines like Amazon Athena requires scanning gigabytes of data per query.
+3. Plain gzip compression shrinks files but prevents column pruning, forcing engines to download entire files across the network.
 
 ---
 
-## Step-by-step implementation
+## The solution
 
-### Step 1: Configure DuckDB with S3 credentials
+Decomposing log streams with Razobill into `(template, ints, strs)` isolates repeating format strings from variable parameters.
+Writing these columns to Parquet with Zstd compression achieves an 85.5% to 94.8% storage footprint reduction compared to raw text logs, while allowing query engines to download only the queried columns.
 
-In your DuckDB script, install and load `httpfs` alongside `razobill`:
+```mermaid
+flowchart LR
+    A["Raw Log Stream"] --> B["DuckDB: RzSplit(msg)"]
+    B --> C["Parquet Columnar Stripe: template, ints, strs"]
+    C --> D["Amazon S3: s3://example-bucket/logs/*.parquet"]
+    D --> E["Athena / DuckDB Queries with Column Pruning"]
+    D --> F["Lossless Reconstruction: RzJoin(template, ints, strs)"]
+```
+
+Queries download only requested columns, while audits can reconstruct the exact raw text at any time.
+
+---
+
+## Prerequisites
+
+- DuckDB 1.2.0 or newer.
+- An Amazon S3 bucket (or local MinIO/LocalStack instance).
+- DuckDB extensions `httpfs` and `razobill`.
+
+---
+
+## Step 1: Configure DuckDB S3 credentials
+
+In your DuckDB session, load `httpfs` and `razobill` and set your credentials:
 
 ```sql
 INSTALL httpfs;
@@ -36,35 +56,35 @@ LOAD httpfs;
 INSTALL razobill FROM community;
 LOAD razobill;
 
--- Set AWS authentication
+-- Configure S3 credentials (example values shown)
 SET s3_region = 'us-east-1';
-SET s3_access_key_id = 'YOUR_ACCESS_KEY';
-SET s3_secret_access_key = 'YOUR_SECRET_KEY';
+SET s3_access_key_id = 'AKIAIOSFODNN7EXAMPLE';
+SET s3_secret_access_key = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
 ```
 
 ---
 
-### Step 2: Decompose and write directly to Parquet on S3
+## Step 2: Decompose and export to Parquet on S3
 
-Transform your incoming logs table into partitioned Parquet files:
+Decompose raw log events and export them directly to partitioned Parquet files:
 
 ```sql
 COPY (
     SELECT
         current_timestamp AS event_time,
         parsed.template AS template,
-        parsed.ints AS numbers,
-        parsed.strs AS words
+        parsed.ints AS ints,
+        parsed.strs AS strs
     FROM (
-        SELECT RzSplit(msg) AS parsed FROM raw_stream_buffer
+        SELECT RzSplit(msg) AS parsed FROM raw_logs
     )
-) TO 's3://my-telemetry-bucket/year=2026/month=10/events.parquet'
+) TO 's3://example-telemetry-bucket/year=2026/month=10/events.parquet'
 (FORMAT PARQUET, COMPRESSION ZSTD);
 ```
 
 ---
 
-### Step 3: Query S3 data with partition pruning
+## Step 3: Query S3 data with column pruning
 
 Query only the relevant columns directly over object storage:
 
@@ -72,23 +92,38 @@ Query only the relevant columns directly over object storage:
 SELECT
     template,
     COUNT(*) AS occurrences,
-    AVG(numbers[1]) AS avg_duration_ms
-FROM read_parquet('s3://my-telemetry-bucket/year=2026/month=10/*.parquet')
-WHERE template LIKE '%Connection timed out%'
+    AVG(ints[1]) AS avg_port
+FROM read_parquet('s3://example-telemetry-bucket/year=2026/month=10/*.parquet')
+WHERE template LIKE '%Failed password%'
 GROUP BY template;
 ```
 
-Because Parquet stores columns independently, Athena or DuckDB downloads only the `template` and `numbers` byte ranges, cutting network transfer costs.
+DuckDB issues byte-range HTTP GET requests to download only the `template` and `ints` columns, avoiding the network transfer of variable string payloads.
 
 ---
 
-## Verification
+## How to verify
 
-Verify that any row in the S3 Parquet dataset can be restored to its raw string on demand:
+Verify that any row in the Parquet archive reconstructs to the exact original raw message:
 
 ```sql
 SELECT
-    RzJoin(template, numbers, words) AS original_raw_line
-FROM read_parquet('s3://my-telemetry-bucket/year=2026/month=10/*.parquet')
-LIMIT 5;
+    RzJoin(template, ints, strs) AS restored_log
+FROM read_parquet('s3://example-telemetry-bucket/year=2026/month=10/*.parquet')
+LIMIT 1;
 ```
+
+---
+
+## Honest caveats
+
+All S3 storage cost calculations in Razobill evidence artifacts were measured against LocalStack emulated environments and simulated AWS pricing models, rather than production AWS billing invoices.
+Verify compression ratios and transfer costs on your own production corpora before finalizing retention policies.
+
+---
+
+## Related
+
+- [Compacting logs in DuckDB](duckdb.md): local DuckDB SQL queries.
+- [Benchmark methodology](../explanation/benchmarks.md): Parquet compression measurements.
+- [Lossless invertibility](../explanation/lossless-invertibility.md): two-pass reconstruction mechanics.

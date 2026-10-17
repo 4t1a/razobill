@@ -1,22 +1,25 @@
-# Deploying OpenTelemetry processor
+# Deploying the OpenTelemetry processor
 
-Configure razobillprocessor inside the OpenTelemetry Collector to compact logs at the edge.
-Read this guide if you are deploying the OpenTelemetry Collector as a DaemonSet or sidecar.
-Skip this guide if you are ingesting logs directly into a database.
+[Docs](../README.md) / [How-to guides](opentelemetry.md) / OpenTelemetry
 
----
+This guide shows you how to build and configure `razobillprocessor` inside an OpenTelemetry Collector to compact logs at the edge before transmission.
 
-## Problem
-
-Edge logging pipelines transmit uncompressed, unstructured log strings across cloud availability zones and networks.
-This consumes substantial network egress bandwidth and overburdens downstream log collectors.
+- **Who this is for**: SREs and platform engineers managing OpenTelemetry Collector DaemonSets or sidecars.
+- **What you will have at the end**: A custom OpenTelemetry Collector binary that replaces raw log message bodies with compact templates and extracts parameter slices.
+- **Maturity**: Beta.
 
 ---
 
-## Solution
+## The problem
 
-The `razobillprocessor` module compiles the librazobill C ABI into a native Go processor for the OpenTelemetry Collector.
-It parses incoming `plog.LogRecord` payloads in sub-microsecond time:
+Edge logging pipelines transmit uncompressed, repetitive string messages across networks and cloud availability zones.
+This creates high network egress costs and places heavy indexing loads on central observability clusters.
+
+---
+
+## The solution: razobillprocessor
+
+The `razobillprocessor` component parses incoming `plog.LogRecord` payloads using the librazobill C ABI:
 
 1. Replaces `LogRecord.Body` with the compact template string.
 2. Extracts numeric values into a typed integer slice attribute (`razobill.ints`).
@@ -24,18 +27,28 @@ It parses incoming `plog.LogRecord` payloads in sub-microsecond time:
 
 ```mermaid
 flowchart LR
-    A["Raw Log Body: 'host 10.0.0.1 port 22'"] --> P["razobillprocessor"]
-    P --> B["LogRecord.Body: 'host {s} port {i}'"]
+    A["Raw Log: 'Failed password for root from 192.168.1.100 port 22'"] --> P["razobillprocessor"]
+    P --> B["LogRecord.Body: 'Failed password for {s} from {s} port {i}'"]
     P --> C["Attribute: razobill.ints = [22]"]
-    P --> D["Attribute: razobill.strs = ['10.0.0.1']"]
+    P --> D["Attribute: razobill.strs = ['root', '192.168.1.100']"]
     B & C & D --> E["OTLP / S3 / ClickHouse Exporter"]
 ```
 
+The processor strips raw string redundancy at the host edge before network egress.
+
 ---
 
-## Configuration
+## Prerequisites
 
-Add the `razobill` processor to your collector configuration (`config.yaml`):
+- Go 1.25 or newer (`go version`).
+- OpenTelemetry Collector Builder (`builder`) installed (`go install go.opentelemetry.io/collector/cmd/builder@v0.111.0`).
+- Compiled `librazobill` C ABI shared library available in your system library path.
+
+---
+
+## Step 1: Configure the processor in collector YAML
+
+Add `razobill` to the processors pipeline in your collector configuration (`config.yaml`):
 
 ```yaml
 receivers:
@@ -68,14 +81,14 @@ service:
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `drop_raw_body` | boolean | `true` | When true, overwrites `LogRecord.Body` with the template. |
-| `include_hash` | boolean | `true` | Populates the `razobill.formHash` attribute with a 64-bit template hash. |
+| `drop_raw_body` | boolean | `true` | Overwrites `LogRecord.Body` with the template string. |
+| `include_hash` | boolean | `true` | Populates `razobill.formHash` with the 64-bit template hash. |
 
 ---
 
-## Building with the OpenTelemetry collector builder
+## Step 2: Build with the OpenTelemetry collector builder
 
-To compile a custom collector binary including `razobillprocessor`, use the official builder manifest (`BuilderConfig.yaml`):
+Use the manifest provided in `ext/otel/BuilderConfig.yaml`:
 
 ```yaml
 dist:
@@ -94,15 +107,40 @@ Compile the collector:
 builder --config ext/otel/BuilderConfig.yaml
 ```
 
+The resulting binary `dist/otelcol-razobill` contains the compiled Razobill processor.
+
 ---
 
-## Verification
+## How to verify
 
-Start the collector and send a test log message:
+Execute the Go unit tests in `ext/otel`:
 
 ```bash
-./dist/otelcol-razobill --config config.yaml
+go test ./ext/otel/tests
 ```
 
-Verify that exported records contain the template body and parameter slice attributes.
-Downstream consumers can reconstruct the raw log message at any time by calling `RzJoin`.
+Expected output:
+
+```text
+ok      github.com/razobill/razobill/ext/otel/tests
+```
+
+---
+
+## Troubleshooting
+
+### C ABI dynamic library missing at runtime
+
+**What happened**:
+The collector binary exits with an error indicating `librazobill.so` or `razobill.dll` cannot be found.
+
+**How to resolve**:
+Ensure `LD_LIBRARY_PATH` (Linux) or `PATH` (Windows) points to the directory containing the compiled `librazobill` binary.
+
+---
+
+## Related
+
+- [Universal C ABI reference](../reference/c-abi.md): C99 library declarations.
+- [Vector transform guide](vector.md): edge log transformation using Vector.
+- [Packages reference](../reference/packages.md): distributions and dependencies.

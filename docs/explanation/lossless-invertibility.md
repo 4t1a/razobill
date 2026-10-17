@@ -1,92 +1,95 @@
-# Lossless invertibility
+# Lossless invertibility in Razobill
 
-Understanding the mathematical guarantee that decomposed log streams can be restored byte-for-byte.
-Read this article if you want to understand why Razobill guarantees exact reconstruction where other parsers lose data.
-Skip this article if you only need the API syntax for calling `RzSplit` and `RzJoin`.
+[Docs](../README.md) / [Explanation](lossless-invertibility.md) / Lossless invertibility
 
----
+This article explains the mathematical model, decomposition mechanics, and engineering trade-offs behind Razobill's byte-for-byte lossless reconstruction guarantee.
 
-## Background
-
-Traditional log parsers treat log clustering as an unsupervised machine learning or probabilistic tree search problem.
-Heuristic tools like Drain, Spell, and AEL group messages by token frequency or length.
-In doing so, they introduce irreversible distortion:
-
-1. They discard non-numeric variable tokens (such as file paths, IP addresses, or hostnames) when assigning templates.
-2. They alter whitespace, punctuation, and uppercase/lowercase casing.
-3. They split identical application log formats into hundreds of separate clusters due to unseen token variations.
-
-When a security incident or regulatory audit occurs, teams discovering that their telemetry database holds only lossy templates cannot reconstruct the original log line.
-They must choose between storing petabytes of raw, redundant text or accepting lossy approximations.
-
-Razobill eliminates this trade-off by modeling log formatting as an invertible algebraic decomposition rather than statistical clustering.
+- **Who this is for**: Systems architects, database engineers, and security auditors who need to verify that decomposed log archives preserve raw evidence without data loss.
+- **What you will have at the end**: An understanding of the algebraic bijection, the two-pass reconstruction algorithm, and the trade-offs between lossless parsing and statistical clustering.
 
 ---
 
-## Mechanics of exact invertibility
+## The question
 
-Razobill establishes an exact algebraic relation over the set of all byte strings $\Sigma^*$:
+How can an observability pipeline split unstructured text logs into relational database columns to shrink storage while guaranteeing that the exact original text can be reconstructed for security audits?
 
-$$\text{RzJoin}(\text{RzSplit}(x)) = x \quad \forall x \in \Sigma^*$$
+Traditional log parsers treat template discovery as a clustering problem. Algorithms like Drain3 and Spell group similar lines by token count and word position. In doing so, they discard non-numeric variable tokens (such as user names, IP addresses, and file paths), normalize whitespace, and alter punctuation. Once discarded, the original log line cannot be recovered.
 
-Every decomposed record contains three discrete projections:
+Razobill replaces probabilistic clustering with an algebraic decomposition that preserves every byte.
 
-1. **Template ($T$)**: The invariant character skeleton, containing typed slot markers:
-   - `{i}`: Placeholder for a 64-bit integer.
-   - `{s}`: Placeholder for a variable word.
-   - `{{` and `}}`: Escaped literal braces.
-2. **Numbers ($I$)**: A contiguous vector of extracted 64-bit signed integers parsed using branchless digit accumulators.
-3. **Words ($S$)**: A contiguous vector of string slices pointing directly into the input byte stream.
+---
 
-### Proof of bijection
+## The algebraic model
 
-During decomposition:
+Razobill establishes an exact bijection over the set of byte sequences.
+For every input string $x$:
 
-- Literal occurrences of `{` or `}` in the original input string are escaped into `{{` or `}}`.
-- When an integer is detected at byte position $[p_k, p_k + L_k]$, its numeric value is parsed and appended to $I$, and the sequence `{i}` replaces $[p_k, p_k + L_k]$ in $T$.
-- When a variable word is detected at byte position $[q_m, q_m + M_m]$, a pointer and length slice are appended to $S$, and the sequence `{s}` replaces $[q_m, q_m + M_m]$ in $T$.
+$$\text{join}(\text{split}(x)) = x$$
 
-During reconstruction (`RzJoin`):
+Every log event decomposes into three relational components:
 
-- The template string is scanned linearly for `{` characters.
-- Double braces `{{` and `}}` are collapsed back into single literal `{` and `}` bytes.
-- Placeholders `{i}` pop the next integer from $I$ and format it directly into the output buffer via high-speed `std::to_chars`.
-- Placeholders `{s}` copy the next string slice from $S$ into the output buffer.
-- Because every non-template byte was explicitly assigned to either $I$ or $S$ without modification, the reconstructed output equals the input byte-for-byte.
+1. **Template ($T$)**: Constant character skeleton containing `{i}` for integers and `{s}` for strings. Literal braces are escaped as `{{` and `}}`.
+2. **Integers ($I$)**: Array of 64-bit non-negative integers extracted from numeric tokens.
+3. **Strings ($S$)**: Array of variable string slices borrowed directly from the input byte stream.
 
 ```mermaid
 flowchart LR
-    A["Raw Log Line: 'Worker 4 timed out after 3 retries'"] --> B["RzSplit"]
-    B --> C["Template: 'Worker {i} timed out after {i} retries'"]
-    B --> D["Numbers: [4, 3]"]
-    B --> E["Words: []"]
+    A["Raw Log Line: 'Failed password for root from 192.168.1.100 port 22'"] --> B["RzSplit"]
+    B --> C["Template: 'Failed password for {s} from {s} port {i}'"]
+    B --> D["Integers: [22]"]
+    B --> E["Strings: ['root', '192.168.1.100']"]
     C & D & E --> F["RzJoin"]
-    F --> G["Exact Byte Restoration: 'Worker 4 timed out after 3 retries'"]
+    F --> G["Exact Byte Restoration: 'Failed password for root from 192.168.1.100 port 22'"]
 ```
 
----
-
-## Theoretical foundation
-
-The algebraic decomposition in Razobill is grounded in information-theoretic semantic accounting introduced by M. M. Atta (2026) in [*Latitude and Doubt*](https://doi.org/10.5281/zenodo.23287286).
-
-Under this model, the information content of a log event is partitioned into:
-
-- Invariant structural template information.
-- Numeric and variable parameter payload information.
-
-Because the decomposition is an exact partition without discarded entropy, zero information leakage occurs across template boundaries.
+The split operation extracts typed tokens while join formats and reassembles them in a single contiguous memory pass.
 
 ---
 
-## Measured trade-offs
+## Two-pass reconstruction mechanics
 
-| Dimension | Probabilistic Parsers (Drain3) | Regex Matching | Razobill Exact Invertibility |
+During reconstruction (`join` or `RzJoin`), the engine uses a two-pass algorithm (`src/Slots.cpp:125-185`) to guarantee memory safety and zero unnecessary allocations:
+
+1. **Pass 1 (Size calculation and validation)**:
+   - Scans the template string linearly.
+   - Replaces `{i}` with the exact digit length of the corresponding integer using a lookup table.
+   - Replaces `{s}` with the exact byte length of the corresponding string slice.
+   - Verifies that placeholder counts match the lengths of parameter arrays. If counts disagree, returns `Status::SlotUnderflow` or `Status::SlotOverflow`.
+   - Checks that total reconstructed size does not exceed the 16 MiB limit (`kMaxMessageBytes`).
+2. **Pass 2 (Contiguous formatting)**:
+   - Allocates the target output buffer once to the exact pre-calculated size.
+   - Copies template literals and collapses escaped braces (`{{` to `{`, `}}` to `}`).
+   - Formats integers directly into the output slice via `std::to_chars` without intermediate string copies.
+   - Copies string slices directly into the output buffer.
+
+Because every character in the original message is assigned either to the template or to a parameter array, the output matches the original line bit for bit.
+
+---
+
+## Alternatives rejected
+
+We evaluated three alternative approaches before choosing typed slot decomposition:
+
+1. **Regular expressions**: Writing regular expressions for each log format preserves data but requires manual maintenance. PCRE engines backtrack on malformed inputs and throughput drops below 100k lines per second per core.
+2. **Probabilistic clustering (Drain3)**: Groups logs into tree-structured clusters. While effective at finding high-level event types, it alters variable tokens, making forensic log recovery impossible.
+3. **Custom binary bitstream compression (CLP)**: Achieves high file compression ratios by encoding logs into custom archive formats. However, it requires proprietary command-line utilities and cannot be queried with standard SQL in DuckDB or ClickHouse.
+
+---
+
+## Engineering trade-offs and limits
+
+| Dimension | Drain3 (Clustering) | CLP (Custom Archive) | Razobill (Relational Columns) |
 | :--- | :--- | :--- | :--- |
-| **Data loss** | High (variables discarded) | None (if perfectly crafted) | **Zero (mathematically proven)** |
-| **Throughput** | 10k - 50k lines/sec/core | 50k - 200k lines/sec/core | **> 2.5M lines/sec/core** |
-| **Memory scaling** | Unbounded parse trees | Engine state machine | **Zero heap allocation on hot path** |
-| **Rule maintenance** | Tuning depth and similarity thresholds | Manual regex writing | **Zero configuration required** |
+| **Invertibility** | Lossy (variables discarded) | Lossless (custom bitstream) | Lossless (relational columns) |
+| **Query interface** | Specialized Python scripts | Dedicated CLP CLI | Standard SQL (`SELECT ...`) |
+| **Throughput (1 core)** | 10k–40k lines/s | 390k–750k lines/s | 2.38M lines/s (SSH dataset) |
+| **Cluster count** | Fewer templates (median 45.5) | N/A | More templates (median 70.5) |
+| **Maximum line size** | Memory-dependent | Archive chunk size | Hard limit of 16 MiB per line |
 
-> [!NOTE]
-> **Under the hood**: Invertibility holds across UTF-8 text, ASCII logs, and arbitrary binary byte sequences containing non-printable bytes.
+---
+
+## Related
+
+- [DuckDB extension guide](../how-to/duckdb.md): query and join decomposed logs using SQL.
+- [Controlled glossary](../reference/glossary.md): formal definitions for template, ints, strs, and round trip.
+- [Empirical benchmarks](benchmarks.md): throughput and compression measurements across LogHub datasets.

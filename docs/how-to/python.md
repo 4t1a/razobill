@@ -1,164 +1,184 @@
 # Parsing logs in Python
 
-Process single messages, batch streams, and binary buffers using the pyrazobill library.
-Read this guide if you are integrating Razobill into a Python logging or telemetry pipeline.
-Skip this guide if you are querying logs inside a database.
+[Docs](../README.md) / [How-to guides](python.md) / Python
+
+This guide shows you how to parse log strings, process batches with multithreading, handle raw bytes, and reconstruct original messages using the `pyrazobill` package.
+
+- **Who this is for**: Python developers building telemetry ingestion scripts, CLI utilities, or ETL data pipelines.
+- **What you will have at the end**: A Python script that decomposes log strings and batches into relational records and verifies exact lossless reconstruction.
 
 ---
 
-## Problem
+## The problem
 
-Parsing millions of log lines in pure Python using regular expressions or `split()` creates high CPU overhead and triggers garbage collection stalls.
-Standard Python string allocations on large log corpora often consume tens of gigabytes of RAM.
+Processing millions of log lines in Python with regular expressions or custom `split()` logic causes high CPU utilization and large memory allocations:
+
+1. Standard regex engines backtrack on unexpected log tokens, slowing down batch throughput.
+2. Creating intermediate strings for every token triggers garbage collection overhead.
+3. Discarding parameters makes it impossible to reproduce original logs for compliance.
 
 ---
 
-## Solution
+## Prerequisites
 
-The `pyrazobill` package compiles high-performance C++20 parsing routines with pure-Python fallback support.
-It exposes unified `split` and `join` primitives.
+- Python 3.9 or newer.
+- Package `pyrazobill` installed via `pip install pyrazobill`.
 
-### Step 1: Install and import
+---
 
-Install the package from PyPI:
+## Step 1: Parse a single log line
 
-```bash
-pip install pyrazobill
-```
-
-Import the module:
+Call `rz.split(line)`:
 
 ```python
 import pyrazobill as rz
-```
 
----
-
-### Step 2: Parse a single log line
-
-Call `rz.RzSplit` (or its ergonomic alias `rz.split`):
-
-```python
-line = "Accepted publickey for ubuntu from 10.0.0.15 port 54322 ssh2"
-record = rz.RzSplit(line)
+line = "Failed password for root from 192.168.1.100 port 22"
+record = rz.split(line)
 
 print("Template:", record.template)
-print("Numbers: ", record.ints)
-print("Words:   ", record.strs)
+print("Integers:", record.ints)
+print("Strings: ", record.strs)
 ```
 
-Output:
+Expected output:
 
 ```text
-Template: Accepted publickey for {s} from {s} port {i} {s}
-Numbers:  [54322]
-Words:    ['ubuntu', '10.0.0.15', 'ssh2']
+Template: Failed password for {s} from {s} port {i}
+Integers: [22]
+Strings:  ['root', '192.168.1.100']
 ```
 
-The returned `record` is an instance of `RzRecord`, a named tuple with fields `template`, `ints`, and `strs`.
+The returned object is an `RzRecord` named tuple with fields `template`, `ints`, and `strs`.
 
 ---
 
-### Step 3: Reconstruct original text
+## Step 2: Reconstruct original text
 
-Pass the record fields directly to `rz.RzJoin`:
+Pass the decomposed record back to `rz.join`:
 
 ```python
-# Unpack the record tuple
-restored = rz.RzJoin(*record)
+restored = rz.join(record.template, record.ints, record.strs)
 assert restored == line
 ```
 
+Every character and delimiter matches the original input line.
+
 ---
 
-### Step 4: Batch parsing with `RzSplitMany`
+## Step 3: Batch parsing with split_many
 
-When parsing arrays or files of log messages, call `rz.RzSplitMany`:
+When parsing lists or streams of log messages, call `rz.split_many`:
 
 ```python
 lines = [
-    "Connection reset by 192.168.1.1 port 80",
-    "Connection reset by 192.168.1.2 port 443",
-    "Connection reset by 192.168.1.3 port 8080"
+    "Failed password for root from 192.168.1.100 port 22",
+    "Failed password for admin from 10.0.0.1 port 2222",
 ]
 
-records = rz.RzSplitMany(lines)
+records = rz.split_many(lines)
 for rec in records:
-    print(rec.template, rec.ints)
+    print(rec.template, rec.ints, rec.strs)
 ```
 
-Output:
+Expected output:
 
 ```text
-Connection reset by {s} port {i} [80]
-Connection reset by {s} port {i} [443]
-Connection reset by {s} port {i} [8080]
+Failed password for {s} from {s} port {i} [22] ['root', '192.168.1.100']
+Failed password for {s} from {s} port {i} [2222] ['admin', '10.0.0.1']
 ```
 
-`RzSplitMany` releases the Python GIL during parsing, enabling parallel C++ worker threads to execute simultaneously.
+When the input collection exceeds 128 items, the compiled C++ engine releases the Python Global Interpreter Lock (GIL) and dispatches parsing across worker threads.
 
 ---
 
-### Step 5: Handling raw bytes
+## Step 4: Handle raw binary bytes
 
-`pyrazobill` accepts either `str` or `bytes` as input.
-When `bytes` are provided, `RzSplit` returns byte-encoded templates and string views without UTF-8 decoding overhead:
+`pyrazobill` accepts either `str` or `bytes`.
+When `bytes` are provided, `split()` operates without UTF-8 decoding overhead and returns bytes:
 
 ```python
-raw_bytes = b"\x00\x01 GET /health HTTP/1.1 200"
-record = rz.RzSplit(raw_bytes)
+raw_bytes = b"Failed password for root from 192.168.1.100 port 22"
+record = rz.split(raw_bytes)
 
 assert isinstance(record.template, bytes)
-assert rz.RzJoin(*record) == raw_bytes
+assert rz.join(record.template, record.ints, record.strs) == raw_bytes
 ```
 
 ---
 
-### Step 6: Fast 64-bit template hashing with `RzHash`
+## Step 5: Fast template hashing
 
-Compute deterministic 64-bit template hashes for database indexing or partition keys:
+Compute a 64-bit unsigned hash of the template string for indexing or database partitioning:
 
 ```python
 line = "Failed password for root from 192.168.1.100 port 22"
-rec = rz.RzSplit(line)
-form_hash = rz.RzHash(rec.template)
+rec = rz.split(line)
+template_hash = rz.hash(rec.template)
 
-print("Template hash:", form_hash)
-# 54855824174769941
+print("Template hash:", template_hash)
 ```
 
-The resulting hash matches ClickHouse `xxHash64()` and DuckDB `RzHash()` bit-for-bit.
-
----
-
-### Step 7: Error handling
-
-When malformed inputs or invalid arguments are supplied, `pyrazobill` raises an `RzError` (a subclass of `ValueError`):
-
-```python
-try:
-    rz.RzSplit("valid message", mode="invalid_mode")
-except rz.RzError as err:
-    print("Caught expected error:", err)
-```
-
-Output:
+Expected output:
 
 ```text
-Caught expected error: [razobill] What happened: Invalid scan mode. Why: Expected 'semantic' or 'exact', got 'invalid_mode'. What to do: Use mode='semantic' (default) or mode='exact'.
+Template hash: 54855824174769941
 ```
+
+The resulting integer matches ClickHouse `xxHash64` and DuckDB `RzHash` bit for bit.
 
 ---
 
-## Verification
+## How to verify
 
-Run this test script to verify that both native and fallback implementations preserve exact invertibility:
+Verify your installation by running a round-trip check on your running example:
 
 ```python
 import pyrazobill as rz
 
-sample = "Worker 12 finished task in 45 ms with status OK"
-rec = rz.RzSplit(sample)
-assert rz.RzJoin(*rec) == sample
-print("Verification passed: pyrazobill", rz.__version__, "is functional.")
+sample = "Failed password for root from 192.168.1.100 port 22"
+rec = rz.split(sample)
+assert rz.join(rec.template, rec.ints, rec.strs) == sample
+print("Verification passed on pyrazobill version", rz.__version__)
+print("Native SIMD engine active:", rz.isNative())
 ```
+
+---
+
+## Troubleshooting
+
+### RzError: Invalid scan mode
+
+**What happened**:
+Calling `rz.split(line, mode="custom")` raises an `RzError`:
+
+```text
+RzError: [razobill] What happened: Invalid scan mode. Why: Expected 'semantic' or 'exact', got 'custom'.
+```
+
+**How to resolve**:
+Pass either `mode="semantic"` (default) or `mode="exact"`:
+
+```python
+rec = rz.split(line, mode="semantic")
+```
+
+### RzError: Unsupported input type
+
+**What happened**:
+Passing an integer or dictionary to `split()` raises an `RzError`:
+
+```text
+RzError: [razobill] What happened: Unsupported input type. Why: Expected str or bytes, got int.
+```
+
+**How to resolve**:
+Cast or format the argument as `str` or `bytes` before passing to `split()`.
+
+---
+
+## Related
+
+- [Python API reference](../reference/python-api.md): parameter types, error classes, and return signatures.
+- [DuckDB extension guide](duckdb.md): parsing logs with analytical SQL.
+- [Lossless invertibility](../explanation/lossless-invertibility.md): two-pass reconstruction mechanics.

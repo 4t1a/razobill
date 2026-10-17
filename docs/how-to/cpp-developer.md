@@ -1,76 +1,196 @@
-# Embedding librazobill in C++
+# Embed librazobill in C and C++
 
-Build and link the high-performance C++20 engine into native applications and services.
-Read this guide if you are writing C or C++ services that need native in-process log decomposition.
-Skip this guide if you are calling Razobill through Python or SQL.
+[Docs](../README.md) > [How-to guides](../README.md#how-to-guides) > Embed librazobill in C and C++
 
----
+This guide shows how to link and execute `librazobill` directly in native C++20 and C99 applications.
 
-## Problem
-
-Application binaries embedding external libraries require predictable memory lifetimes and zero runtime overhead.
-You need a C++ engine that guarantees zero allocations on the parsing path while remaining safe across ABI boundaries.
+- **Audience**: Systems engineers and telemetry agent developers embedding in-process log decomposition.
+- **Outcome**: A compiled native binary that decomposes log lines, extracts typed parameters, and asserts round-trip reconstruction without external dependencies.
 
 ---
 
-## Solution
+## Prerequisites
 
-`librazobill` can be embedded directly via CMake or linked as a universal C ABI shared library (`RazobillC.h`).
+- C++20 compiler: GCC 11+, Clang 13+, or MSVC 2022 (v19.30+)
+- CMake 3.20 or newer
+- POSIX threads (`pthreads`) on Linux/macOS, or Windows SDK on Windows
 
 ---
 
-## CMake integration
+## Step 1: Add librazobill to your CMake project
 
-### Option A: subdirectory integration
+Razobill provides the CMake alias target `librazobill::librazobill` for static linking and `razobill_cabi` for shared library linking.
 
-Add Razobill to your CMake build tree:
+Add Razobill as a subdirectory in your `CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
-project(my_telemetry_service LANGUAGES C CXX)
+project(log_processor LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_subdirectory(path/to/razobill)
+# Add Razobill source repository
+add_subdirectory(path/to/razobill EXCLUDE_FROM_ALL)
 
-add_executable(my_service main.cpp)
-target_link_libraries(my_service PRIVATE librazobill::librazobill)
+# Native C++ application target
+add_executable(processor main.cpp)
+target_link_libraries(processor PRIVATE librazobill::librazobill)
 ```
 
-### Option B: universal C ABI linking
+---
 
-If linking dynamically across binary boundaries, include the public header and link against the shared library:
+## Step 2: Parse and reconstruct logs using C++20
 
-```c
-#include "librazobill/RazobillC.h"
-#include <stdio.h>
-#include <assert.h>
+Include `librazobill/Slots.hpp` and `librazobill/Razobill.hpp` to access the native C++ engine.
 
-int main(void) {
-    const char message[] = "Host node-1 reported error 404";
-    size_t length = sizeof(message) - 1;
+Create `main.cpp`:
 
-    RzRecord record;
-    RzStatus status = RzSplit(message, length, &record);
-    assert(status == RZ_OK);
+```cpp
+#include "librazobill/Razobill.hpp"
+#include "librazobill/Slots.hpp"
 
-    printf("Template: %.*s\n", (int)record.templateLength, record.templateStr);
-    printf("Numbers extracted: %zu\n", record.intCount);
-    printf("Words extracted:   %zu\n", record.strCount);
+#include <cassert>
+#include <iostream>
+#include <string>
+#include <string_view>
 
-    // Free heap memory allocated for record structures
-    RzFree(&record);
+int main() {
+    // Synthetic log line (RFC 1918 private IP)
+    const std::string line = "Failed password for root from 192.168.1.100 port 22";
+
+    // Decompose into template and parameters
+    razobill::core::SlotRecord record = razobill::core::splitSlots(line);
+
+    std::cout << "Template: " << record.templateString << "\n";
+    std::cout << "Integers (" << record.intSlots.size() << "): ";
+    for (int64_t val : record.intSlots) {
+        std::cout << val << " ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Strings  (" << record.strSlots.size() << "): ";
+    for (std::string_view sv : record.strSlots) {
+        std::cout << "'" << sv << "' ";
+    }
+    std::cout << "\n";
+
+    // Byte-exact reconstruction invariant
+    std::string reconstructed = razobill::core::joinSlots(
+        record.templateString,
+        record.intSlots,
+        record.strSlots
+    );
+
+    assert(reconstructed == line);
+    std::cout << "Round trip verified: exact match.\n";
+
     return 0;
 }
 ```
 
 ---
 
-## Memory lifetime invariants
+## Step 3: Embed using the C ABI
 
-> [!WARNING]
-> **Gotcha**: Pointers in `record.strValues` point directly into the caller's `message` buffer. The source message buffer must remain valid until you are finished reading `record.strValues`.
+If your service is written in C99, Go (CGO), Rust (bindgen), or Zig, link against `razobill_cabi` and include `librazobill/RazobillC.h`.
 
-1. Always call `RzFree(&record)` when done with a record to prevent memory leaks.
-2. In C++, prefer `razobill::core::SlotRecord` when working entirely inside C++ code for RAII safety.
+Create `main.c`:
+
+```c
+#include "librazobill/RazobillC.h"
+
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char message[] = "Failed password for root from 192.168.1.100 port 22";
+    size_t length = strlen(message);
+
+    RzRecord record;
+    RzStatus status = RzSplit(message, length, &record);
+    assert(status == RZ_OK);
+
+    printf("Template: %.*s\n", (int)record.templateLength, record.templateStr);
+    printf("Integers: %zu extracted\n", record.intCount);
+    printf("Strings:  %zu extracted\n", record.strCount);
+
+    // Reconstruct into a preallocated destination buffer
+    char out_buf[256];
+    size_t out_len = sizeof(out_buf);
+    status = RzJoin(record.templateStr, record.templateLength,
+                    record.intValues, record.intCount,
+                    record.strValues, record.strLengths, record.strCount,
+                    out_buf, &out_len);
+    assert(status == RZ_OK);
+    assert(out_len == length);
+    assert(memcmp(out_buf, message, length) == 0);
+
+    // Free internal buffers allocated by RzSplit
+    RzFree(&record);
+
+    printf("C ABI round trip verified: exact match.\n");
+    return 0;
+}
+```
+
+---
+
+## Memory lifetime and concurrency rules
+
+1. **String view lifetimes**: `record.strValues` contains pointers pointing directly into the input `message` buffer. You must keep the input buffer alive while reading `record.strValues`.
+2. **Buffer release**: Every successful call to `RzSplit` must be paired with `RzFree(&record)` to free allocated template and integer arrays.
+3. **Thread safety**: Core split and join functions are reentrant and stateless. Multiple threads can parse concurrent streams without locking or global synchronization.
+
+---
+
+## Verification
+
+Compile and run your application:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/processor
+```
+
+Expected output:
+
+```text
+Template: Failed password for root from {} port {}
+Integers (2): 100 22 
+Strings  (1): '192.168.1' 
+Round trip verified: exact match.
+```
+
+---
+
+## Troubleshooting
+
+### Undefined reference to RzSplit
+
+Ensure your target links against `librazobill::librazobill` or `razobill_cabi`:
+
+```cmake
+target_link_libraries(my_app PRIVATE librazobill::librazobill)
+```
+
+If linking the shared library dynamically on Linux, ensure `librazobill.so` is in `LD_LIBRARY_PATH` or specify `RPATH` in CMake:
+
+```cmake
+set_target_properties(my_app PROPERTIES BUILD_RPATH "${CMAKE_BINARY_DIR}")
+```
+
+### Segmentation fault accessing record.strValues
+
+The input message string was destroyed, reallocated, or went out of scope while `record.strValues` was being accessed. Ensure the backing storage persists until you are done with the record or have copied the string views into owned buffers.
+
+---
+
+## Related
+
+- [C API reference](../reference/c-abi.md)
+- [C++ API reference](../reference/cpp-api.md)
+- [Hardware acceleration with SIMD](neon-simd.md)
