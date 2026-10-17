@@ -201,7 +201,8 @@ void RazobillEngine::detectLocked() {
             if (db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0) > 0) {
                 hasCollision_ = true;
             }
-        } catch (...) {
+        } catch (const std::exception&) { // NOLINT(bugprone-empty-catch)
+            // Table rb_form may not exist yet prior to installLocked(); safe to ignore
         }
     }
 }
