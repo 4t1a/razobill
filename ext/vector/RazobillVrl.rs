@@ -108,7 +108,10 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
     }
 
     let mut map = BTreeMap::new();
-    map.insert("template".to_string(), serde_json::Value::from(form_str.clone()));
+    map.insert(
+        "template".to_string(),
+        serde_json::Value::from(form_str.clone()),
+    );
     map.insert("form".to_string(), serde_json::Value::from(form_str));
     map.insert("ints".to_string(), serde_json::Value::Array(ints));
     map.insert("strs".to_string(), serde_json::Value::Array(strs));

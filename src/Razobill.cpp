@@ -198,7 +198,8 @@ void RazobillEngine::detectLocked() {
     }
     if (ready_) {
         try {
-            if (db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0) > 0) {
+            if (db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0) >
+                0) {
                 hasCollision_ = true;
             }
         } catch (const std::exception&) { // NOLINT(bugprone-empty-catch)

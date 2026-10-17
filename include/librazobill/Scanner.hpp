@@ -12,6 +12,7 @@
 // The scanner runs in strictly linear O(N) time with zero dynamic heap allocation.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -123,7 +124,7 @@ template <class OnToken>
             ++p;
         }
         const auto* const dEnd = p;
-        const std::size_t dLen = static_cast<std::size_t>(dEnd - dStart);
+        const auto dLen = static_cast<std::size_t>(dEnd - dStart);
         const char lastDelimChar = dLen > 0 ? static_cast<char>(*(dEnd - 1)) : '\0';
 
         if (p >= end) break;
@@ -206,9 +207,7 @@ template <class OnToken>
 [[nodiscard]] constexpr bool isIntToken(std::string_view t) noexcept {
     if (t.empty() || t.size() > 18) return false;
     if (t.front() == '0') return t.size() == 1;
-    for (char c : t)
-        if (c < '0' || c > '9') return false;
-    return true;
+    return std::ranges::all_of(t, [](char c) { return c >= '0' && c <= '9'; });
 }
 
 } // namespace razobill::core

@@ -54,7 +54,7 @@ jobs:
           ASAN_OPTIONS: "detect_leaks=1"
           UBSAN_OPTIONS: "halt_on_error=1"
         run: |
-          ./build/FuzzDecomposeReconstruct 100000
+          ./build/FuzzDecomposeReconstruct -runs=100000 -max_total_time=30
 
   tsan:
     name: TSan (ThreadSanitizer - Data Race Detector)

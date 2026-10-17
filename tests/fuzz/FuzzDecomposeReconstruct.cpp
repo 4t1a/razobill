@@ -153,10 +153,22 @@ int main(int argc, char** argv) {
               << " sample test cases and 16MB boundary test passed perfectly!\n";
 
     size_t targetIterations = 1'000'000;
-    if (argc > 1 && argv[1] != nullptr) {
-        char* endp = nullptr;
-        targetIterations = std::strtoull(argv[1], &endp, 10);
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) continue;
+        std::string_view arg(argv[i]);
+        if (arg.starts_with("-runs=")) {
+            arg.remove_prefix(6);
+            char* endp = nullptr;
+            targetIterations = std::strtoull(arg.data(), &endp, 10);
+            break;
+        }
+        if (!arg.starts_with('-')) {
+            char* endp = nullptr;
+            targetIterations = std::strtoull(argv[i], &endp, 10);
+            break;
+        }
     }
+    if (targetIterations == 0) targetIterations = 100'000;
 
     const unsigned int numThreads = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
     std::cout << "[FuzzDecomposeReconstruct] Spawning " << numThreads << " worker threads for " << targetIterations

@@ -36,9 +36,7 @@
 #include <arm_neon.h>
 #endif
 
-namespace razobill::core {
-
-namespace simd {
+namespace razobill::core::simd {
 
 /// Supported hardware vector acceleration tiers.
 enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx512 = 3 };
@@ -135,7 +133,7 @@ inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noex
         __m256i eqCr = _mm256_cmpeq_epi8(chunk, crVec);
 
         __m256i combined = _mm256_or_si256(_mm256_or_si256(eqSpace, eqTab), _mm256_or_si256(eqLf, eqCr));
-        std::uint32_t mask = static_cast<std::uint32_t>(_mm256_movemask_epi8(combined));
+        const auto mask = static_cast<std::uint32_t>(_mm256_movemask_epi8(combined));
         if (mask != 0) {
             return i + static_cast<std::size_t>(countTrailingZeros64(mask));
         }
@@ -279,6 +277,4 @@ inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) no
 #endif
 }
 
-} // namespace simd
-
-} // namespace razobill::core
+} // namespace razobill::core::simd

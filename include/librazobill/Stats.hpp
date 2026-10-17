@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <span>
 #include <tuple>
 #include <unordered_map>
@@ -210,7 +211,7 @@ struct CertifiedInterval {
 [[nodiscard]] inline CertifiedInterval certifiedInterval(std::size_t kCategories, double sampleCount,
                                                          double delta = 0.05) noexcept {
     if (sampleCount <= 0 || kCategories < 2) return {0.0, 0.0};
-    constexpr double ln2 = 0.6931471805599453;
+    const double ln2 = std::numbers::ln2;
     const double eps =
         std::sqrt((2.0 / sampleCount) * (static_cast<double>(kCategories) * ln2 + std::log(1.0 / delta)));
     if (eps >= 0.5) {
