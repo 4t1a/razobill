@@ -73,8 +73,8 @@ else()
   endif()
 endif()
 
-# Core library: librazobill (STATIC by default, or SHARED if BUILD_SHARED_LIBS=ON)
-add_library(librazobill
+# Core library: librazobill (STATIC engine for C++ tests and embedders)
+add_library(librazobill STATIC
   src/Slots.cpp
   src/Stats.cpp
   src/Channel.cpp
@@ -84,7 +84,7 @@ add_library(librazobill
   src/RazobillC.cpp
 )
 add_library(librazobill::librazobill ALIAS librazobill)
-set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill ARCHIVE_OUTPUT_NAME razobill)
+set_target_properties(librazobill PROPERTIES OUTPUT_NAME razobill_static ARCHIVE_OUTPUT_NAME razobill_static)
 
 target_include_directories(librazobill
   PUBLIC
@@ -96,7 +96,26 @@ target_include_directories(librazobill
 )
 target_link_libraries(librazobill PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 
-add_library(RazobillDuckdb SHARED ext/duckdb/DuckdbExtension.cpp src/RazobillC.cpp)
+# Universal C ABI Shared Library (for foreign FFIs: Go, Rust, Python ctypes, Zig, C#)
+add_library(razobill_cabi SHARED src/RazobillC.cpp)
+target_include_directories(razobill_cabi PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_compile_definitions(razobill_cabi PRIVATE LIBRAZOBILL_EXPORTS)
+target_link_libraries(razobill_cabi PRIVATE librazobill)
+if(WIN32)
+  set_target_properties(razobill_cabi PROPERTIES PREFIX "")
+endif()
+set_target_properties(razobill_cabi PROPERTIES
+  OUTPUT_NAME razobill
+  ARCHIVE_OUTPUT_NAME razobill_cabi
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
+  LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+add_library(RazobillDuckdb SHARED ext/duckdb/DuckdbExtension.cpp)
 target_include_directories(RazobillDuckdb PRIVATE include thirdparty/duckdbcapi)
 if(DEFINED EXTENSION_NAME)
   target_compile_definitions(RazobillDuckdb PRIVATE DUCKDB_EXTENSION_NAME=${EXTENSION_NAME})
@@ -109,10 +128,12 @@ if(NOT MSVC)
 endif()
 target_link_libraries(RazobillDuckdb PRIVATE librazobill)
 if(WIN32)
-  target_link_options(RazobillDuckdb PRIVATE "-Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/razobill.lib")
+  if(NOT MSVC)
+    target_link_options(RazobillDuckdb PRIVATE "-Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/razobill_duckdb.lib")
+  endif()
   set_target_properties(RazobillDuckdb PROPERTIES
     PREFIX ""
-    OUTPUT_NAME razobill
+    OUTPUT_NAME razobill_duckdb
     ARCHIVE_OUTPUT_NAME razobill_duckdb
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
@@ -123,7 +144,7 @@ if(WIN32)
   )
 else()
   set_target_properties(RazobillDuckdb PROPERTIES
-    OUTPUT_NAME razobill
+    OUTPUT_NAME razobill_duckdb
     ARCHIVE_OUTPUT_NAME razobill_duckdb
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
@@ -175,11 +196,6 @@ if(NOT RAZOBILL_BUILD_EXT_ONLY)
       if(WIN32 AND MINGW)
         target_link_options(Core PRIVATE -static-libgcc -static-libstdc++ -Wl,-Bstatic -l:libwinpthread.a -Wl,-Bdynamic)
       endif()
-
-      # Copy compiled Core extension to lib/python/pyrazobill package directory
-      add_custom_command(TARGET Core POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:Core> ${CMAKE_SOURCE_DIR}/lib/python/pyrazobill/
-        COMMENT "Copying Core extension into python distribution" VERBATIM)
     endif()
   endif()
 
@@ -247,8 +263,8 @@ endif()
 # Public Installation & Packaging (CMake Export, pkg-config, CPack)
 # ==============================================================================
 
-# Install librazobill library
-install(TARGETS librazobill
+# Install librazobill static library and razobill_cabi shared library
+install(TARGETS librazobill razobill_cabi
   EXPORT librazobillTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

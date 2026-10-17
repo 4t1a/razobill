@@ -16,44 +16,40 @@ from setuptools import setup
 baseDir = Path(__file__).resolve().parent
 repoRoot = baseDir.parent.parent
 
-# Staging directories for self-contained source distributions
-srcCoreDir = baseDir / "srcCore"
-incCoreDir = baseDir / "includeCore"
-thirdpartyCoreDir = baseDir / "thirdpartyCore"
-
-# Sync C++ source and header files from the monorepo root if available
+# Monorepo single-source-of-truth vs standalone sdist distribution
 if (repoRoot / "src").exists() and (repoRoot / "include").exists():
-    srcCoreDir.mkdir(exist_ok=True)
-    for cppFile in (repoRoot / "src").glob("*.cpp"):
-        shutil.copy2(cppFile, srcCoreDir / cppFile.name)
-
-    if (incCoreDir / "librazobill").exists():
-        shutil.rmtree(incCoreDir / "librazobill")
-    incCoreDir.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(repoRoot / "include" / "librazobill", incCoreDir / "librazobill")
-
-    if (repoRoot / "thirdparty").exists():
-        if thirdpartyCoreDir.exists():
-            shutil.rmtree(thirdpartyCoreDir)
-        shutil.copytree(repoRoot / "thirdparty", thirdpartyCoreDir)
-
-# All paths must be /-separated and relative to setup.py directory
-sources = [
-    "PyRazobill.cpp",
-    "srcCore/Slots.cpp",
-    "srcCore/Stats.cpp",
-    "srcCore/Channel.cpp",
-    "srcCore/Dialect.cpp",
-    "srcCore/BackendAdbc.cpp",
-    "srcCore/Razobill.cpp",
-    "srcCore/RazobillC.cpp",
-]
-
-includeDirs = [
-    "includeCore",
-    "thirdpartyCore/adbc",
-    "thirdpartyCore/duckdbcapi",
-]
+    sources = [
+        "PyRazobill.cpp",
+        os.path.relpath(repoRoot / "src" / "Slots.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "Stats.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "Channel.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "Dialect.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "BackendAdbc.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "Razobill.cpp", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "src" / "RazobillC.cpp", baseDir).replace("\\", "/"),
+    ]
+    includeDirs = [
+        os.path.relpath(repoRoot / "include", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "thirdparty" / "adbc", baseDir).replace("\\", "/"),
+        os.path.relpath(repoRoot / "thirdparty" / "duckdbcapi", baseDir).replace("\\", "/"),
+    ]
+else:
+    # Standalone sdist package using staged directories
+    sources = [
+        "PyRazobill.cpp",
+        "srcCore/Slots.cpp",
+        "srcCore/Stats.cpp",
+        "srcCore/Channel.cpp",
+        "srcCore/Dialect.cpp",
+        "srcCore/BackendAdbc.cpp",
+        "srcCore/Razobill.cpp",
+        "srcCore/RazobillC.cpp",
+    ]
+    includeDirs = [
+        "includeCore",
+        "thirdpartyCore/adbc",
+        "thirdpartyCore/duckdbcapi",
+    ]
 
 
 def find_windows_sdk_dirs():

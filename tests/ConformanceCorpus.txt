@@ -10,3 +10,17 @@ Template with {{escaped}} braces and {raw} placeholders 100
 it's a "quoted" 1
 simple text without numbers
 127.0.0.1 - - [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
+Astral plane emoji 🚀🔥 telemetry status: 200 OK 💯
+فشل تسجيل الدخول للمستخدم admin كود 403
+device uuid: 550e8400-e29b-41d4-a716-446655440000 addr: ::1 count: 12
+sigma_entropy = 3.14159 delta = -0.0042 [valid]
+path: ///var/log//syslog///daemon.log size: 1048576
+Windows path C:\Program Files\App\server.exe pid 4192
+{"event": "auth_failure", "attempts": 3, "ip": "10.0.0.5"}
+   padded   spaces   and   tabs	123	end   
+offset: -00042 id: 00000000000000000001 max: -9223372036854775808
+Nested {{double}} and normal text 999
+=== [SYSTEM_ALERT] >>> ### 404 ***
+trailing int 10
+0xdeadbeef 0x0 0x1234
+EOF reached at block 1048576 with checksum 0xabcdef01

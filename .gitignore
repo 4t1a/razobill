@@ -127,4 +127,5 @@ perf.data
 perf.data.old
 gmon.out
 *.log
+*.serena
 target/
