@@ -74,6 +74,19 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
         return SimdArchitecture::Avx2;
     }
     return SimdArchitecture::Scalar;
+#elif defined(_MSC_VER) && (defined(__x86_64__) || defined(_M_X64))
+    int cpuInfo[4] = {0};
+    __cpuid(cpuInfo, 0);
+    const int nIds = cpuInfo[0];
+    if (nIds >= 7) {
+        __cpuidex(cpuInfo, 7, 0);
+        const bool avx2 = (cpuInfo[1] & (1 << 5)) != 0;
+        const bool avx512f = (cpuInfo[1] & (1 << 16)) != 0;
+        const bool avx512bw = (cpuInfo[1] & (1 << 30)) != 0;
+        if (avx512f && avx512bw) return SimdArchitecture::Avx512;
+        if (avx2) return SimdArchitecture::Avx2;
+    }
+    return SimdArchitecture::Scalar;
 #elif defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64)
     return SimdArchitecture::Neon;
 #elif defined(__AVX2__)

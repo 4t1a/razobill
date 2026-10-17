@@ -347,6 +347,7 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
     }
 
     std::vector<core::SlotRecord> records(total);
+    std::vector<Status> statuses(total, Status::Ok);
 
     // Release GIL for multi-threaded parsing
     {
@@ -356,16 +357,26 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             pool.parallelFor(total, 256, [&](size_t start, size_t end) {
                 for (size_t idx = start; idx < end; ++idx) {
                     if (!rawInputs[idx].bytes.empty()) {
-                        (void)core::parse(rawInputs[idx].bytes, records[idx], mode);
+                        statuses[idx] = core::parse(rawInputs[idx].bytes, records[idx], mode);
                     }
                 }
             });
         } else {
             for (size_t idx = 0; idx < total; ++idx) {
                 if (!rawInputs[idx].bytes.empty()) {
-                    (void)core::parse(rawInputs[idx].bytes, records[idx], mode);
+                    statuses[idx] = core::parse(rawInputs[idx].bytes, records[idx], mode);
                 }
             }
+        }
+    }
+
+    // Check statuses before constructing Python objects
+    for (size_t idx = 0; idx < total; ++idx) {
+        if (statuses[idx] != Status::Ok) {
+            throw py::value_error("[razobill] What happened: Parsing failed at index " +
+                                  std::to_string(idx) + ". Why: " +
+                                  std::string(razobill::describe(statuses[idx])) +
+                                  ". What to do: Check input data integrity.");
         }
     }
 

@@ -122,7 +122,9 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
     }
     if (!std::strncmp(fmt, "d:", 2)) {
         int precision = 0, scale = 0, bits = 128;
-        std::sscanf(fmt + 2, "%d,%d,%d", &precision, &scale, &bits);
+        if (std::sscanf(fmt + 2, "%d,%d,%d", &precision, &scale, &bits) < 2) {
+            throw BackendError(std::string("malformed decimal format string: ") + fmt);
+        }
         if (bits != 128) throw BackendError(std::string("unsupported decimal width: ") + fmt);
         const auto* w = static_cast<const std::uint64_t*>(a->buffers[1]) + 2 * (i + a->offset);
         const auto hi = static_cast<std::int64_t>(w[1]);
@@ -189,14 +191,20 @@ public:
 
     ~AdbcBackend() override {
         AdbcError err{};
-        if (have_conn_) driver_.ConnectionRelease(&conn_, &err);
-        if (have_db_) driver_.DatabaseRelease(&db_, &err);
+        if (have_conn_) {
+            driver_.ConnectionRelease(&conn_, &err);
+            if (err.release) { err.release(&err); err = AdbcError{}; }
+        }
+        if (have_db_) {
+            driver_.DatabaseRelease(&db_, &err);
+            if (err.release) { err.release(&err); err = AdbcError{}; }
+        }
         if (lib_) {
             sysUnloadLibrary(lib_);
             lib_ = nullptr;
         }
-        for (void* h : preloadHandles_) {
-            sysUnloadLibrary(h);
+        for (auto it = preloadHandles_.rbegin(); it != preloadHandles_.rend(); ++it) {
+            sysUnloadLibrary(*it);
         }
         preloadHandles_.clear();
     }
@@ -282,7 +290,7 @@ private:
     bool have_db_ = false, have_conn_ = false;
 };
 
-template <class T, class V> const T& get(const Table& t, std::size_t r, std::size_t c, const char* want) {
+template <class T> const T& get(const Table& t, std::size_t r, std::size_t c, const char* want) {
     const auto& v = t.rows.at(r).at(c);
     if (const auto* p = std::get_if<T>(&v)) return *p;
     throw BackendError(std::string("result cell is not ") + want);
@@ -310,7 +318,7 @@ double Table::f64(std::size_t r, std::size_t c) const {
     throw BackendError("result cell is not a number");
 }
 const std::string& Table::str(std::size_t r, std::size_t c) const {
-    return get<std::string, void>(*this, r, c, "a string");
+    return get<std::string>(*this, r, c, "a string");
 }
 
 std::unique_ptr<Backend> makeAdbcBackend(const AdbcOptions& options) {

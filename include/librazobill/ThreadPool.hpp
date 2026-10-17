@@ -19,6 +19,7 @@
 // to spend their working hours queuing up at the DMV.
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
@@ -158,7 +159,7 @@ private:
     std::queue<std::function<void()>> tasks_;
     std::mutex mutex_;
     std::condition_variable cv_;
-    bool stopping_;
+    std::atomic<bool> stopping_{false};
 };
 
 } // namespace razobill::core

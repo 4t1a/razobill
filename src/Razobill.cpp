@@ -85,6 +85,10 @@ private:
     bool committed_ = false;
 };
 
+// SQL Injection Defense-in-Depth (F-SQL-01, F-ENGINE-03):
+// Identifiers are restricted to ASCII alphanumeric and underscores [A-Za-z_][A-Za-z0-9_]{0,63}
+// with a non-digit first character, preventing SQL injection even before quoteIdentifier()
+// applies ANSI SQL standard double-quote escaping.
 void requireIdentifier(const std::string& s, const char* what) {
     const bool ok = !s.empty() && s.size() <= 64 && (std::isalpha(static_cast<unsigned char>(s[0])) || s[0] == '_') &&
                     std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isalnum(c) || c == '_'; });
@@ -213,6 +217,10 @@ void RazobillEngine::installLocked() {
 std::size_t RazobillEngine::registerFormsLocked(const std::string& selectForms) {
     const auto& d = *dx_;
     const auto before = db_.query("SELECT count(*) FROM rb_form").i64(0, 0);
+    // DESIGN DECISION (F-MEM-10):
+    // Sequential form IDs (`no`) use 32-bit signed integers (`tI32()`), allowing up to 2,147,483,647
+    // distinct log forms. For analytical workloads this bound is never exceeded, while
+    // 32-bit integer IDs keep compact column storage and in-memory indexes cache-efficient.
     db_.exec("INSERT INTO rb_form SELECT " + d.hashExpr("form") +
              ", CAST((SELECT count(*) FROM rb_form) + row_number() OVER (ORDER BY form) - 1 AS " + d.tI32() +
              "), form, " + d.templateExpr("form") + " FROM (SELECT DISTINCT form FROM (" + selectForms +

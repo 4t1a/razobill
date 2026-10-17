@@ -198,4 +198,8 @@ RZ_API const char* RzVersion(void) {
     return LIBRAZOBILL_VERSION_STRING;
 }
 
+RZ_API int RzAbiVersion(void) {
+    return RZ_ABI_VERSION;
+}
+
 } // extern "C"

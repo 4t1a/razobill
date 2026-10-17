@@ -19,6 +19,12 @@
 #define LIBRAZOBILL_VERSION_STRING "1.1.2"
 #define LIBRAZOBILL_ABI_VERSION 1
 
+#if defined(_MSVC_LANG)
+static_assert(_MSVC_LANG >= 202002L, "librazobill requires C++20 or later (/std:c++20)");
+#elif defined(__cplusplus)
+static_assert(__cplusplus >= 202002L, "librazobill requires C++20 or later (-std=c++20)");
+#endif
+
 #if defined(__cplusplus)
 #define LIBRAZOBILL_DEPRECATED(msg) [[deprecated(msg)]]
 #elif defined(_MSC_VER)

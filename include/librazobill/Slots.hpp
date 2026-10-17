@@ -15,14 +15,15 @@ namespace razobill::core {
 
 // Structure-of-arrays representation of parsed log slots.
 //
-// PERF:
+// PERF & LIFETIME CONTRACT (F-MEM-01):
 // `strs` contains zero-copy `std::string_view` referencing the original message slice.
-// As long as the source message string is alive during batch processing, no string
-// copies occur during parsing.
+// The caller's source message buffer MUST outlive `SlotRecord` and remain unmodified
+// while `strs` elements are accessed. Callers requiring detached lifetimes must explicitly
+// copy the string slices into owning containers.
 struct SlotRecord {
     std::string templateStr;            // human-readable format string with {i} and {s} placeholders
     std::vector<std::int64_t> ints;     // values of the '{i}' slots
-    std::vector<std::string_view> strs; // values of the '{s}' slots; zero-copy views into the message
+    std::vector<std::string_view> strs; // values of the '{s}' slots; zero-copy views into caller message buffer
 
     // Legacy fields for internal backward compatibility
     std::string skeleton;

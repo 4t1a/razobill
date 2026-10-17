@@ -28,8 +28,10 @@
 #if defined(_WIN32) || defined(__CYGWIN__)
 #if defined(LIBRAZOBILL_EXPORTS)
 #define RZ_API __declspec(dllexport)
-#else
+#elif defined(LIBRAZOBILL_STATIC)
 #define RZ_API
+#else
+#define RZ_API __declspec(dllimport)
 #endif
 #else
 #define RZ_API __attribute__((visibility("default")))
@@ -117,6 +119,11 @@ RZ_API const char* RzStatusMessage(RzStatus status);
  * Returns the runtime library semantic version string (e.g. "2.0.0").
  */
 RZ_API const char* RzVersion(void);
+
+/**
+ * Returns the runtime library ABI version (e.g. 1).
+ */
+RZ_API int RzAbiVersion(void);
 
 #ifdef __cplusplus
 }

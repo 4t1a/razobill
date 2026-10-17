@@ -19,8 +19,8 @@
 #include "librazobill/Slots.hpp"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    if (size == 0 || size > 1024 * 1024) {
-        return 0; // Skip empty or excessive payloads (>1MB)
+    if (size == 0 || size > razobill::core::kMaxMessageBytes) {
+        return 0; // Skip empty or excessive payloads (>16MB)
     }
 
     const std::string_view input(reinterpret_cast<const char*>(data), size);
@@ -142,7 +142,14 @@ int main(int argc, char** argv) {
         const auto& tc = testCases[i];
         LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(tc.data()), tc.size());
     }
-    std::cout << "[FuzzDecomposeReconstruct] All " << testCases.size() << " sample test cases passed perfectly!\n";
+
+    // Boundary verification at kMaxMessageBytes + 1
+    {
+        razobill::core::SlotRecord rec;
+        std::string overLimit(razobill::core::kMaxMessageBytes + 1, 'x');
+        assert(razobill::core::parse(overLimit, rec) == razobill::Status::TooLarge);
+    }
+    std::cout << "[FuzzDecomposeReconstruct] All " << testCases.size() << " sample test cases and 16MB boundary test passed perfectly!\n";
 
     size_t targetIterations = 1'000'000;
     if (argc > 1 && argv[1] != nullptr) {

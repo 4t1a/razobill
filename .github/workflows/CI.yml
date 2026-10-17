@@ -37,10 +37,10 @@ jobs:
 
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -78,10 +78,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -120,37 +120,12 @@ jobs:
             echo "Intel SDE emulator not present, skipping emulation run"
           fi
 
-  sanitizers:
-    name: Memory & Thread Sanitizers (ASan, UBSan, TSan)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source Tree
-        uses: actions/checkout@v7
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build clang-18 llvm-18
-          python -m pip install --upgrade pip pybind11 duckdb pytest
-
-      - name: Build & Run AddressSanitizer + UndefinedBehaviorSanitizer
-        run: |
-          cmake -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
-          ninja -C build-asan UnitTests
-          ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:abort_on_error=1 ./build-asan/UnitTests
-
-      - name: Build & Run ThreadSanitizer
-        run: |
-          cmake -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
-          ninja -C build-tsan UnitTests
-          TSAN_OPTIONS=abort_on_error=1 ./build-tsan/UnitTests
-
   fuzzing:
     name: Hostile Input & Differential Fuzzing
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: |
@@ -162,16 +137,16 @@ jobs:
           cmake -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-13 -DENABLE_FUZZING=ON
           ninja -C build-fuzz FuzzDecomposeReconstruct
 
-      - name: Execute Hostile Differential Fuzzer (100,000 iterations)
+      - name: Execute Hostile Differential Fuzzer (1,000,000 iterations)
         run: |
-          ./build-fuzz/FuzzDecomposeReconstruct 100000
+          ./build-fuzz/FuzzDecomposeReconstruct 1000000
 
   abi-and-compliance:
     name: ABI Stability, SBOM & Code Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Verify C ABI Contract Version
         run: |

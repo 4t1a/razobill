@@ -147,6 +147,7 @@ TEST_CASE("Universal C ABI: Edge cases, empty string, errors and metadata") {
     invalidRecord.strLengths = nullptr; // Invalid!
     CHECK(RzJoin(&invalidRecord, emptyBuf, sizeof(emptyBuf), &emptyLen) == RZ_ERR_INVALID_ARGUMENT);
 
-    // Version
+    // Version & ABI
     CHECK(std::string(RzVersion()) == "1.1.2");
+    CHECK(RzAbiVersion() == 1);
 }

@@ -175,6 +175,18 @@ Ledger ledger(std::span<const Cell> cells, double totalEvents, double confidence
     const double C = entropyOfMap(w);
     const double E = entropyOfMap(x);
     const double J = entropyOfMap(joint);
+    // Fréchet Polytope Projection (Theorem 1 / Information Theory Ledger):
+    // For any joint distribution with marginal entropies H(W) = C and H(X) = E,
+    // the joint entropy H(X,W) must lie within the Fréchet bounds:
+    //   max(C, E) <= H(X,W) <= C + E.
+    // Due to finite-sample estimation or floating-point imprecision, empirical J
+    // can slightly violate these boundaries. Projecting J into [max(C, E), C + E]
+    // produces J_bound, which guarantees:
+    //   1) Lambda = J_bound - C >= 0 (equivocation non-negativity)
+    //   2) Delta  = J_bound - E >= 0 (ambiguity non-negativity)
+    //   3) I      = C + E - J_bound >= 0 (mutual information non-negativity)
+    //   4) Exact algebraic ledger identities: (I + Lambda) == E, (I + Delta) == C,
+    //      and (E - C) == (Lambda - Delta), with zero independent clamping drift.
     const double J_bound = std::max(std::max(C, E), std::min(J, C + E));
     const double Lambda = J_bound - C;
     const double Delta = J_bound - E;

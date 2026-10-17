@@ -33,6 +33,7 @@ public:
           defaultBlockSize_(other.defaultBlockSize_) {
         other.currentBlockIdx_ = 0;
         other.offset_ = 0;
+        other.defaultBlockSize_ = 0;
     }
 
     MemoryArena& operator=(MemoryArena&& other) noexcept {
@@ -44,6 +45,7 @@ public:
             defaultBlockSize_ = other.defaultBlockSize_;
             other.currentBlockIdx_ = 0;
             other.offset_ = 0;
+            other.defaultBlockSize_ = 0;
         }
         return *this;
     }

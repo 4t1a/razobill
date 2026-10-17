@@ -65,8 +65,13 @@ public:
         o.reserve(s.size() + 16);
         o.push_back('\'');
         for (char c : s) {
-            if (c == '\\' || c == '\'') o.push_back('\\');
-            o.push_back(c);
+            if (c == '\0') {
+                o.push_back('\\');
+                o.push_back('0');
+            } else {
+                if (c == '\\' || c == '\'') o.push_back('\\');
+                o.push_back(c);
+            }
         }
         o.push_back('\'');
         return o;

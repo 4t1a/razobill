@@ -103,6 +103,11 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
 
 Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints, std::span<const std::string_view> strs,
                       std::string& out) {
+    // DESIGN DECISION (F-SLOT-02):
+    // Two-pass reconstruction: Pass 1 calculates the exact output byte size (`estSize`),
+    // checks slot underflow/overflow invariants, and prevents buffer reallocation.
+    // Pass 2 formats integers and copies string slices directly into the pre-reserved buffer.
+    // This eliminates intermediate reallocations and guarantees O(N) allocation determinism.
     const char* p = tmpl.data();
     const char* const end = p + tmpl.size();
     std::size_t nInt = 0, nStr = 0;

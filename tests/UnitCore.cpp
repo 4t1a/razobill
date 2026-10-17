@@ -4,6 +4,7 @@
 #include <string>
 
 #include "doctest.h"
+#include "librazobill/Dialect.hpp"
 #include "librazobill/SimdScanner.hpp"
 #include "librazobill/Slots.hpp"
 #include "librazobill/ThreadPool.hpp"
@@ -199,6 +200,23 @@ TEST_CASE("property: parse then reconstruct is the identity (random structured m
     }
 }
 
+TEST_CASE("property: parse then reconstruct is the identity (random structured messages, semantic mode)") {
+    std::mt19937_64 rng(0xBEEFCAFE);
+    const std::string alphabet = "abcXYZ0123456789 \t=,;:()[]{}\"'<>|/._-+\xC3\xA9\xE6\x97\xA5\x0B\x1F\x7F\x80\xFF";
+    SlotRecord s;
+    std::string form, rebuilt;
+    for (int iter = 0; iter < 300000; ++iter) {
+        std::string m(rng() % 64, ' ');
+        for (auto& c : m)
+            c = alphabet[rng() % alphabet.size()];
+        if (iter % 997 == 0 && !m.empty()) m[rng() % m.size()] = static_cast<char>(0x11 + rng() % 3);
+        REQUIRE(parse(m, s, ScanMode::Semantic) == Status::Ok);
+        form = s.formKey();
+        REQUIRE(reconstruct(form, s.ints, s.strs, rebuilt) == Status::Ok);
+        REQUIRE(rebuilt == m);
+    }
+}
+
 TEST_CASE("property: forms are insensitive to slot values") {
     SlotRecord a, b;
     REQUIRE(parse("Receiving block blk_1 src: /10.0.0.1:1 dest: /10.0.0.2:2", a) == Status::Ok);
@@ -335,4 +353,42 @@ TEST_CASE("ThreadPool: parallelFor exception safety and worker settlement") {
         nextTasks.fetch_add(static_cast<int>(end - start));
     });
     CHECK(nextTasks.load() == 50);
+}
+
+TEST_CASE("Dialect: quoting and SQL expression generation (DuckDB & ClickHouse)") {
+    auto duck = makeDialect(Flavor::DuckDB);
+    auto ch = makeDialect(Flavor::ClickHouse);
+    REQUIRE(duck != nullptr);
+    REQUIRE(ch != nullptr);
+
+    CHECK(duck->flavor() == Flavor::DuckDB);
+    CHECK(ch->flavor() == Flavor::ClickHouse);
+
+    // Standard string quoting
+    CHECK(duck->quote("hello") == "'hello'");
+    CHECK(duck->quote("it's a test") == "'it''s a test'");
+    CHECK(duck->quote("back\\slash") == "'back\\slash'");
+
+    CHECK(ch->quote("hello") == "'hello'");
+    CHECK(ch->quote("it's a test") == "'it\\'s a test'");
+    CHECK(ch->quote("back\\slash") == "'back\\\\slash'");
+
+    // NUL byte escaping in ClickHouse dialect (F-DIAL-01)
+    std::string nulStr("hello\0world", 11);
+    std::string chQuoted = ch->quote(nulStr);
+    CHECK(chQuoted == "'hello\\0world'");
+
+    // ClickHouse template expression substring underflow protection
+    std::string tmplCh = ch->templateExpr("raw_form");
+    CHECK(!tmplCh.empty());
+
+    // DuckDB template expression
+    std::string tmplDuck = duck->templateExpr("raw_form");
+    CHECK(!tmplDuck.empty());
+
+    // Type expressions
+    CHECK(duck->tU64() == "UBIGINT");
+    CHECK(ch->tU64() == "UInt64");
+    CHECK(duck->supportsCompact() == true);
+    CHECK(ch->supportsCompact() == false);
 }

@@ -69,15 +69,18 @@ inline constexpr std::array<unsigned char, 256> kClass = makeClasses();
 // Context keyword detector (e.g., "user", "from", "for", "host").
 // If a word like "user" precedes a non-numeric token ("alice"), Semantic mode
 // knows "alice" is a variable parameter rather than static template syntax!
+inline constexpr std::size_t kMaxKeywordLen = 10;
+
 inline bool isContextKeyword(std::string_view w) noexcept {
-    if (w.size() < 2 || w.size() > 10) return false;
-    char buf[12];
+    if (w.size() < 2 || w.size() > kMaxKeywordLen) return false;
+    std::array<char, 12> buf{};
+    static_assert(kMaxKeywordLen < buf.size(), "kMaxKeywordLen must fit inside stack buffer");
     for (std::size_t i = 0; i < w.size(); ++i) {
         char c = w[i];
         if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + 32);
         buf[i] = c;
     }
-    std::string_view s(buf, w.size());
+    std::string_view s(buf.data(), w.size());
     return s == "for" || s == "user" || s == "by" || s == "from" || s == "ruser" || s == "rhost" || s == "host" ||
            s == "account" || s == "client" || s == "src" || s == "dest" || s == "to" || s == "at" || s == "proxy" ||
            s == "server" || s == "node" || s == "target" || s == "app" || s == "device";
@@ -195,6 +198,11 @@ template <class OnToken>
 }
 
 // Decimal integer validator
+// DESIGN DECISION (F-SLOT-01):
+// Tokens with length <= 18 decimal digits (max 999,999,999,999,999,999) are guaranteed to strictly fit
+// within signed int64_t without overflow (INT64_MAX is 9,223,372,036,854,775,807, which is 19 digits).
+// Bounding at 18 digits avoids complex lexicographical comparisons against INT64_MAX on the critical
+// tokenizer hot path, safely categorizing larger numeric sequences into string slots without truncation.
 [[nodiscard]] constexpr bool isIntToken(std::string_view t) noexcept {
     if (t.empty() || t.size() > 18) return false;
     if (t.front() == '0') return t.size() == 1;

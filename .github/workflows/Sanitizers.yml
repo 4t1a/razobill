@@ -16,24 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang llvm
+          sudo apt-get install -y ninja-build clang-18 llvm-18
           python -m pip install --upgrade pip pybind11 duckdb pytest hypothesis
 
       - name: Configure CMake with ASan + UBSan + Fuzzing
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_SANITIZER_ASAN_UBSAN=ON \
             -DENABLE_FUZZING=ON
@@ -54,31 +54,31 @@ jobs:
           ASAN_OPTIONS: "detect_leaks=1"
           UBSAN_OPTIONS: "halt_on_error=1"
         run: |
-          ./build/FuzzDecomposeReconstruct -runs=1000 -max_len=2048 -timeout=10
+          ./build/FuzzDecomposeReconstruct 100000
 
   tsan:
     name: TSan (ThreadSanitizer - Data Race Detector)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang llvm
+          sudo apt-get install -y ninja-build clang-18 llvm-18
           python -m pip install --upgrade pip pybind11 duckdb pytest
 
       - name: Configure CMake with TSan
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_SANITIZER_TSAN=ON
 
@@ -97,12 +97,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Tree
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Install Clang-Tidy
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy ninja-build
+          sudo apt-get install -y clang-tidy-18 ninja-build
 
       - name: Generate Compilation Database
         run: |
@@ -110,4 +110,4 @@ jobs:
 
       - name: Run Clang-Tidy on Core Sources
         run: |
-          clang-tidy -p build src/*.cpp --warnings-as-errors=''
+          clang-tidy-18 -p build src/*.cpp --warnings-as-errors=''

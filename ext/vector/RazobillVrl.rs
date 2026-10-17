@@ -67,6 +67,10 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
     }
     let _guard = RecordGuard(&mut record);
 
+    // DESIGN DECISION (F-EXT-06):
+    // Vector VRL represents internal event values as UTF-8 JSON objects (`serde_json::Value`).
+    // Using `String::from_utf8_lossy` ensures invalid UTF-8 sequences in raw binary payloads do not panic
+    // or fail the entire VRL pipeline, safely replacing malformed bytes with U+FFFD (REPLACEMENT CHARACTER).
     let form_str = if record.template_length > 0 && !record.template_str.is_null() {
         let form_slice = unsafe {
             std::slice::from_raw_parts(record.template_str as *const u8, record.template_length)

@@ -13,6 +13,8 @@
 // enum maintains steady-state cache performance without invoking stack unwinders.
 #pragma once
 
+#include <ostream>
+
 namespace razobill {
 
 enum class Status : unsigned char {
@@ -41,8 +43,13 @@ enum class Status : unsigned char {
         return "destination buffer capacity is insufficient";
     case Status::InvalidParam:
         return "invalid parameter or null pointer";
+    default:
+        return "unknown";
     }
-    return "unknown";
+}
+
+inline std::ostream& operator<<(std::ostream& os, Status s) {
+    return os << describe(s);
 }
 
 } // namespace razobill

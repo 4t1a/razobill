@@ -112,6 +112,10 @@ public:
 
         hashToKeys_[explicitHash].push_back(keyStr);
         auto inserted = formsByKey_.emplace(keyStr, std::move(entry));
+        // ISO C++ [unord.req]: Rehashing an std::unordered_map never invalidates
+        // pointers or references to elements, only iterators. Caching raw pointers
+        // to mapped values in formsById_ is guaranteed stable for the lifetime of
+        // formsByKey_ entries.
         formsById_.push_back(&inserted.first->second);
         return inserted.first->second.id;
     }

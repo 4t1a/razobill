@@ -18,6 +18,7 @@ flowchart TD
     P4["Phase 4: Database Control Plane, SQL Dialects & ADBC RAII"]
     P5["Phase 5: Python Bindings & Foreign Adapters (Rust VRL, Go OTel, DuckDB)"]
     P6["Phase 6: Production Verification, Sanitizers & Scale Certification"]
+    P7["Phase 7: Deep Audit Hardening, Precision Bounds & Comprehensive Coverage"]
 
     P0 --> P1
     P1 --> P2
@@ -25,6 +26,7 @@ flowchart TD
     P3 --> P4
     P4 --> P5
     P5 --> P6
+    P6 --> P7
 ```
 
 ---
@@ -279,3 +281,62 @@ flowchart TD
   - Run `BenchCore` and `BenchStorage` on 10M rows:
     - Sustain $> 10\text{M msgs/sec}$ throughput.
     - Verify 0 bytes memory leak under Valgrind / CRT leak detection.
+
+---
+
+## Phase 7: Deep Audit Hardening, Precision Bounds & Comprehensive Coverage
+
+*Goal: Address all actionable findings from the deep audit series (01–10), hardening precision bounds, resource destruction order, dialect string safety, and test coverage.*
+
+- [x] **Step 7.1: Bound `sscanf` Parsing of Arrow Decimal Format Strings**
+  - **Audit Ref:** `F-ADBC-01`
+  - **File:** [src/BackendAdbc.cpp:123–126](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L123-L126)
+  - **Action:** Check `std::sscanf(fmt + 2, "%d,%d,%d", &precision, &scale, &bits) >= 2`, throw `BackendError` if malformed to prevent silent zero-scale corruption.
+- [x] **Step 7.2: Eliminate Dead Template Parameter `V` in `BackendAdbc.cpp`**
+  - **Audit Ref:** `F-ADBC-02`
+  - **File:** [src/BackendAdbc.cpp:285–289](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L285-L289)
+  - **Action:** Clean unused `typename V` template parameter in `get<T, V>` helper and simplify caller `get<std::string>`.
+- [x] **Step 7.3: Check and Release `AdbcError` in ADBC Backend Teardown**
+  - **Audit Ref:** `F-ADBC-03`, `F-MEM-07`
+  - **File:** [src/BackendAdbc.cpp:190–193](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L190-L193)
+  - **Action:** Check `if (err.release) err.release(&err);` after `ConnectionRelease` and `DatabaseRelease` in `~AdbcBackend()`.
+- [x] **Step 7.4: Reverse Dynamic Library Unload Order in `~AdbcBackend()`**
+  - **Audit Ref:** `F-ADBC-04`, `F-MEM-08`
+  - **File:** [src/BackendAdbc.cpp:194–201](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L194-L201)
+  - **Action:** Unload driver `lib_` first, then unload `preloadHandles_` in reverse order of loading, avoiding UAF if the driver depends on preloaded symbols.
+- [x] **Step 7.5: Escape NUL Bytes in ClickHouse Dialect `quote()`**
+  - **Audit Ref:** `F-DIAL-01`
+  - **File:** [src/Dialect.cpp:67–70](file:///C:/FM/rzd/razobill/src/Dialect.cpp#L67-L70)
+  - **Action:** Escape `\0` as `\\0` in `ClickHouseDialect::quote()`, preventing binary string truncation in ClickHouse.
+- [x] **Step 7.6: IEEE-754 Precision Underflow Guard in `Channel::embed()` and `Channel::decode()`**
+  - **Audit Ref:** `F-CHAN-02`, `F-CHAN-03`
+  - **File:** [src/Channel.cpp:188–210, 264–272](file:///C:/FM/rzd/razobill/src/Channel.cpp#L188-L210)
+  - **Action:** Check `if (curR - curL < 1e-15) { res.success = false; return res; }` during interval narrowing, guarding against mantissa underflow on long sequences.
+- [x] **Step 7.7: Propagate Parse Statuses in Python `splitMany()`**
+  - **Audit Ref:** `F-EXT-08`
+  - **File:** [lib/python/PyRazobill.cpp:354–370](file:///C:/FM/rzd/razobill/lib/python/PyRazobill.cpp#L354-L370)
+  - **Action:** Collect `Status` from parallel worker parsing rather than discarding `(void)core::parse()`; if any message fails (e.g. `TooLarge`), raise an actionable exception instead of silently returning empty tuples.
+- [x] **Step 7.8: Decouple Stack Buffer Bounds in `isContextKeyword()`**
+  - **Audit Ref:** `F-SCAN-01`
+  - **File:** [include/librazobill/Scanner.hpp:72–84](file:///C:/FM/rzd/razobill/include/librazobill/Scanner.hpp#L72-L84)
+  - **Action:** Use `std::array<char, 12>` with `static_assert(kMaxKeywordLen < sizeof(buf))` tying keyword length limit to buffer capacity.
+- [x] **Step 7.9: Explicitly Inertize Moved-From `MemoryArena`**
+  - **Audit Ref:** `F-ARENA-01`
+  - **File:** [include/librazobill/MemoryArena.hpp:31–36, 43–46](file:///C:/FM/rzd/razobill/include/librazobill/MemoryArena.hpp#L31-L36)
+  - **Action:** Set `other.defaultBlockSize_ = 0;` in move constructor and move assignment operator.
+- [x] **Step 7.10: Add Consumer-Side `__declspec(dllimport)` Guard in `RazobillC.h`**
+  - **Audit Ref:** `F-CABI-06`
+  - **File:** [include/librazobill/RazobillC.h:28–36](file:///C:/FM/rzd/razobill/include/librazobill/RazobillC.h#L28-L36)
+  - **Action:** Define `RZ_API __declspec(dllimport)` when `_WIN32` is defined, `LIBRAZOBILL_EXPORTS` is not defined, and `LIBRAZOBILL_STATIC` is not defined.
+- [x] **Step 7.11: Add C++ 300,000-Iteration Randomized Semantic Mode Property Test**
+  - **Audit Ref:** `F-TEST-05`
+  - **File:** [tests/UnitCore.cpp:185–200](file:///C:/FM/rzd/razobill/tests/UnitCore.cpp#L185-L200)
+  - **Action:** Add a randomized 300,000-iteration roundtrip property test for `ScanMode::Semantic` mirroring the `ScanMode::DigitOnly` property test.
+- [x] **Step 7.12: Add Comprehensive Degenerate & Negative Edge-Case Test Suite for Channel**
+  - **Audit Ref:** `F-TEST-06`
+  - **File:** [tests/UnitChannel.cpp:121–165](file:///C:/FM/rzd/razobill/tests/UnitChannel.cpp#L121-L165)
+  - **Action:** Add tests for empty sequences, payloadBits = 0, zero-probability options, and precision underflow rejection.
+- [x] **Step 7.13: Document Mathematical Axioms and Clamping Rationale**
+  - **Audit Ref:** `F-MATH-02`, `F-MATH-04`
+  - **File:** [src/Stats.cpp:178–183](file:///C:/FM/rzd/razobill/src/Stats.cpp#L178-L183), [src/Channel.cpp:94–105](file:///C:/FM/rzd/razobill/src/Channel.cpp#L94-L105)
+  - **Action:** Add detailed mathematical commentary on Fréchet projection rationale and log-likelihood quantization resolution.

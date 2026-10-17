@@ -91,6 +91,15 @@ double failureProbabilityBound(const ChannelCapacity& capacity, std::size_t payl
     return std::min(1.0, std::max(0.0, chebyshev + slack));
 }
 
+// Exact analytical failure probability on discrete distributions via dynamic programming.
+//
+// Quantization & Truncation Bounds (Theorem 8 / Proposition 9):
+// Log-probabilities (-log2 p) are quantized to 0.001-bit resolution (kScale = 1000.0).
+// For any sequence of length L, the maximum cumulative quantization drift is bounded
+// by at most 0.5 * L / kScale bits.
+// State pruning discards low-probability states (mass < 1e-12) once the state space
+// exceeds kMaxDistStates (4096). Pruned mass is strictly accumulated in `prunedMass` and added
+// back to the final error probability, guaranteeing that the returned delta is a rigorous upper bound.
 double exactFailureProbability(std::span<const MeaningChoice> sequence, std::size_t payloadBits) noexcept {
     if (sequence.empty()) return 0.0;
 
@@ -186,6 +195,10 @@ EmbedResult embed(std::span<const MeaningChoice> sequence, std::uint64_t message
         }
 
         const double curWidth = curR - curL;
+        if (curWidth < 1e-15) {
+            res.success = false;
+            return res;
+        }
         double subL = curL;
         bool found = false;
 
@@ -239,6 +252,10 @@ DecodeResult decode(std::span<const MeaningChoice> sequence, std::span<const std
         }
 
         const double curWidth = curR - curL;
+        if (curWidth < 1e-15) {
+            res.success = false;
+            return res;
+        }
         double subL = curL;
         bool match = false;
 
@@ -265,7 +282,7 @@ DecodeResult decode(std::span<const MeaningChoice> sequence, std::span<const std
     const double numCells = std::ldexp(1.0, static_cast<int>(payloadBits)); // 2^k
     const double cellWidth = 1.0 / numCells;
 
-    if (q >= cellWidth) {
+    if (q < 1e-15 || q >= cellWidth) {
         res.success = false;
         return res;
     }

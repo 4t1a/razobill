@@ -69,6 +69,11 @@ public:
     // Fast string_view accessor preserving source compatibility.
     // References remain stable across intern() operations because idToStr_ uses std::deque
     // (guaranteeing pointer stability on push_back). Invalidated only on gc() or clear().
+    //
+    // CAUTION [Concurrency]: In environments where gc() or clear() can be called concurrently,
+    // the returned string_view may dangle after the internal read lock is released.
+    // For concurrent workloads with active dictionary compaction/GC, prefer lookupCopy(),
+    // lookup(id, out), or withString(id, fn) which hold the lock during copy/inspection.
     [[nodiscard]] std::string_view lookup(std::uint32_t id) const {
         std::shared_lock<std::shared_mutex> lock(mutex_);
         if (id < idToStr_.size()) {

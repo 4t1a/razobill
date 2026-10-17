@@ -95,6 +95,7 @@ target_include_directories(librazobill
     thirdparty/duckdbcapi
 )
 target_link_libraries(librazobill PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+target_compile_definitions(librazobill PUBLIC LIBRAZOBILL_STATIC)
 
 # Universal C ABI Shared Library (for foreign FFIs: Go, Rust, Python ctypes, Zig, C#)
 add_library(razobill_cabi SHARED src/RazobillC.cpp)

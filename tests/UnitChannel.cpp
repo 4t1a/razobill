@@ -162,3 +162,67 @@ TEST_CASE("Channel mantissa bounds (> 53 bits) and circular S1 boundary recovery
         CHECK(decodeMax.message == msgMax);
     }
 }
+
+TEST_CASE("Channel degenerate inputs and precision underflow rejection") {
+    constexpr double sharedKey = 0.123456789;
+
+    // 1. Empty sequence
+    std::vector<MeaningChoice> emptySeq;
+    auto resEmptyEmbed = embed(emptySeq, 1, 4, sharedKey, 0.5);
+    CHECK(!resEmptyEmbed.success);
+
+    std::vector<std::size_t> emptyForms;
+    auto resEmptyDecode = decode(emptySeq, emptyForms, 4, sharedKey);
+    CHECK(!resEmptyDecode.success);
+
+    // 2. payloadBits == 0
+    std::vector<MeaningChoice> validSeq;
+    MeaningChoice mc;
+    mc.meaning = 1;
+    mc.options = {SynonymousOption{0, 0.5}, SynonymousOption{1, 0.5}};
+    validSeq.push_back(mc);
+
+    auto resZeroBitsEmbed = embed(validSeq, 0, 0, sharedKey, 0.5);
+    CHECK(!resZeroBitsEmbed.success);
+
+    std::vector<std::size_t> validForms = {0};
+    auto resZeroBitsDecode = decode(validSeq, validForms, 0, sharedKey);
+    CHECK(!resZeroBitsDecode.success);
+
+    // 3. Step with empty options
+    std::vector<MeaningChoice> emptyOptSeq;
+    emptyOptSeq.push_back(MeaningChoice{1, {}});
+    auto resEmptyOptEmbed = embed(emptyOptSeq, 1, 4, sharedKey, 0.5);
+    CHECK(!resEmptyOptEmbed.success);
+
+    // 4. Step with all zero probabilities
+    std::vector<MeaningChoice> zeroProbSeq;
+    zeroProbSeq.push_back(MeaningChoice{1, {SynonymousOption{0, 0.0}, SynonymousOption{1, 0.0}}});
+    auto resZeroProbEmbed = embed(zeroProbSeq, 1, 4, sharedKey, 0.5);
+    CHECK(!resZeroProbEmbed.success);
+
+    auto resZeroProbDecode = decode(zeroProbSeq, validForms, 4, sharedKey);
+    CHECK(!resZeroProbDecode.success);
+
+    // 5. Observed forms size mismatch
+    std::vector<std::size_t> mismatchedForms = {0, 1};
+    auto resMismatchDecode = decode(validSeq, mismatchedForms, 4, sharedKey);
+    CHECK(!resMismatchDecode.success);
+
+    // 6. Long sequence causing interval precision underflow (< 1e-15)
+    // 60 choices of 2 equal options cuts interval by 2^-60 (~ 8.6e-19 < 1e-15)
+    std::vector<MeaningChoice> longSeq;
+    for (int i = 0; i < 60; ++i) {
+        MeaningChoice choice;
+        choice.meaning = static_cast<std::uint32_t>(i);
+        choice.options = {SynonymousOption{0, 0.5}, SynonymousOption{1, 0.5}};
+        longSeq.push_back(std::move(choice));
+    }
+    auto resLongEmbed = embed(longSeq, 42, 8, sharedKey, 0.5);
+    CHECK(!resLongEmbed.success);
+
+    std::vector<std::size_t> longForms(longSeq.size(), 0);
+    auto resLongDecode = decode(longSeq, longForms, 8, sharedKey);
+    CHECK(!resLongDecode.success);
+}
+
