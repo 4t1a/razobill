@@ -12,7 +12,7 @@ A clear and concise explanation of what this pull request changes and why.
   - [ ] Core unit tests pass (`./build/UnitTests` or `.\build\UnitTests.exe`)
   - [ ] DuckDB integration tests pass (`./build/IntegrationDuckdb` or `.\build\IntegrationDuckdb.exe`)
   - [ ] Python unit tests pass (`python -m unittest discover -s lib/python/tests`)
-  - [ ] Python property tests pass (`python -m pytest lib/python/tests/test_properties.py`)
+  - [ ] Python property tests pass (`python -m pytest lib/python/tests/TestProperties.py`)
 - [ ] **Documentation**:
   - [ ] Documentation updated in `docs/` adhering to Diataxis structure.
   - [ ] Markdownlint passes cleanly (`npx markdownlint-cli2 "**/*.md"`).

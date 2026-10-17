@@ -18,7 +18,7 @@ This project adheres to the [Contributor Covenant](CODE_OF_CONDUCT.md). By parti
 | --- | --- | --- |
 | `include/librazobill/` | Public C++20 headers and C ABI declarations | `Razobill.hpp`, `Slots.hpp`, `RazobillC.h`, `SimdScanner.hpp` |
 | `src/` | Core C++20 engine and C ABI implementation | `Slots.cpp`, `RazobillC.cpp`, `BackendAdbc.cpp`, `Channel.cpp` |
-| `lib/python/` | Python C-extension wrapper (`pyrazobill`) and test suite | `PyRazobill.cpp`, `tests/test_razobill.py`, `tests/test_properties.py` |
+| `lib/python/` | Python C-extension wrapper (`pyrazobill`) and test suite | `PyRazobill.cpp`, `tests/TestPyRazobill.py`, `tests/TestProperties.py` |
 | `ext/duckdb/` | DuckDB C extension adapter | `DuckdbExtension.cpp` |
 | `ext/otel/` | OpenTelemetry Collector processor component | `processor.go`, `factory.go` |
 | `ext/vector/` | Vector VRL transform crate | `src/lib.rs` |
@@ -132,7 +132,7 @@ python -m unittest discover -s lib/python/tests
 
 # Hypothesis property-based fuzz tests (5 tests)
 pip install pytest hypothesis
-python -m pytest lib/python/tests/test_properties.py
+python -m pytest lib/python/tests/TestProperties.py
 ```
 
 Expected output:

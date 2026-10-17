@@ -48,7 +48,7 @@ pip install -e .
 python -m unittest discover -s lib/python/tests
 
 # Python property-based fuzz tests (5 tests, ~0.9s)
-python -m pytest lib/python/tests/test_properties.py
+python -m pytest lib/python/tests/TestProperties.py
 ```
 
 ## Documentation and linting rules
