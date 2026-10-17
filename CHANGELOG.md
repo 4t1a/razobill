@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **Architectural comparison with CLP**:
   - Added dedicated comparison in `README.md` clarifying structural differences between Razobill (in-database relational decomposition into standard SQL columns) and YScope CLP (custom compressed archive format and IR).
 - **Technical postmortem**:
-  - Added in-depth architectural explanation and reproducer dissection in `docs/issues&fixes/blog-1-1-2-parser-hang.md`.
+  - Added in-depth architectural explanation and reproducer dissection for the quote-backslash edge-case hang.
 
 ### Changed
 
