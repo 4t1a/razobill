@@ -1,64 +1,79 @@
 # Documentation navigation hub
 
-The authoritative index for all Razobill guides, API specifications, and architectural documentation.
-Read this page if you want to find the right document for your current task.
-Skip this page if you already know the specific guide or reference page you need.
+Welcome to the Razobill documentation. Razobill splits log lines into templates, integers, and strings, and reconstructs them byte for byte.
+
+Use the four doors below to navigate by your current objective.
 
 ---
 
-## 1. Tutorials
+## 1. Tutorials (Learn)
 
-Learning-oriented walk-throughs designed to get you running quickly.
+Step-by-step learning exercises designed to get you running quickly.
 
-- [Getting started in 5 minutes](tutorials/getting-started.md): Install Razobill, parse your first log line, and verify bit-exact reconstruction in Python and DuckDB.
-- [Building an ingestion pipeline](tutorials/first-pipeline.md): Read raw log files, decompose messages, and write compact columnar Parquet files with DuckDB.
+| Guide | What you will build / learn | Time |
+| --- | --- | --- |
+| [Getting started](tutorials/getting-started.md) | Install Razobill, parse your first log line, and verify reconstruction in Python and DuckDB. | 3 min |
+| [Build an ingestion pipeline](tutorials/first-pipeline.md) | Decompose log batches in Python, store them in DuckDB, and query parameters via SQL. | 5 min |
 
 ---
 
-## 2. How-to guides
+## 2. How-to guides (Do)
 
 Task-oriented recipes for solving specific engineering problems.
 
-- [Compacting logs in DuckDB](how-to/duckdb.md): Load the DuckDB community extension, parse lines with `RzSplit`, and aggregate by template.
-- [Compacting logs in ClickHouse and chDB](how-to/chdb.md): Connect to embedded chDB, verify xxHash64 hash parity, and query additive log indices.
-- [Parsing logs in Python](how-to/python.md): Batch processing, multithreaded parsing releasing the GIL, and error handling with `pyrazobill`.
-- [Deploying OpenTelemetry processor](how-to/opentelemetry.md): Configure `razobillprocessor` inside the OTel Collector to strip raw log payloads at the edge.
-- [Transforming logs with Vector](how-to/vector.md): Embed the native Rust transform into your Vector pipeline.
-- [Writing compact Parquet to Amazon S3](how-to/s3-compaction.md): Compress telemetry streams into S3 object storage with ZSTD compression.
-- [Embedding librazobill in C++](how-to/cpp-developer.md): CMake integration, compiler flags, and direct C++20 header usage.
-- [Hardware acceleration with SIMD](how-to/neon-simd.md): Configure AVX-512, AVX2, and ARM NEON hardware acceleration.
+| Guide | Problem solved | Target environment |
+| --- | --- | --- |
+| [Compacting logs in DuckDB](how-to/duckdb.md) | Query and aggregate decomposed logs inside SQL using `RzSplit` and `RzJoin`. | DuckDB SQL |
+| [Additive indexing in ClickHouse](how-to/chdb.md) | Index templates with xxHash64 bit-parity without altering raw text columns. | ClickHouse & chDB |
+| [Batch processing in Python](how-to/python.md) | Parse gigabyte log batches using multithreaded workers that release the GIL. | Python 3.9+ |
+| [Edge collector in OpenTelemetry](how-to/opentelemetry.md) | Strip repetitive log bodies at the edge using `razobillprocessor`. | OTel Collector |
+| [Transforming logs with Vector](how-to/vector.md) | Decompose incoming log streams via native VRL remap functions. | Vector pipelines |
+| [Writing compact Parquet to S3](how-to/s3-compaction.md) | Store structured log columns in Parquet on Amazon S3 with Zstd compression. | AWS S3 & DuckDB |
+| [Embed librazobill in C and C++](how-to/cpp-developer.md) | Link the static or shared engine directly into native C++20 and C99 binaries. | C++20 & C99 |
+| [Hardware acceleration with SIMD](how-to/neon-simd.md) | Configure AVX-512, AVX2, and ARM NEON vectorization flags and verify CPUID dispatch. | Host CPUs |
+| [Troubleshooting guide](how-to/troubleshooting.md) | Resolve runtime status codes, compiler errors, and common type cast mismatches. | All platforms |
 
 ---
 
-## 3. Reference specifications
+## 3. Reference specifications (Look up)
 
-Information-oriented formal technical specifications and API definitions.
+Formal technical specifications, type signatures, and operational policies.
 
-- [DuckDB SQL reference](reference/sql-functions.md): Exact signatures, types, and return values for `RzSplit`, `RzJoin`, `RzTemplate`, and `RzHash`.
-- [Python API reference](reference/python-api.md): Specification for `pyrazobill` exports, named tuples, parameters, and exceptions.
-- [Universal C ABI reference](reference/c-abi.md): Memory lifetimes, return status codes, and function declarations in `RazobillC.h`.
-- [C++20 engine reference](reference/cpp-api.md): Core C++ class declarations, allocators, pools, and scanner APIs.
-- [Deprecation policy](reference/deprecation-policy.md): Versioning rules, ABI stability guarantees, and the 3-phase deprecation cycle.
-- [Release governance](reference/release-governance.md): Release checklist, artifact signatures, and provenance verification.
-- [Controlled glossary](glossary.md): Canonical terms, definitions, and banned synonyms.
-
----
-
-## 4. Explanations and architecture
-
-Understanding-oriented articles explaining design choices, theoretical foundations, and performance trade-offs.
-
-- [Architecture overview](explanation/architecture.md): Systems architecture, modular layout, and data-plane design.
-- [Lossless invertibility](explanation/lossless-invertibility.md): The algebraic invertibility guarantee and byte reconstruction mechanics.
-- [Semantic versus exact scanning](explanation/semantic-vs-exact.md): Token boundaries, slot grouping, and template cardinality trade-offs.
-- [Data-oriented design](explanation/data-oriented-design.md): Structure-of-Arrays (SoA), memory arena bump allocation, and cache efficiency.
-- [SIMD vectorization](explanation/simd-vectorization.md): Branchless delimiter scanning using AVX-512, AVX2, and ARM NEON hardware instructions.
-- [Concurrency model](explanation/concurrency-model.md): Work-stealing thread pool and lock-free thread-local working buffers.
-- [Benchmark methodology](explanation/benchmarks.md): Reproducible performance measurements, corpus details, and comparison benchmarks.
+| Specification | Contents | Primary interface |
+| --- | --- | --- |
+| [DuckDB SQL reference](reference/sql-functions.md) | Exact signatures and return types for `RzSplit`, `RzJoin`, `RzTemplate`, `RzHash`. | SQL functions |
+| [Python API reference](reference/python-api.md) | Function signatures, parameter types, named tuples, and exception classes. | `pyrazobill` module |
+| [Universal C ABI reference](reference/c-abi.md) | C99 signatures, zero-copy pointer lifetimes, and `RzStatus` return codes. | `RazobillC.h` |
+| [C++20 engine reference](reference/cpp-api.md) | C++20 classes, bump allocators, string pools, and `SlotRecord` representations. | `librazobill` headers |
+| [Compatibility matrix](reference/compatibility.md) | Verified matrix for operating systems, CPU architectures, Python, and DuckDB. | Platform support |
+| [Package directory](reference/packages.md) | Decision guide for choosing and installing the right package across environments. | Package management |
+| [Controlled glossary](reference/glossary.md) | Authoritative definitions for templates, slots, round trips, and banned synonyms. | Terminology |
+| [Deprecation policy](reference/deprecation-policy.md) | Semantic versioning rules, ABI compatibility contracts, and deprecation cycle. | Governance |
+| [Release governance](reference/release-governance.md) | Quality gates, test suites, artifact signing, and provenance verification. | Release process |
 
 ---
 
-## 5. Troubleshooting and support
+## 4. Explanations and architecture (Understand)
 
-- [Troubleshooting guide](troubleshooting.md): Solutions indexed by exact compiler errors and runtime status codes.
-- [Documentation style guide](STYLE.md): Style rules, component templates, and writing standards.
+Deep-dive articles explaining architectural choices, proofs, and performance trade-offs.
+
+| Article | Question explored | Key takeaway |
+| --- | --- | --- |
+| [Architecture overview](explanation/architecture.md) | How does Razobill structure data-plane and control-plane execution? | Monotonic arenas and zero hot-path heap allocations. |
+| [Lossless invertibility](explanation/lossless-invertibility.md) | How is byte-for-byte reconstruction mathematically guaranteed? | Exact algebraic partition with two-pass linear formatting. |
+| [System comparisons](explanation/comparisons.md) | How does Razobill compare with Drain3 and CLP? | Drain3 clusters lossily; CLP archives; Razobill enables SQL. |
+| [Known limits](explanation/limits.md) | Where does Razobill fall short and what are its operational boundaries? | 0.808 clustering accuracy, author benchmarks, 16 MiB line cap. |
+| [Frequently asked questions](explanation/faq.md) | What are the most common questions regarding usage, safety, and formats? | Direct answers for engineers and administrators. |
+| [Benchmark methodology](explanation/benchmarks.md) | What are the empirical throughput, scaling, and compression measurements? | Full tables across LogHub datasets and ClickHouse MergeTree. |
+| [Semantic vs exact scanning](explanation/semantic-vs-exact.md) | How do semantic grouping heuristics avoid template explosion? | Dynamic tokens extracted to `{s}` slots; 4.3× fewer templates. |
+| [Data-oriented design](explanation/data-oriented-design.md) | How does memory layout maximize CPU cache prefetching? | Structure-of-Arrays (SoA) layout with 64-byte alignment. |
+| [SIMD vectorization](explanation/simd-vectorization.md) | How do vector instructions eliminate branch mispredictions? | Parallel 32/64-byte chunk comparisons and hardware trailing zero count. |
+| [Concurrency model](explanation/concurrency-model.md) | How does Razobill scale across multi-core systems without locks? | Thread-local scratchpads and work-stealing thread pool. |
+
+---
+
+## Contributing and community
+
+- [Contributor guide](../CONTRIBUTING.md): Step-by-step guide to clone, build, and run tests.
+- [Security policy](../SECURITY.md): Vulnerability disclosure procedures and supported releases.
+- [Code of Conduct](../CODE_OF_CONDUCT.md): Contributor Covenant standards.
