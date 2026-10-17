@@ -6,28 +6,55 @@ High-Scale DuckDB SQL Integration Benchmark for librazobill
 ARCHITECTURE:
 Vectorized scalar extension execution in DuckDB.
 Demonstrates:
-1. Dynamic loading of `librazobill.duckdb_extension`.
-2. Multi-threaded SQL parsing (`rbFormSemantic`, `rbIntsSemantic`, `rbStrsSemantic`).
-3. 100% Lossless SQL reconstruction (`rbReconstruct`).
-4. Parsing 1,000,000 rows in ~0.3 seconds inside SQL.
-
-TROLL:
-Legacy log stack:
-  Logs -> Kafka -> Logstash -> Elasticsearch -> JVM OutOfMemoryError -> Rage restart.
-Modern librazobill stack:
-  LOAD 'librazobill.duckdb_extension'; -> 1,000,000 rows parsed in 0.3 seconds -> Done.
+1. Dynamic loading of `razobill.duckdb_extension` (via RZB_EXT or build paths).
+2. Multi-threaded SQL parsing with `RzSplit`.
+3. 100% Lossless SQL reconstruction with `RzJoin`.
+4. High-throughput parsing of 1,000,000 rows inside SQL.
 """
 
+import os
 import sys
 import time
 from pathlib import Path
 
 # Add lib/python directory to sys.path
-pkg_dir = Path(__file__).resolve().parent.parent / "lib" / "python"
+repo_root = Path(__file__).resolve().parent.parent
+pkg_dir = repo_root / "lib" / "python"
 sys.path.insert(0, str(pkg_dir))
 
 import duckdb
 import pyrazobill
+
+
+def resolve_extension_path() -> str:
+    """Resolves the loadable DuckDB extension binary path."""
+    # 1. Environment variable RZB_EXT
+    env_path = os.environ.get("RZB_EXT")
+    if env_path and Path(env_path).is_file():
+        return str(Path(env_path).resolve()).replace("\\", "/")
+
+    # 2. Package helper if available
+    if hasattr(pyrazobill, "extensionPath"):
+        try:
+            return pyrazobill.extensionPath().replace("\\", "/")
+        except Exception:
+            pass
+
+    # 3. Known build tree candidate locations
+    candidates = [
+        repo_root / "build" / "razobill.duckdb_extension",
+        repo_root / "build" / "librazobill.duckdb_extension",
+        repo_root / "build" / "Release" / "razobill.duckdb_extension",
+        repo_root / "build" / "Release" / "librazobill.duckdb_extension",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c.resolve()).replace("\\", "/")
+
+    raise FileNotFoundError(
+        "Could not find razobill DuckDB extension binary. "
+        "Please compile the extension (cmake --build build) or set the RZB_EXT environment variable."
+    )
 
 
 def main():
@@ -36,11 +63,17 @@ def main():
     print("=" * 100)
 
     con = duckdb.connect(config={"allow_unsigned_extensions": "true"})
-    ext_path = pyrazobill.extensionPath().replace("\\", "/")
+    ext_path = resolve_extension_path()
     print(f"Loading DuckDB extension: {ext_path}")
     con.execute(f"LOAD '{ext_path}';")
 
     N = 1000000
+    if len(sys.argv) > 1:
+        try:
+            N = int(sys.argv[1])
+        except ValueError:
+            pass
+
     print(f"\nGenerating in-memory dataset of {N:,} log messages...")
     con.execute(
         f"""
@@ -61,11 +94,11 @@ def main():
         """
         CREATE TEMP TABLE staged AS
         SELECT
-            rbFormSemantic(msg) AS form,
-            rbIntsSemantic(msg) AS ints,
-            rbStrsSemantic(msg) AS strs,
+            parsed.template AS form,
+            parsed.ints AS ints,
+            parsed.strs AS strs,
             msg
-        FROM raw;
+        FROM (SELECT RzSplit(msg) AS parsed, msg FROM raw);
     """
     )
     t_parse = time.perf_counter() - t0
@@ -78,7 +111,7 @@ def main():
         """
         SELECT count(*)
         FROM staged
-        WHERE rbReconstruct(form, ints, strs) IS DISTINCT FROM msg;
+        WHERE RzJoin(form, ints, strs) IS DISTINCT FROM msg;
     """
     ).fetchone()[0]
     t_rebuild = time.perf_counter() - t0
