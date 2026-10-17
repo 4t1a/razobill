@@ -1,6 +1,6 @@
 # Glossary
 
-[Docs](../README.md) / [Reference](glossary.md) / Glossary
+[Docs](../README.md) > [Reference specifications](../README.md#3-reference-specifications-look-up) > Glossary
 
 This document defines canonical terms used across the Razobill project.
 Use these terms consistently in documentation, code comments, and issue discussions.

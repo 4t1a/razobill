@@ -1,6 +1,6 @@
 # Troubleshooting
 
-[Docs](../README.md) / [How-to guides](troubleshooting.md) / Troubleshooting
+[Docs](../README.md) > [How-to guides](../README.md#2-how-to-guides-do) > Troubleshooting
 
 This guide provides solutions for common error messages and unexpected behaviors indexed by their exact error strings.
 
