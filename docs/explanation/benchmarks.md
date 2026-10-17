@@ -1,5 +1,7 @@
 # Benchmark methodology and empirical results
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > Benchmark methodology and empirical results
+
 Reproducible performance measurements, memory scaling, and comparison against Drain3 and CLP.
 Read this article if you want to inspect benchmark numbers, test corpora, and testing methodology.
 Skip this article if you only need the developer guides.
@@ -137,11 +139,20 @@ Evaluated on a multi-system corpus of 134,815 log events inside embedded chDB (`
 
 ---
 
-## Known limits
+## Known limits and engineering boundaries
 
-We designed Razobill for specific production trade-offs. Here is where it falls short:
+For a complete audit of benchmark constraints, hardware details, clustering trade-offs, and operational boundaries, see [Known limits and engineering boundaries](limits.md).
 
-1. **It is not a clustering tool**: On the project's 16-dataset benchmark, median grouping accuracy was 0.808 for Razobill versus 0.871 for Drain3. Razobill also retains more unique templates (median 70.5 vs 45.5). If your primary goal is finding the absolute minimum number of cluster archetypes regardless of variable loss, Drain3 is better suited. If you need lossless reconstruction and SQL analytical queries, Razobill is designed for that.
-2. **The benchmarks are author-run**: All benchmarks were measured on a single author machine under Windows 11. We encourage verifying throughput on your specific production hardware and workloads.
-3. **S3 cost models use emulators**: The S3 storage savings reported in evidence benchmarks were measured using LocalStack and simulated cost equations, rather than production AWS billing statements.
-4. **Platform support constraints**: Pre-compiled DuckDB community binaries cover Linux (x86-64, aarch64), macOS (Apple Silicon, Intel), and Windows MSVC (x86-64). WebAssembly and MinGW builds are currently not included.
+Key operational takeaways:
+
+1. **Clustering accuracy**: Razobill retains more templates than Drain3 (median 70.5 vs 45.5 clusters) and has a lower grouping accuracy (0.808 vs 0.871) because it preserves variable tokens for lossless reconstruction.
+2. **Author-run measurements**: All benchmarks were measured on a single workstation (Windows 11, Intel 6-Core / 12-Thread, 32 GB RAM). Run `tools/BenchDrain.py` on your own hardware to verify numbers.
+3. **S3 cost models**: Measured using LocalStack and simulated cost equations rather than production billing statements.
+
+---
+
+## Related
+
+- [System comparisons: Drain3, CLP, and Razobill](comparisons.md)
+- [Known limits and engineering boundaries](limits.md)
+- [Lossless invertibility mechanics](lossless-invertibility.md)

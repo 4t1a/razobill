@@ -1,5 +1,7 @@
 # Data-oriented design and memory layout
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > Data-oriented design and memory layout
+
 How cache contiguity and Structure-of-Arrays layout maximize CPU efficiency during log parsing.
 Read this article if you want to understand memory alignment, cache prefetching, and bump allocators in librazobill.
 Skip this article if you are consuming pre-compiled packages.
@@ -58,3 +60,11 @@ For operations requiring string persistence, `StringPool` provides generational 
 - Unique string literals are deduplicated using 64-bit hashes.
 - Strings are packed sequentially into monolithic contiguous buffers.
 - Periodic garbage collection (`gc()`) compacts live strings monotonically, removing dead space while preserving contiguous layout for CPU prefetchers.
+
+---
+
+## Related
+
+- [Systems architecture overview](architecture.md)
+- [SIMD vectorization and hardware dispatch](simd-vectorization.md)
+- [C++20 engine reference](../reference/cpp-api.md)

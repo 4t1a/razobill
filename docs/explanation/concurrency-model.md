@@ -1,5 +1,7 @@
 # Concurrency model and thread safety
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > Concurrency model and thread safety
+
 How Razobill scales across multi-core systems without locks on the query path.
 Read this article if you want to understand thread management, GIL release in Python, and multi-core scaling.
 Skip this article if you are processing single messages sequentially.
@@ -38,12 +40,12 @@ In Python, parsing millions of strings in a Python loop is CPU-bound and constra
 records = [rz.RzSplit(line) for line in millions_of_lines]
 ```
 
-When you call `rz.RzSplitMany(lines)`:
+When you call `rz.split_many(lines)` (or `rz.RzSplitMany`):
 
-1. Python strings are collected into a C++ string vector.
-2. The Python GIL is explicitly released using `py::gil_scoped_release`.
+1. Python strings are transferred into internal string views.
+2. For batches larger than 128 lines, the Python GIL is explicitly released using `py::gil_scoped_release`.
 3. Background worker threads in `librazobill` parse chunks of messages simultaneously.
-4. Python named tuple objects are instantiated and returned to the caller once parallel work completes.
+4. Python named tuples (`SlotRecord`) are constructed and returned to the caller once parallel work completes.
 
 ---
 
@@ -53,4 +55,12 @@ For batch tasks, librazobill includes a cache-aware work-stealing thread pool:
 
 - Worker threads maintain local work queues.
 - When an idle worker exhausts its local batch, it steals tasks from the tail of another worker's queue.
-- This balances uneven workloads (e.g. mixed short syslog messages and long Java stack traces) across all CPU cores.
+- This balances uneven workloads (such as mixed short syslog messages and long Java stack traces) across all CPU cores.
+
+---
+
+## Related
+
+- [Systems architecture overview](architecture.md)
+- [Batch processing in Python](../how-to/python.md)
+- [Python API reference](../reference/python-api.md)

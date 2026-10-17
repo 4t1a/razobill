@@ -1,5 +1,7 @@
 # SIMD vectorization and hardware dispatch
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > SIMD vectorization and hardware dispatch
+
 Accelerating delimiter tokenization using AVX-512, AVX2, and ARM NEON vector instructions.
 Read this article if you want to understand how librazobill parses delimiters at hardware line rates.
 Skip this article if you only need high-level API details.
@@ -43,6 +45,14 @@ To ensure broad portability while extracting maximum performance from modern pro
 1. **AVX-512BW (x86-64)**: Scans 64-byte chunks per iteration on modern Intel and AMD processors.
 2. **AVX2 (x86-64)**: Scans 32-byte chunks per iteration. Supported by virtually all modern x86 servers and desktops.
 3. **ARM NEON (AArch64)**: Scans 16-byte chunks per iteration using 128-bit NEON registers on Apple Silicon and AWS Graviton processors.
-4. **Scalar fallback**: Portable portable fallback loop utilized when SIMD instructions are absent.
+4. **Scalar fallback**: Portable fallback loop utilized when SIMD instructions are absent.
 
 Feature detection runs once on first invocation. Subsequent calls dispatch through cached function pointers with zero branching overhead.
+
+---
+
+## Related
+
+- [Hardware acceleration with SIMD](../how-to/neon-simd.md)
+- [Data-oriented design and memory layout](data-oriented-design.md)
+- [Empirical benchmarks and methodology](benchmarks.md)

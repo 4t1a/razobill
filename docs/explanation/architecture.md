@@ -1,5 +1,7 @@
 # Systems architecture overview
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > Systems architecture overview
+
 A modular monolith design for high-throughput telemetry decomposition and reconstruction.
 Read this article if you want to understand how librazobill manages memory, vectorization, and language bindings.
 Skip this article if you are only writing queries in DuckDB or Python.
@@ -86,3 +88,11 @@ Razobill connects to columnar storage engines via two dedicated architectures:
 
 1. **Direct DuckDB scalar extension**: Compiled C++ scalar functions operating directly on `duckdb_string_t` vectors.
 2. **Arrow ADBC backend (`BackendAdbc.cpp`)**: Dynamic Arrow Database Connectivity driver connecting to in-process ClickHouse chDB with bit-identical `xxHash64` hash alignment across engines.
+
+---
+
+## Related
+
+- [Lossless invertibility mechanics](lossless-invertibility.md)
+- [Data-oriented design](data-oriented-design.md)
+- [Universal C ABI reference](../reference/c-abi.md)

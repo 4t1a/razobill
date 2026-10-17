@@ -1,5 +1,7 @@
 # Semantic versus exact scanning
 
+[Docs](../README.md) > [Explanations](../README.md#4-explanations-and-architecture-understand) > Semantic versus exact scanning
+
 Understanding template extraction heuristics, token boundaries, and cardinality reduction.
 Read this article if you want to understand how Razobill groups variable tokens into templates.
 Skip this article if you are satisfied with default semantic scanning.
@@ -69,3 +71,11 @@ In high-entropy workloads (such as SSH authentication attempts with varying remo
 - Use **exact mode** for:
   - Compilers, DSLs, or configuration format validation.
   - Scenarios where IP addresses or paths are intended to form distinct cluster categories.
+
+---
+
+## Related
+
+- [Lossless invertibility mechanics](lossless-invertibility.md)
+- [Known limits and engineering boundaries](limits.md)
+- [System comparisons: Drain3, CLP, and Razobill](comparisons.md)
