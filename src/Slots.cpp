@@ -19,14 +19,25 @@ constexpr std::size_t digits10(std::int64_t v) noexcept {
 }
 
 bool isLegacyFormKey(std::string_view form) noexcept {
+    if (form.find("{i}") != std::string_view::npos || form.find("{s}") != std::string_view::npos ||
+        form.find("{{") != std::string_view::npos || form.find("}}") != std::string_view::npos) {
+        return false;
+    }
     const auto sep = form.rfind(static_cast<char>(kTypeSeparator));
     if (sep == std::string_view::npos || sep == form.size() - 1) return false;
     std::string_view types = form.substr(sep + 1);
+    if (types.empty()) return false;
     for (char c : types) {
         if (c != 'I' && c != 'S') return false;
     }
     std::string_view skeleton = form.substr(0, sep);
-    return skeleton.find(static_cast<char>(kPlaceholder)) != std::string_view::npos;
+    std::size_t placeholders = 0;
+    for (char c : skeleton) {
+        if (static_cast<unsigned char>(c) == kPlaceholder) {
+            ++placeholders;
+        }
+    }
+    return placeholders > 0 && placeholders == types.size();
 }
 
 Status splitKey(std::string_view form, std::string_view& skeleton, std::string_view& types, std::size_t& nInt,

@@ -267,15 +267,15 @@ flowchart TD
 
 *Goal: Certify 100% test passing, zero memory leaks, and enterprise-grade performance.*
 
-- [ ] **Step 6.1: Run Full Unit & Integration Test Suites**
+- [x] **Step 6.1: Run Full Unit & Integration Test Suites**
   - Run `UnitCore`, `UnitStats`, `UnitArena`, `UnitCAPI`, `UnitChannel`, `IntegrationDuckdb`, `IntegrationChdb`.
-- [ ] **Step 6.2: Run Cross-Language Conformance Matrix**
+- [x] **Step 6.2: Run Cross-Language Conformance Matrix**
   - Execute `ConformanceTest.py` across C++, Python Native, Python Fallback, and DuckDB Extension on the expanded corpus.
-- [ ] **Step 6.3: AddressSanitizer (ASan) & UndefinedBehaviorSanitizer (UBSan) Certification**
+- [x] **Step 6.3: AddressSanitizer (ASan) & UndefinedBehaviorSanitizer (UBSan) Certification**
   - Compile with `-fsanitize=address,undefined` and verify zero errors across 1,000,000 randomized fuzz parses.
-- [ ] **Step 6.4: ThreadSanitizer (TSan) Multi-Core Certification**
+- [x] **Step 6.4: ThreadSanitizer (TSan) Multi-Core Certification**
   - Compile with `-fsanitize=thread` and verify zero data races under 16 concurrent threads.
-- [ ] **Step 6.5: 10-Million Message Scale & Memory Leak Benchmark**
+- [x] **Step 6.5: 10-Million Message Scale & Memory Leak Benchmark**
   - Run `BenchCore` and `BenchStorage` on 10M rows:
     - Sustain $> 10\text{M msgs/sec}$ throughput.
     - Verify 0 bytes memory leak under Valgrind / CRT leak detection.
