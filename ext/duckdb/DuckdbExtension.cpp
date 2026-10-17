@@ -91,6 +91,8 @@ struct Scratch {
         if (text.capacity() > kScratchKeepBytes) std::string().swap(text);
         if (record.skeleton.capacity() > kScratchKeepBytes) std::string().swap(record.skeleton);
         if (record.templateStr.capacity() > kScratchKeepBytes) std::string().swap(record.templateStr);
+        if (record.ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes) std::vector<std::int64_t>().swap(record.ints);
+        if (record.strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes) std::vector<std::string_view>().swap(record.strs);
         if (ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes) std::vector<std::int64_t>().swap(ints);
         if (strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes) std::vector<std::string_view>().swap(strs);
     }
@@ -280,6 +282,7 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
 
         sc.ints.clear();
         sc.strs.clear();
+        bool rowHasNullArg = false;
 
         for (const auto& a : sc.args) {
             if (!isValid(a.validity, r)) continue;
@@ -315,9 +318,11 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
                 const auto entry = static_cast<const duckdb_list_entry*>(a.data)[r];
                 const auto* p = static_cast<const std::int64_t*>(a.childData);
                 for (idx_t i = 0; i < entry.length; ++i) {
-                    if (isValid(a.childValidity, entry.offset + i)) {
-                        sc.ints.push_back(p[entry.offset + i]);
+                    if (!isValid(a.childValidity, entry.offset + i)) {
+                        rowHasNullArg = true;
+                        break;
                     }
+                    sc.ints.push_back(p[entry.offset + i]);
                 }
                 break;
             }
@@ -325,15 +330,23 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
                 const auto entry = static_cast<const duckdb_list_entry*>(a.data)[r];
                 auto* p = static_cast<duckdb_string_t*>(a.childData);
                 for (idx_t i = 0; i < entry.length; ++i) {
-                    if (isValid(a.childValidity, entry.offset + i)) {
-                        sc.strs.push_back(viewOf(p[entry.offset + i]));
+                    if (!isValid(a.childValidity, entry.offset + i)) {
+                        rowHasNullArg = true;
+                        break;
                     }
+                    sc.strs.push_back(viewOf(p[entry.offset + i]));
                 }
                 break;
             }
             case Kind::Unsupported:
                 break;
             }
+            if (rowHasNullArg) break;
+        }
+
+        if (rowHasNullArg) {
+            setNull(out, r);
+            continue;
         }
 
         auto tmplSv = viewOf(tmplData[r]);

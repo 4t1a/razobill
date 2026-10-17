@@ -83,21 +83,21 @@ func (p *RazobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error
 					}
 
 					// Copy 64-bit integers
-					if cRecord.intCount > 0 {
+					if cRecord.intCount > 0 && cRecord.intValues != nil {
 						intsSlice := attrs.PutEmptySlice("razobill.ints")
 						intsSlice.EnsureCapacity(int(cRecord.intCount))
-						intPtrs := (*[1 << 28]C.int64_t)(unsafe.Pointer(cRecord.intValues))[:cRecord.intCount:cRecord.intCount]
-						for idx := 0; idx < int(cRecord.intCount); idx++ {
-							intsSlice.AppendEmpty().SetInt(int64(intPtrs[idx]))
+						intPtrs := unsafe.Slice((*int64)(unsafe.Pointer(cRecord.intValues)), int(cRecord.intCount))
+						for _, val := range intPtrs {
+							intsSlice.AppendEmpty().SetInt(val)
 						}
 					}
 
 					// Copy variable strings
-					if cRecord.strCount > 0 {
+					if cRecord.strCount > 0 && cRecord.strValues != nil && cRecord.strLengths != nil {
 						strsSlice := attrs.PutEmptySlice("razobill.strs")
 						strsSlice.EnsureCapacity(int(cRecord.strCount))
-						strPtrs := (*[1 << 28]*C.char)(unsafe.Pointer(cRecord.strValues))[:cRecord.strCount:cRecord.strCount]
-						strLens := (*[1 << 28]C.size_t)(unsafe.Pointer(cRecord.strLengths))[:cRecord.strCount:cRecord.strCount]
+						strPtrs := unsafe.Slice(cRecord.strValues, int(cRecord.strCount))
+						strLens := unsafe.Slice(cRecord.strLengths, int(cRecord.strCount))
 						for idx := 0; idx < int(cRecord.strCount); idx++ {
 							sVal := C.GoStringN(strPtrs[idx], C.int(strLens[idx]))
 							strsSlice.AppendEmpty().SetStr(sVal)
@@ -105,6 +105,8 @@ func (p *RazobillProcessor) ConsumeLogs(ctx context.Context, ld plog.Logs) error
 					}
 
 					C.RzFree(&cRecord)
+				} else {
+					rec.Attributes().PutStr("razobill.error", C.GoString(C.RzStatusMessage(status)))
 				}
 				C.free(unsafe.Pointer(cMsg))
 			}

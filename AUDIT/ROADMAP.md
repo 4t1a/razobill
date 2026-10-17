@@ -231,33 +231,33 @@ flowchart TD
 
 *Goal: Fix semantic parsing divergence, eliminate threadpool deadlocks, plug C-API leaks, and remove duplicate sources.*
 
-- [ ] **Step 5.1: Align Python Fallback with C++ Core Scanner**
+- [x] **Step 5.1: Align Python Fallback with C++ Core Scanner**
   - **File:** [lib/python/pyrazobill/_fallback.py:107–110](file:///C:/FM/rzd/razobill/lib/python/pyrazobill/_fallback.py#L107-L110)
   - **Action:**
     - Remove dead path code `elif tok.startswith("/") or "/" in tok:`.
     - Align hex string classification: require `any("0" <= c <= "9" for c in tok)` to match C++ `seen & detail::kDigit`.
-- [ ] **Step 5.2: Plug Naked `PyObject*` Refcount Leak in `joinOne()`**
+- [x] **Step 5.2: Plug Naked `PyObject*` Refcount Leak in `joinOne()`**
   - **File:** [lib/python/PyRazobill.cpp:232–247](file:///C:/FM/rzd/razobill/lib/python/PyRazobill.cpp#L232-L247)
   - **Action:** Wrap `encodedTmpl` in `py::reinterpret_steal<py::object>` immediately upon allocation, ensuring automatic decref if `item.cast<int64_t>()` throws.
-- [ ] **Step 5.3: Resolve Static Threadpool Fork Deadlock & Windows Freeze**
+- [x] **Step 5.3: Resolve Static Threadpool Fork Deadlock & Windows Freeze**
   - **File:** [lib/python/PyRazobill.cpp:339](file:///C:/FM/rzd/razobill/lib/python/PyRazobill.cpp#L339)
   - **Action:** Replace internal static thread pool with thread-local batch processing or hook `os.register_at_fork` / `pthread_atfork` to safely reset workers.
-- [ ] **Step 5.4: Deduplicate Python Source Tree**
+- [x] **Step 5.4: Deduplicate Python Source Tree**
   - **Action:**
     - Remove `lib/python/includeCore/` and `lib/python/srcCore/`.
     - Configure `setup.py` and `CMakeLists.txt` to compile root canonical headers and sources directly.
-- [ ] **Step 5.5: Fix DuckDB Extension Vector Trimming & Null Handling**
+- [x] **Step 5.5: Fix DuckDB Extension Vector Trimming & Null Handling**
   - **File:** [ext/duckdb/DuckdbExtension.cpp:83–97, 284–332](file:///C:/FM/rzd/razobill/ext/duckdb/DuckdbExtension.cpp#L83-L97)
   - **Action:**
     - Trim `sc.record.ints` and `sc.record.strs` in `Scratch::trim()`.
     - In `RzJoinImpl`, when a null column or element is encountered, set the output row invalid (`setNull`) instead of skipping elements and crashing.
-- [ ] **Step 5.6: Fix Rust VRL Extension Zero-Allocation FFI & Slice Invariants**
+- [x] **Step 5.6: Fix Rust VRL Extension Zero-Allocation FFI & Slice Invariants**
   - **File:** [ext/vector/RazobillVrl.rs:48, 56–79](file:///C:/FM/rzd/razobill/ext/vector/RazobillVrl.rs#L48)
   - **Action:** Pass `raw_msg.as_ptr() as *const c_char` directly (avoiding heap `CString` allocation). Check for null pointers before invoking `slice::from_raw_parts`.
-- [ ] **Step 5.7: Fix Go OTel Processor Error Logging & Dynamic Slice Casting**
+- [x] **Step 5.7: Fix Go OTel Processor Error Logging & Dynamic Slice Casting**
   - **File:** [ext/otel/RazobillProcessor.go:63–109](file:///C:/FM/rzd/razobill/ext/otel/RazobillProcessor.go#L63-L109), [Config.go](file:///C:/FM/rzd/razobill/ext/otel/Config.go)
   - **Action:** Emit warning metrics on non-OK status. Replace static `1 << 28` array casting with `unsafe.Slice`. Wire `Config.Mode` to C ABI.
-- [ ] **Step 5.8: Add Missing `hash()` Stub to `Core.pyi`**
+- [x] **Step 5.8: Add Missing `hash()` Stub to `Core.pyi`**
   - **File:** [lib/python/pyrazobill/Core.pyi](file:///C:/FM/rzd/razobill/lib/python/pyrazobill/Core.pyi)
   - **Action:** Add `def hash(input_val: Union[str, bytes]) -> int: ...`.
 

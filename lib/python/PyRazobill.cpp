@@ -6,6 +6,10 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -21,6 +25,27 @@ namespace py = pybind11;
 using namespace razobill;
 
 namespace {
+
+static std::unique_ptr<core::ThreadPool>& getThreadPoolHolder() {
+    static std::unique_ptr<core::ThreadPool> pool = std::make_unique<core::ThreadPool>();
+    return pool;
+}
+
+static core::ThreadPool& getThreadPool() {
+    static std::once_flag initFork;
+    std::call_once(initFork, []() {
+#if !defined(_WIN32)
+        pthread_atfork(nullptr, nullptr, []() {
+            getThreadPoolHolder() = std::make_unique<core::ThreadPool>();
+        });
+#endif
+    });
+    auto& p = getThreadPoolHolder();
+    if (!p) {
+        p = std::make_unique<core::ThreadPool>();
+    }
+    return *p;
+}
 
 core::ScanMode parseMode(const std::string& mode) {
     if (mode == "semantic") return core::ScanMode::Semantic;
@@ -223,16 +248,18 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
     std::string tmplStorage;
     std::string_view tmplView;
 
-    PyObject* encodedTmpl = nullptr;
+    py::object encodedTmpl;
     if (isBytes) {
         char* buf = nullptr;
         Py_ssize_t len = 0;
         PYBIND11_BYTES_AS_STRING_AND_SIZE(tmplObj.ptr(), &buf, &len);
         tmplView = std::string_view(buf, static_cast<size_t>(len));
     } else {
-        encodedTmpl = PyUnicode_AsEncodedString(tmplObj.ptr(), "utf-8", "surrogateescape");
-        if (!encodedTmpl) throw py::error_already_set();
-        tmplView = std::string_view(PyBytes_AS_STRING(encodedTmpl), static_cast<size_t>(PyBytes_GET_SIZE(encodedTmpl)));
+        PyObject* raw = PyUnicode_AsEncodedString(tmplObj.ptr(), "utf-8", "surrogateescape");
+        if (!raw) throw py::error_already_set();
+        encodedTmpl = py::reinterpret_steal<py::object>(raw);
+        tmplView = std::string_view(PyBytes_AS_STRING(encodedTmpl.ptr()),
+                                    static_cast<size_t>(PyBytes_GET_SIZE(encodedTmpl.ptr())));
     }
 
     std::vector<int64_t> ints;
@@ -241,16 +268,9 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
         ints.push_back(item.cast<int64_t>());
     }
 
-    std::vector<PyObject*> encodedStrs;
+    std::vector<py::object> encodedStrs;
     std::vector<std::string_view> strViews;
     strViews.reserve(py::len(strsSeq));
-
-    auto cleanup = [&]() {
-        if (encodedTmpl) Py_DECREF(encodedTmpl);
-        for (PyObject* obj : encodedStrs) {
-            Py_DECREF(obj);
-        }
-    };
 
     for (auto item : strsSeq) {
         if (py::isinstance<py::bytes>(item)) {
@@ -260,14 +280,12 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
             strViews.emplace_back(buf, static_cast<size_t>(len));
         } else if (py::isinstance<py::str>(item)) {
             PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
-            if (!enc) {
-                cleanup();
-                throw py::error_already_set();
-            }
-            encodedStrs.push_back(enc);
-            strViews.emplace_back(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc)));
+            if (!enc) throw py::error_already_set();
+            py::object encObj = py::reinterpret_steal<py::object>(enc);
+            strViews.emplace_back(PyBytes_AS_STRING(encObj.ptr()),
+                                  static_cast<size_t>(PyBytes_GET_SIZE(encObj.ptr())));
+            encodedStrs.push_back(std::move(encObj));
         } else {
-            cleanup();
             std::string tn = py::str(item.get_type());
             throw py::type_error("[razobill] What happened: Unsupported string slot element type. "
                                  "Why: Expected str or bytes in strs list, got " +
@@ -281,17 +299,14 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
     Status st = core::reconstruct(tmplView, ints, strViews, result);
     if (st != Status::Ok) {
         std::string err = formatJoinError(st, tmplView);
-        cleanup();
         throw py::value_error(err);
     }
 
     if (isBytes) {
-        cleanup();
         return py::bytes(result.data(), result.size());
     } else {
         PyObject* pyRes =
             PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
-        cleanup();
         if (!pyRes) throw py::error_already_set();
         return py::reinterpret_steal<py::object>(pyRes);
     }
@@ -337,7 +352,7 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
     {
         py::gil_scoped_release release;
         if (total > 128) {
-            static core::ThreadPool pool;
+            auto& pool = getThreadPool();
             pool.parallelFor(total, 256, [&](size_t start, size_t end) {
                 for (size_t idx = start; idx < end; ++idx) {
                     if (!rawInputs[idx].bytes.empty()) {
@@ -401,11 +416,10 @@ uint64_t hashOne(const py::object& input) {
     if (py::isinstance<py::str>(input)) {
         PyObject* encoded = PyUnicode_AsEncodedString(input.ptr(), "utf-8", "surrogateescape");
         if (!encoded) throw py::error_already_set();
-        char* buf = PyBytes_AS_STRING(encoded);
-        Py_ssize_t len = PyBytes_GET_SIZE(encoded);
-        uint64_t h = core::xxh64(std::string_view(buf, static_cast<size_t>(len)));
-        Py_DECREF(encoded);
-        return h;
+        py::object encObj = py::reinterpret_steal<py::object>(encoded);
+        char* buf = PyBytes_AS_STRING(encObj.ptr());
+        Py_ssize_t len = PyBytes_GET_SIZE(encObj.ptr());
+        return core::xxh64(std::string_view(buf, static_cast<size_t>(len)));
     }
     std::string tn = py::str(input.get_type());
     throw py::type_error("[razobill] What happened: Unsupported input type in RzHash. "

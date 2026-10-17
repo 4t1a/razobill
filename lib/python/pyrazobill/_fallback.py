@@ -104,10 +104,6 @@ def _scan(msg: str, mode: str):
                 is_var = True
             elif len(tok) > 4 and (tok.endswith(".exe") or tok.endswith(".dll") or tok.endswith(".so")):
                 is_var = True
-            elif tok.startswith("/") or "/" in tok:
-                is_var = True
-            elif len(tok) >= 8 and all(c in "0123456789abcdefABCDEF" for c in tok):
-                is_var = True
 
         if is_var:
             yield msg[gap:start], tok

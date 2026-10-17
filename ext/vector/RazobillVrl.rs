@@ -3,7 +3,6 @@
 //! Provides zero-copy parsing of raw log strings into (template, ints, strs) structs.
 
 use std::collections::BTreeMap;
-use std::ffi::CString;
 use std::os::raw::c_char;
 
 #[repr(C)]
@@ -45,18 +44,37 @@ extern "C" {
 /// Decomposes an input string into a structured JSON-compatible map.
 pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Value>, String> {
     let mut record: RzRecord = unsafe { std::mem::zeroed() };
-    let c_str = CString::new(raw_msg).map_err(|e| e.to_string())?;
 
-    let status = unsafe { RzSplit(c_str.as_ptr(), raw_msg.len(), &mut record) };
+    let status = unsafe {
+        RzSplit(
+            raw_msg.as_ptr() as *const c_char,
+            raw_msg.len(),
+            &mut record,
+        )
+    };
 
     if !matches!(status, RzStatus::Ok) {
-        return Err("Razobill decomposition failed".to_string());
+        return Err(format!("Razobill decomposition failed with status {:?}", status));
     }
 
-    let form_slice = unsafe {
-        std::slice::from_raw_parts(record.template_str as *const u8, record.template_length)
+    struct RecordGuard<'a>(&'a mut RzRecord);
+    impl<'a> Drop for RecordGuard<'a> {
+        fn drop(&mut self) {
+            unsafe {
+                RzFree(self.0);
+            }
+        }
+    }
+    let _guard = RecordGuard(&mut record);
+
+    let form_str = if record.template_length > 0 && !record.template_str.is_null() {
+        let form_slice = unsafe {
+            std::slice::from_raw_parts(record.template_str as *const u8, record.template_length)
+        };
+        String::from_utf8_lossy(form_slice).to_string()
+    } else {
+        String::new()
     };
-    let form_str = String::from_utf8_lossy(form_slice).to_string();
 
     let mut ints = Vec::with_capacity(record.int_count);
     if record.int_count > 0 && !record.int_values.is_null() {
@@ -71,16 +89,16 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
         let str_ptrs = unsafe { std::slice::from_raw_parts(record.str_values, record.str_count) };
         let str_lens = unsafe { std::slice::from_raw_parts(record.str_lengths, record.str_count) };
         for i in 0..record.str_count {
-            let slice =
-                unsafe { std::slice::from_raw_parts(str_ptrs[i] as *const u8, str_lens[i]) };
-            strs.push(serde_json::Value::from(
-                String::from_utf8_lossy(slice).to_string(),
-            ));
+            if str_lens[i] > 0 && !str_ptrs[i].is_null() {
+                let slice =
+                    unsafe { std::slice::from_raw_parts(str_ptrs[i] as *const u8, str_lens[i]) };
+                strs.push(serde_json::Value::from(
+                    String::from_utf8_lossy(slice).to_string(),
+                ));
+            } else {
+                strs.push(serde_json::Value::from(""));
+            }
         }
-    }
-
-    unsafe {
-        RzFree(&mut record);
     }
 
     let mut map = BTreeMap::new();
