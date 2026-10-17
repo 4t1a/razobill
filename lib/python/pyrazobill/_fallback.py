@@ -198,7 +198,8 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
                     raise ValueError(
                         "[razobill] What happened: Failed to join log components. "
                         "Why: Count mismatch (template has more {i} placeholders than provided ints). "
-                        "What to do: Verify that {i} and {s} placeholders match provided values."
+                        "What to do: Verify that {i} and {s} placeholders match provided values. "
+                        f"Offending template: '{tmpl_str[:80]}'."
                     )
                 out_parts.append(str(ints[i_idx]))
                 i_idx += 1
@@ -208,7 +209,8 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
                     raise ValueError(
                         "[razobill] What happened: Failed to join log components. "
                         "Why: Count mismatch (template has more {s} placeholders than provided strs). "
-                        "What to do: Verify that {i} and {s} placeholders match provided values."
+                        "What to do: Verify that {i} and {s} placeholders match provided values. "
+                        f"Offending template: '{tmpl_str[:80]}'."
                     )
                 out_parts.append(str_tokens[s_idx])
                 s_idx += 1
@@ -237,7 +239,8 @@ def join(template_val: Union[str, bytes], ints: Sequence[int], strs: Sequence[Un
         raise ValueError(
             f"[razobill] What happened: Failed to join log components. "
             f"Why: Count mismatch (provided {len(ints)} ints, {len(strs)} strs, but template used {i_idx} ints, {s_idx} strs). "
-            f"What to do: Verify that template placeholders match provided values."
+            f"What to do: Verify that template placeholders match provided values. "
+            f"Offending template: '{tmpl_str[:80]}'."
         )
 
     res_str = "".join(out_parts)

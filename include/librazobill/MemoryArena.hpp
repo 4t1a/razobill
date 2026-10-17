@@ -60,7 +60,7 @@ public:
             const std::size_t alignedAddr = (currentAddr + alignment - 1) & ~(alignment - 1);
             const std::size_t padding = alignedAddr - currentAddr;
 
-            if (offset_ + padding + bytes <= cur.capacity) [[likely]] {
+            if (bytes <= cur.capacity && offset_ + padding <= cur.capacity - bytes) [[likely]] {
                 offset_ += padding + bytes;
                 return reinterpret_cast<void*>(alignedAddr);
             }
@@ -96,7 +96,21 @@ public:
         if (!newBlock) [[unlikely]]
             throw std::bad_alloc();
 
+        struct BlockGuard {
+            void* ptr;
+            ~BlockGuard() {
+                if (ptr) {
+#if defined(_MSC_VER) || defined(__MINGW32__)
+                    _aligned_free(ptr);
+#else
+                    free(ptr);
+#endif
+                }
+            }
+        } guard{newBlock};
+
         blocks_.push_back({newBlock, required});
+        guard.ptr = nullptr; // Disarm on successful vector push_back
         currentBlockIdx_ = blocks_.size() - 1;
 
         const std::size_t baseAddr = reinterpret_cast<std::size_t>(newBlock);
@@ -106,6 +120,8 @@ public:
     }
 
     template <typename T, typename... Args> [[nodiscard]] T* create(Args&&... args) {
+        static_assert(std::is_trivially_destructible_v<T>,
+                      "MemoryArena::create only supports trivially destructible types (destructors are not called on reset)");
         void* mem = allocate(sizeof(T), alignof(T));
         return ::new (mem) T(std::forward<Args>(args)...);
     }

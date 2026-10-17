@@ -443,53 +443,61 @@ private:
 } // namespace
 
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info, struct duckdb_extension_access*) {
-    Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT), ubigint(DUCKDB_TYPE_UBIGINT);
-    Type any(DUCKDB_TYPE_ANY);
-    Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob);
+    try {
+        Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT), ubigint(DUCKDB_TYPE_UBIGINT);
+        Type any(DUCKDB_TYPE_ANY);
+        Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob);
 
-    std::vector<const char*> structNames = {"template", "ints", "strs"};
-    std::vector<duckdb_logical_type> structTypesVarchar = {varchar.t, bigintList.t, varcharList.t};
-    std::vector<duckdb_logical_type> structTypesBlob = {blob.t, bigintList.t, blobList.t};
-    Type splitStructVarchar = Type::structOf(structNames, structTypesVarchar);
-    Type splitStructBlob = Type::structOf(structNames, structTypesBlob);
+        std::vector<const char*> structNames = {"template", "ints", "strs"};
+        std::vector<duckdb_logical_type> structTypesVarchar = {varchar.t, bigintList.t, varcharList.t};
+        std::vector<duckdb_logical_type> structTypesBlob = {blob.t, bigintList.t, blobList.t};
+        Type splitStructVarchar = Type::structOf(structNames, structTypesVarchar);
+        Type splitStructBlob = Type::structOf(structNames, structTypesBlob);
 
-    bool ok = true;
+        bool ok = true;
 
-    // 1. RzSplit(line) -> STRUCT(template, ints, strs)
-    FunctionSet splitSet("RzSplit");
-    splitSet.add({varchar.t}, splitStructVarchar.t, guarded<RzSplitImpl>);
-    splitSet.add({blob.t}, splitStructBlob.t, guarded<RzSplitImpl>);
-    ok = ok && splitSet.registerSet(connection);
+        // 1. RzSplit(line) -> STRUCT(template, ints, strs)
+        FunctionSet splitSet("RzSplit");
+        splitSet.add({varchar.t}, splitStructVarchar.t, guarded<RzSplitImpl>);
+        splitSet.add({blob.t}, splitStructBlob.t, guarded<RzSplitImpl>);
+        ok = ok && splitSet.registerSet(connection);
 
-    // 2. RzJoin(template, ints, strs) -> VARCHAR / BLOB (also supports varargs)
-    FunctionSet joinSet("RzJoin");
-    joinSet.add({varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<RzJoinImpl>);
-    joinSet.add({blob.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
-    joinSet.add({blob.t, bigintList.t, varcharList.t}, blob.t, guarded<RzJoinImpl>);
-    joinSet.add({varchar.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
-    joinSet.addVarargs(varchar.t, any.t, varchar.t, guarded<RzJoinImpl>);
-    joinSet.addVarargs(blob.t, any.t, blob.t, guarded<RzJoinImpl>);
-    ok = ok && joinSet.registerSet(connection);
+        // 2. RzJoin(template, ints, strs) -> VARCHAR / BLOB (also supports varargs)
+        FunctionSet joinSet("RzJoin");
+        joinSet.add({varchar.t, bigintList.t, varcharList.t}, varchar.t, guarded<RzJoinImpl>);
+        joinSet.add({blob.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
+        joinSet.add({blob.t, bigintList.t, varcharList.t}, blob.t, guarded<RzJoinImpl>);
+        joinSet.add({varchar.t, bigintList.t, blobList.t}, blob.t, guarded<RzJoinImpl>);
+        joinSet.addVarargs(varchar.t, any.t, varchar.t, guarded<RzJoinImpl>);
+        joinSet.addVarargs(blob.t, any.t, blob.t, guarded<RzJoinImpl>);
+        ok = ok && joinSet.registerSet(connection);
 
-    // 3. RzTemplate(line) -> VARCHAR / BLOB
-    FunctionSet tmplSet("RzTemplate");
-    tmplSet.add({varchar.t}, varchar.t, guarded<RzTemplateImpl>);
-    tmplSet.add({blob.t}, blob.t, guarded<RzTemplateImpl>);
-    ok = ok && tmplSet.registerSet(connection);
+        // 3. RzTemplate(line) -> VARCHAR / BLOB
+        FunctionSet tmplSet("RzTemplate");
+        tmplSet.add({varchar.t}, varchar.t, guarded<RzTemplateImpl>);
+        tmplSet.add({blob.t}, blob.t, guarded<RzTemplateImpl>);
+        ok = ok && tmplSet.registerSet(connection);
 
-    // 4. RzHash(line) -> UBIGINT
-    FunctionSet hashSet("RzHash");
-    hashSet.add({varchar.t}, ubigint.t, guarded<RzHashImpl>);
-    hashSet.add({blob.t}, ubigint.t, guarded<RzHashImpl>);
-    ok = ok && hashSet.registerSet(connection);
+        // 4. RzHash(line) -> UBIGINT
+        FunctionSet hashSet("RzHash");
+        hashSet.add({varchar.t}, ubigint.t, guarded<RzHashImpl>);
+        hashSet.add({blob.t}, ubigint.t, guarded<RzHashImpl>);
+        ok = ok && hashSet.registerSet(connection);
 
-    return ok;
+        return ok;
+    } catch (...) {
+        return false;
+    }
 }
 
 // Dual-entrypoint alias: allows loading via both 'LOAD razobill;' and 'LOAD librazobill;'
 DUCKDB_EXTENSION_EXTERN_C_GUARD_OPEN
 DUCKDB_CAPI_ENTRY_VISIBILITY DUCKDB_EXTENSION_API bool librazobill_init_c_api(duckdb_extension_info info,
                                                                               struct duckdb_extension_access* access) {
-    return razobill_init_c_api(info, access);
+    try {
+        return razobill_init_c_api(info, access);
+    } catch (...) {
+        return false;
+    }
 }
 DUCKDB_EXTENSION_EXTERN_C_GUARD_CLOSE

@@ -68,33 +68,33 @@ flowchart TD
 
 *Goal: Eliminate all use-after-free, undefined behaviors, unsequenced operations, and potential crash vectors.*
 
-- [ ] **Step 1.1: Fix C ABI Pointer Validation & Span Construction UB**
+- [x] **Step 1.1: Fix C ABI Pointer Validation & Span Construction UB**
   - **File:** [src/RazobillC.cpp:85–94](file:///C:/FM/rzd/razobill/src/RazobillC.cpp#L85-L94)
   - **Action:** Guard against `(nullptr, count > 0)` in `std::span`. Explicitly reject `strCount > 0` with null `strValues` or null `strLengths`.
     ```cpp
     if (record->intCount > 0 && !record->intValues) return RZ_ERR_INVALID_ARGUMENT;
     if (record->strCount > 0 && (!record->strValues || !record->strLengths)) return RZ_ERR_INVALID_ARGUMENT;
     ```
-- [ ] **Step 1.2: Remediate `MemoryArena` Fast-Path Integer Overflow**
+- [x] **Step 1.2: Remediate `MemoryArena` Fast-Path Integer Overflow**
   - **File:** [include/librazobill/MemoryArena.hpp:57–67](file:///C:/FM/rzd/razobill/include/librazobill/MemoryArena.hpp#L57-L67)
   - **Action:** Prevent `std::size_t` wrap-around in `offset_ + padding + bytes <= cur.capacity` by using safe headroom checks:
     ```cpp
     if (bytes <= cur.capacity && offset_ + padding <= cur.capacity - bytes)
     ```
-- [ ] **Step 1.3: Enforce Destructor Type Safety in `MemoryArena::create<T>()`**
+- [x] **Step 1.3: Enforce Destructor Type Safety in `MemoryArena::create<T>()`**
   - **File:** [include/librazobill/MemoryArena.hpp:108–111](file:///C:/FM/rzd/razobill/include/librazobill/MemoryArena.hpp#L108-L111)
   - **Action:** Add compile-time assertion preventing silent resource leaks of non-trivial objects:
     ```cpp
     static_assert(std::is_trivially_destructible_v<T>,
                   "MemoryArena::create only supports trivially destructible types");
     ```
-- [ ] **Step 1.4: Fix Memory Leak on Vector Reallocation in `MemoryArena`**
+- [x] **Step 1.4: Fix Memory Leak on Vector Reallocation in `MemoryArena`**
   - **File:** [include/librazobill/MemoryArena.hpp:99](file:///C:/FM/rzd/razobill/include/librazobill/MemoryArena.hpp#L99)
   - **Action:** Wrap raw pointer `newBlock` in a local RAII guard before invoking `blocks_.push_back()`.
-- [ ] **Step 1.5: Secure `ThreadPool::parallelFor` Against Lifetime Escapes**
+- [x] **Step 1.5: Secure `ThreadPool::parallelFor` Against Lifetime Escapes**
   - **File:** [include/librazobill/ThreadPool.hpp:131–136](file:///C:/FM/rzd/razobill/include/librazobill/ThreadPool.hpp#L131-L136)
   - **Action:** Wrap task submission in a `try...catch` block that waits for all launched futures to settle before propagating exceptions, eliminating use-after-free of stack-captured functors.
-- [ ] **Step 1.6: Fix Unsequenced Argument Evaluation Hazard in `FormCatalog`**
+- [x] **Step 1.6: Fix Unsequenced Argument Evaluation Hazard in `FormCatalog`**
   - **File:** [include/librazobill/FormCatalog.hpp:111–113](file:///C:/FM/rzd/razobill/include/librazobill/FormCatalog.hpp#L111-L113)
   - **Action:** Decouple key insertion from move:
     ```cpp
@@ -103,7 +103,7 @@ flowchart TD
     auto inserted = formsByKey_.emplace(keyStr, std::move(entry));
     formsById_.push_back(&inserted.first->second);
     ```
-- [ ] **Step 1.7: Wrap `DUCKDB_EXTENSION_ENTRYPOINT` in Exception Boundary**
+- [x] **Step 1.7: Wrap `DUCKDB_EXTENSION_ENTRYPOINT` in Exception Boundary**
   - **File:** [ext/duckdb/DuckdbExtension.cpp:445–487](file:///C:/FM/rzd/razobill/ext/duckdb/DuckdbExtension.cpp#L445-L487)
   - **Action:** Wrap extension registration logic in `try ... catch (const std::exception& e)` and return `false` on failure, preventing C++ exceptions from escaping across the DuckDB C ABI.
 

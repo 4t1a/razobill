@@ -125,14 +125,29 @@ public:
         std::vector<std::future<void>> futures;
         futures.reserve(numChunks);
 
-        for (std::size_t chunkIdx = 0; chunkIdx < numChunks; ++chunkIdx) {
-            std::size_t start = chunkIdx * chunkSize;
-            std::size_t end = std::min(start + chunkSize, total);
-            futures.push_back(submit([&fn, start, end]() { fn(start, end); }));
+        std::exception_ptr firstException = nullptr;
+        try {
+            for (std::size_t chunkIdx = 0; chunkIdx < numChunks; ++chunkIdx) {
+                std::size_t start = chunkIdx * chunkSize;
+                std::size_t end = std::min(start + chunkSize, total);
+                futures.push_back(submit([&fn, start, end]() { fn(start, end); }));
+            }
+        } catch (...) {
+            firstException = std::current_exception();
         }
 
         for (auto& fut : futures) {
-            fut.get();
+            try {
+                fut.get();
+            } catch (...) {
+                if (!firstException) {
+                    firstException = std::current_exception();
+                }
+            }
+        }
+
+        if (firstException) {
+            std::rethrow_exception(firstException);
         }
     }
 

@@ -100,16 +100,18 @@ public:
             collisionCount_++;
         }
 
+        const std::string keyStr(key);
+
         FormEntry entry;
         entry.id = static_cast<std::uint32_t>(formsByKey_.size() + 1);
         entry.hash = explicitHash;
-        entry.key = std::string(key);
+        entry.key = keyStr;
         entry.templateStr = std::string(tmpl);
         entry.intSlots = numInts;
         entry.strSlots = numStrs;
 
-        hashToKeys_[explicitHash].push_back(entry.key);
-        auto inserted = formsByKey_.emplace(entry.key, std::move(entry));
+        hashToKeys_[explicitHash].push_back(keyStr);
+        auto inserted = formsByKey_.emplace(keyStr, std::move(entry));
         formsById_.push_back(&inserted.first->second);
         return inserted.first->second.id;
     }

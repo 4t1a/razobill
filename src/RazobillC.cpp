@@ -79,16 +79,21 @@ RZ_API RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* out
 RZ_API RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength) {
     if (!record) return RZ_ERR_INVALID_ARGUMENT;
     if (!record->templateStr && record->templateLength > 0) return RZ_ERR_INVALID_ARGUMENT;
+    if (record->intCount > 0 && !record->intValues) return RZ_ERR_INVALID_ARGUMENT;
+    if (record->strCount > 0 && (!record->strValues || !record->strLengths)) return RZ_ERR_INVALID_ARGUMENT;
 
     try {
         const std::string_view tmplView(record->templateStr ? record->templateStr : "", record->templateLength);
-        std::span<const int64_t> intSpan(record->intValues ? record->intValues : nullptr, record->intCount);
+        std::span<const int64_t> intSpan;
+        if (record->intCount > 0) {
+            intSpan = std::span<const int64_t>(record->intValues, record->intCount);
+        }
 
         std::vector<std::string_view> strViews;
         strViews.reserve(record->strCount);
         for (size_t i = 0; i < record->strCount; ++i) {
-            const char* sPtr = record->strValues ? record->strValues[i] : nullptr;
-            const size_t sLen = record->strLengths ? record->strLengths[i] : 0;
+            const char* sPtr = record->strValues[i];
+            const size_t sLen = record->strLengths[i];
             if (!sPtr && sLen > 0) return RZ_ERR_INVALID_ARGUMENT;
             strViews.emplace_back(sPtr ? sPtr : "", sLen);
         }

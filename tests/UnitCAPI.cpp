@@ -128,6 +128,25 @@ TEST_CASE("Universal C ABI: Edge cases, empty string, errors and metadata") {
     CHECK(std::string(RzStatusMessage(RZ_OK)) == "Success");
     CHECK(std::string(RzStatusMessage(RZ_ERR_BUFFER_TOO_SMALL)).find("insufficient") != std::string::npos);
 
+    // Defensive pointer validation: count > 0 with null pointer must return RZ_ERR_INVALID_ARGUMENT
+    RzRecord invalidRecord{};
+    invalidRecord.templateStr = "test {i}";
+    invalidRecord.templateLength = 8;
+    invalidRecord.intCount = 1;
+    invalidRecord.intValues = nullptr; // Invalid!
+    CHECK(RzJoin(&invalidRecord, emptyBuf, sizeof(emptyBuf), &emptyLen) == RZ_ERR_INVALID_ARGUMENT);
+
+    invalidRecord.intCount = 0;
+    invalidRecord.strCount = 1;
+    invalidRecord.strValues = nullptr; // Invalid!
+    invalidRecord.strLengths = nullptr;
+    CHECK(RzJoin(&invalidRecord, emptyBuf, sizeof(emptyBuf), &emptyLen) == RZ_ERR_INVALID_ARGUMENT);
+
+    const char* dummyStr = "hello";
+    invalidRecord.strValues = &dummyStr;
+    invalidRecord.strLengths = nullptr; // Invalid!
+    CHECK(RzJoin(&invalidRecord, emptyBuf, sizeof(emptyBuf), &emptyLen) == RZ_ERR_INVALID_ARGUMENT);
+
     // Version
     CHECK(std::string(RzVersion()) == "1.1.2");
 }
