@@ -508,3 +508,57 @@ TEST_CASE("binary BLOB support in DuckDB: exact round-trip over invalid UTF-8 by
                                 .i64(0, 0);
     CHECK(mismatches == 0);
 }
+
+TEST_CASE("control plane: config synchronization, transactional atomicity and batch todo") {
+    if (!duckdbAvailable()) {
+        MESSAGE("Skipping DuckDB test: DuckDB driver not present");
+        return;
+    }
+    auto b = open();
+    b->exec("CREATE TABLE ctrl_test(id INTEGER, log_msg VARCHAR, level VARCHAR)");
+    b->exec("INSERT INTO ctrl_test VALUES "
+            "(1, 'Disk full on /dev/sda1 (capacity 98 percent)', 'ERROR'), "
+            "(2, 'Disk full on /dev/sdb1 (capacity 95 percent)', 'ERROR'), "
+            "(3, 'Connection timeout after 30 seconds', 'WARN'), "
+            "(4, 'User root login successful', 'INFO')");
+
+    // Test config precedence and snake_case synchronization
+    RazobillEngine rz(*b, {
+        .table = "ctrl_logs",
+        .purpose = "level",
+        .message_column = "log_msg",
+        .scan_mode = core::ScanMode::Semantic
+    });
+
+    const auto rows = rz.compact("ctrl_test");
+    CHECK(rows == 4);
+    CHECK(rz.verify("ctrl_test") == 0);
+
+    // Verify batched todo() functionality
+    const auto todoList = rz.todo(10);
+    CHECK(!todoList.empty());
+    for (const auto& [tmpl, count] : todoList) {
+        CHECK(!tmpl.empty());
+        CHECK(count > 0);
+    }
+
+    // Verify transactional define(), retire(), and pin()
+    const auto d1 = rz.define("DISK_ALERT", "Disk full on <*>", 1.0, /*force=*/true);
+    CHECK(d1.version == 1);
+    CHECK(rz.version() == 1);
+
+    const auto d2 = rz.define("NET_TIMEOUT", "Connection timeout after <*>", 1.0, /*force=*/true);
+    CHECK(d2.version == 2);
+    CHECK(rz.version() == 2);
+
+    // Pin to version 1
+    rz.pin(1);
+    CHECK(rz.version() == 1);
+
+    // Retire meaning
+    rz.pin(2);
+    const auto v3 = rz.retire("DISK_ALERT");
+    CHECK(v3 == 3);
+    CHECK(rz.version() == 3);
+}
+

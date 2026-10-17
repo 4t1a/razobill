@@ -184,44 +184,44 @@ flowchart TD
 
 *Goal: Eliminate N+1 query loops, triple UDF evaluations, SQL NULL hazards, and OS resource leaks.*
 
-- [ ] **Step 4.1: Clean Dead Code & Fix Config Precedence**
+- [x] **Step 4.1: Clean Dead Code & Fix Config Precedence**
   - **File:** [src/Razobill.cpp:101–105](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L101-L105)
   - **Action:** Remove line 101. Establish canonical config precedence for `messageColumn` and synchronize `scan_mode` with `scanMode`.
-- [ ] **Step 4.2: Replace `std::regex` with Branchless Column Classifier**
+- [x] **Step 4.2: Replace `std::regex` with Branchless Column Classifier**
   - **File:** [src/Razobill.cpp:81–85](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L81-L85)
   - **Action:** Replace `kReserved` regex with direct prefix (`starts_with("rb_")`) and character checks, accelerating column reflection by 10–100×.
-- [ ] **Step 4.3: Remediate ANSI SQL Three-Valued Logic NULL Trap**
+- [x] **Step 4.3: Remediate ANSI SQL Three-Valued Logic NULL Trap**
   - **File:** [src/Razobill.cpp:164, 247, 328](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L164)
   - **Action:** Replace `WHERE form NOT IN (SELECT form FROM rb_form)` with `WHERE NOT EXISTS (SELECT 1 FROM rb_form f WHERE f.form = t.form)` or append `WHERE form IS NOT NULL`.
-- [ ] **Step 4.4: Factor Triple `RzSplit` Scalar Calls into CTE**
+- [x] **Step 4.4: Factor Triple `RzSplit` Scalar Calls into CTE**
   - **File:** [src/Razobill.cpp:232–233](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L232-L233)
   - **Action:** Rewrite table creation into a Common Table Expression (CTE):
     ```sql
     WITH parsed AS (SELECT *, RzSplit(msg) AS r FROM source)
     SELECT other_cols, r.template AS rbf, r.ints AS rbi, r.strs AS rbs FROM parsed
     ```
-- [ ] **Step 4.5: Eliminate N+1 SQL Queries in `todo()`**
+- [x] **Step 4.5: Eliminate N+1 SQL Queries in `todo()`**
   - **File:** [src/Razobill.cpp:615–616](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L615-L616)
   - **Action:** Batch ID lookups into a single `SELECT id, template FROM rb_form WHERE id IN (...)` query and handle missing entries safely.
-- [ ] **Step 4.6: Wrap Control-Plane Operations in RAII Transactions**
+- [x] **Step 4.6: Wrap Control-Plane Operations in RAII Transactions**
   - **File:** [src/Razobill.cpp:205–281, 472–541](file:///C:/FM/rzd/razobill/src/Razobill.cpp#L205-L281)
   - **Action:** Introduce an RAII `TransactionGuard` managing `BEGIN TRANSACTION` and `COMMIT` on scope exit, rolling back on exception.
-- [ ] **Step 4.7: Release `AdbcError` Buffers Before Throwing**
+- [x] **Step 4.7: Release `AdbcError` Buffers Before Throwing**
   - **File:** [src/BackendAdbc.cpp:73–77](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L73-L77)
   - **Action:** In `fail()`, invoke `if (e.release) e.release(&e);` before throwing `BackendError`.
-- [ ] **Step 4.8: Add RAII Unloading for Shared Library Handles in `AdbcBackend`**
+- [x] **Step 4.8: Add RAII Unloading for Shared Library Handles in `AdbcBackend`**
   - **File:** [src/BackendAdbc.cpp:142, 165–170](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L142)
   - **Action:** In `~AdbcBackend()`, call `FreeLibrary` (Windows) or `dlclose` (POSIX) on `lib_` and all preloaded libraries.
-- [ ] **Step 4.9: Add `std::mutex connMutex_` to `AdbcBackend`**
+- [x] **Step 4.9: Add `std::mutex connMutex_` to `AdbcBackend`**
   - **File:** [src/BackendAdbc.cpp:171–247](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L171-L247)
   - **Action:** Protect `run()` with `std::scoped_lock lock(connMutex_);` to guarantee thread safety under concurrent usage.
-- [ ] **Step 4.10: Fix Decimal-128 Two's Complement Cancellation Defect**
+- [x] **Step 4.10: Fix Decimal-128 Two's Complement Cancellation Defect**
   - **File:** [src/BackendAdbc.cpp:109–119](file:///C:/FM/rzd/razobill/src/BackendAdbc.cpp#L109-L119)
   - **Action:** Handle high-order signed bit conversion correctly using two's complement sign-extension, preventing negative values from decoding to zero.
-- [ ] **Step 4.11: Fix `ClickHouseDialect::templateExpr` Index Underflow**
+- [x] **Step 4.11: Fix `ClickHouseDialect::templateExpr` Index Underflow**
   - **File:** [src/Dialect.cpp:88–91](file:///C:/FM/rzd/razobill/src/Dialect.cpp#L88-L91)
   - **Action:** Guard substring extraction with `if(position(s, char(19)) > 0, substring(s, 1, position(s, char(19)) - 1), s)`.
-- [ ] **Step 4.12: Eliminate Magic Bytes in Dialects & Add String Reservation**
+- [x] **Step 4.12: Eliminate Magic Bytes in Dialects & Add String Reservation**
   - **File:** [src/Dialect.cpp:60–67, 82–85](file:///C:/FM/rzd/razobill/src/Dialect.cpp#L60-L67)
   - **Action:** Reference `kPlaceholder` and `kTypeSeparator` constants. Add `reserve()` in `ClickHouseDialect::quote`.
 

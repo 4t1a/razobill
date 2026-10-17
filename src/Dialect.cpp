@@ -11,12 +11,15 @@
 //
 // We encapsulate these differences behind `Dialect` so higher-level pipelines stay pure
 // across disparate relational and distributed analytical database backends.
+#include "librazobill/Scanner.hpp"
+
 namespace razobill {
 
 namespace {
 
 constexpr std::string_view kTokenRegex = R"([^\s=,;:()\[\]{}"'<>|/]*[0-9][^\s=,;:()\[\]{}"'<>|/]*)";
 constexpr std::string_view kIntRegex = "^(0|[1-9][0-9]{0,17})$";
+constexpr unsigned char kControlReserved17 = 0x11;
 
 class DuckDialect final : public Dialect {
 public:
@@ -58,12 +61,15 @@ public:
     bool supportsCompact() const noexcept override { return false; }
     bool denseFormKey() const noexcept override { return false; }
     std::string quote(std::string_view s) const override {
-        std::string o = "'";
+        std::string o;
+        o.reserve(s.size() + 16);
+        o.push_back('\'');
         for (char c : s) {
             if (c == '\\' || c == '\'') o.push_back('\\');
             o.push_back(c);
         }
-        return o + "'";
+        o.push_back('\'');
+        return o;
     }
     std::string tU64() const override { return "UInt64"; }
     std::string tI32() const override { return "Int32"; }
@@ -79,15 +85,21 @@ public:
     }
     std::string formExpr(std::string_view col, core::ScanMode /*mode*/ = core::ScanMode::Semantic) const override {
         const std::string c(col), tok = quote(kTokenRegex), ints = quote(kIntRegex);
-        return "if(position(" + c + ", char(17)) > 0 OR position(" + c + ", char(18)) > 0 OR position(" + c +
-               ", char(19)) > 0, concat(char(18), char(19), 'S'), concat(replaceRegexpAll(" + c + ", " + tok +
-               ", char(18)), char(19), arrayStringConcat(arrayMap(t -> if(match(t, " + ints +
+        const std::string ch17 = "char(" + std::to_string(static_cast<int>(kControlReserved17)) + ")";
+        const std::string ch18 = "char(" + std::to_string(static_cast<int>(core::kPlaceholder)) + ")";
+        const std::string ch19 = "char(" + std::to_string(static_cast<int>(core::kTypeSeparator)) + ")";
+        return "if(position(" + c + ", " + ch17 + ") > 0 OR position(" + c + ", " + ch18 + ") > 0 OR position(" + c +
+               ", " + ch19 + ") > 0, concat(" + ch18 + ", " + ch19 + ", 'S'), concat(replaceRegexpAll(" + c + ", " + tok +
+               ", " + ch18 + "), " + ch19 + ", arrayStringConcat(arrayMap(t -> if(match(t, " + ints +
                "), 'I', 'S'), extractAll(" + c + ", " + tok + ")))))";
     }
     std::string hashExpr(std::string_view t) const override { return "xxHash64(" + std::string(t) + ")"; }
     std::string templateExpr(std::string_view f) const override {
         const std::string s(f);
-        return "replaceAll(substring(" + s + ", 1, position(" + s + ", char(19)) - 1), char(18), '<*>')";
+        const std::string ch18 = "char(" + std::to_string(static_cast<int>(core::kPlaceholder)) + ")";
+        const std::string ch19 = "char(" + std::to_string(static_cast<int>(core::kTypeSeparator)) + ")";
+        return "if(position(" + s + ", " + ch19 + ") > 0, replaceAll(substring(" + s + ", 1, position(" + s +
+               ", " + ch19 + ") - 1), " + ch18 + ", '<*>'), replaceAll(" + s + ", " + ch18 + ", '<*>'))";
     }
     std::string truncate(std::string_view t) const override { return "TRUNCATE TABLE " + std::string(t); }
 };

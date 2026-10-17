@@ -7,7 +7,9 @@
 
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "adbc.h"
 #include "librazobill/Backend.hpp"
@@ -42,6 +44,15 @@ void* sysLoadLibrary(const char* path, bool deepbind, bool global) {
 #endif
 }
 
+void sysUnloadLibrary(void* handle) {
+    if (!handle) return;
+#if defined(_WIN32)
+    FreeLibrary(reinterpret_cast<HMODULE>(handle));
+#else
+    dlclose(handle);
+#endif
+}
+
 void* sysLoadSymbol(void* handle, const char* symbol) {
 #if defined(_WIN32)
     return reinterpret_cast<void*>(GetProcAddress(reinterpret_cast<HMODULE>(handle), symbol));
@@ -70,9 +81,12 @@ std::string sysLastError() {
 #endif
 }
 
-[[noreturn]] void fail(std::string_view what, const AdbcError& e) {
+[[noreturn]] void fail(std::string_view what, AdbcError& e) {
     std::string m(what);
     if (e.message) m += std::string(": ") + e.message;
+    if (e.release) {
+        e.release(&e);
+    }
     throw BackendError(m);
 }
 
@@ -112,7 +126,16 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
         if (bits != 128) throw BackendError(std::string("unsupported decimal width: ") + fmt);
         const auto* w = static_cast<const std::uint64_t*>(a->buffers[1]) + 2 * (i + a->offset);
         const auto hi = static_cast<std::int64_t>(w[1]);
-        double v = static_cast<double>(hi) * 18446744073709551616.0 + static_cast<double>(w[0]);
+        double v = 0.0;
+        if (hi < 0) {
+            const std::uint64_t uhi = static_cast<std::uint64_t>(hi);
+            const std::uint64_t magLo = (w[0] == 0) ? 0ULL : (~w[0] + 1ULL);
+            const std::uint64_t magHi = (w[0] == 0) ? (0ULL - uhi) : ~uhi;
+            const double mag = static_cast<double>(magHi) * 18446744073709551616.0 + static_cast<double>(magLo);
+            v = -mag;
+        } else {
+            v = static_cast<double>(hi) * 18446744073709551616.0 + static_cast<double>(w[0]);
+        }
         for (int k = 0; k < scale; ++k)
             v /= 10.0;
         return v;
@@ -135,9 +158,11 @@ public:
     explicit AdbcBackend(const AdbcOptions& o) : flavor_(o.flavor) {
         const auto& preloads = !o.preloadGlobal.empty() ? o.preloadGlobal : o.preload_global;
         for (const auto& lib : preloads) {
-            if (!sysLoadLibrary(lib.c_str(), /*deepbind=*/false, /*global=*/true)) {
+            void* h = sysLoadLibrary(lib.c_str(), /*deepbind=*/false, /*global=*/true);
+            if (!h) {
                 throw BackendError("preload failed: " + sysLastError());
             }
+            preloadHandles_.push_back(h);
         }
         const std::string driverPath = !o.driverPath.empty() ? o.driverPath : o.driver_path;
         lib_ = sysLoadLibrary(driverPath.c_str(), o.deepbind, /*global=*/false);
@@ -166,6 +191,14 @@ public:
         AdbcError err{};
         if (have_conn_) driver_.ConnectionRelease(&conn_, &err);
         if (have_db_) driver_.DatabaseRelease(&db_, &err);
+        if (lib_) {
+            sysUnloadLibrary(lib_);
+            lib_ = nullptr;
+        }
+        for (void* h : preloadHandles_) {
+            sysUnloadLibrary(h);
+        }
+        preloadHandles_.clear();
     }
 
     Flavor flavor() const noexcept override { return flavor_; }
@@ -179,6 +212,7 @@ public:
 
 private:
     void run(std::string_view sql, Table* out) {
+        std::scoped_lock lock(connMutex_);
         AdbcError err{};
         AdbcStatement st{};
         if (driver_.StatementNew(&conn_, &st, &err) != ADBC_STATUS_OK) fail("StatementNew", err);
@@ -240,6 +274,8 @@ private:
 
     Flavor flavor_;
     void* lib_ = nullptr;
+    std::vector<void*> preloadHandles_;
+    mutable std::mutex connMutex_;
     AdbcDriver driver_{};
     AdbcDatabase db_{};
     AdbcConnection conn_{};
