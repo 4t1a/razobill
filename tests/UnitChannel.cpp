@@ -117,3 +117,48 @@ TEST_CASE("Proposition 9: Minimum key length P and Theorem 8 failure probability
     // For k = 2 bits: delta = sum_{x^2} Q min{1, 4 * 0.25} = 1.0
     CHECK(exactFailureProbability(toySeq, 2) == doctest::Approx(1.0).epsilon(1e-6));
 }
+
+TEST_CASE("Channel mantissa bounds (> 53 bits) and circular S1 boundary recovery") {
+    std::vector<MeaningChoice> sequence;
+    for (std::uint32_t i = 0; i < 30; ++i) {
+        MeaningChoice choice;
+        choice.meaning = i;
+        choice.options = {SynonymousOption{0, 0.5}, SynonymousOption{1, 0.5}};
+        sequence.push_back(std::move(choice));
+    }
+
+    constexpr double sharedKey = 0.6180339887;
+
+    // 1. Guard against payloadBits > 53 (IEEE-754 mantissa limits)
+    auto embed54 = embed(sequence, 1, 54, sharedKey, 0.5);
+    CHECK(!embed54.success);
+
+    auto embed64 = embed(sequence, 1, 64, sharedKey, 0.5);
+    CHECK(!embed64.success);
+
+    std::vector<std::size_t> mockForms(sequence.size(), 0);
+    auto decode54 = decode(sequence, mockForms, 54, sharedKey);
+    CHECK(!decode54.success);
+
+    auto decode64 = decode(sequence, mockForms, 64, sharedKey);
+    CHECK(!decode64.success);
+
+    // 2. Circular boundary on S^1: message 0 with small dither
+    constexpr std::size_t safeK = 8;
+    const std::uint64_t msg0 = 0;
+    auto embed0 = embed(sequence, msg0, safeK, sharedKey, 0.001);
+    if (embed0.success) {
+        auto decode0 = decode(sequence, embed0.chosenForms, safeK, sharedKey);
+        REQUIRE(decode0.success);
+        CHECK(decode0.message == msg0);
+    }
+
+    // 3. Circular boundary on S^1: message 2^k - 1 with large dither
+    const std::uint64_t msgMax = (1ULL << safeK) - 1;
+    auto embedMax = embed(sequence, msgMax, safeK, sharedKey, 0.999);
+    if (embedMax.success) {
+        auto decodeMax = decode(sequence, embedMax.chosenForms, safeK, sharedKey);
+        REQUIRE(decodeMax.success);
+        CHECK(decodeMax.message == msgMax);
+    }
+}

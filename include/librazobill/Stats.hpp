@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <span>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 

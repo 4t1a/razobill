@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -161,18 +162,23 @@ Ledger ledger(std::span<const Cell> cells, double totalEvents, double confidence
         joint[{c.form, c.meaning}] += c.mass;
         w[c.meaning] += c.mass;
         x[c.form] += c.mass;
-        xGivenW[c.meaning].push_back(c.mass);
-        wGivenX[c.form].push_back(c.mass);
         resolved.add(c.mass);
+    }
+
+    for (const auto& [fm, mass] : joint) {
+        if (mass <= 0.0) continue;
+        xGivenW[fm.second].push_back(mass);
+        wGivenX[fm.first].push_back(mass);
     }
 
     const double nTot = resolved.value();
     const double C = entropyOfMap(w);
     const double E = entropyOfMap(x);
     const double J = entropyOfMap(joint);
-    const double Lambda = std::max(J - C, 0.0);
-    const double Delta = std::max(J - E, 0.0);
-    const double I = std::max(C + E - J, 0.0);
+    const double J_bound = std::max(std::max(C, E), std::min(J, C + E));
+    const double Lambda = J_bound - C;
+    const double Delta = J_bound - E;
+    const double I = C + E - J_bound;
     const double distance = Lambda + Delta;
 
     // Perplexity / Effective vocabulary metrics (Corollary 2 & Section 2.1)

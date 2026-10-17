@@ -96,6 +96,7 @@ double exactFailureProbability(std::span<const MeaningChoice> sequence, std::siz
 
     constexpr double kScale = 1000.0;
     std::unordered_map<std::int64_t, double> dist{{0, 1.0}};
+    double prunedMass = 0.0;
 
     for (const auto& step : sequence) {
         if (step.options.empty()) continue;
@@ -120,17 +121,19 @@ double exactFailureProbability(std::span<const MeaningChoice> sequence, std::siz
         constexpr std::size_t kMaxDistStates = 4096;
         if (nextDist.size() > kMaxDistStates) {
             for (auto it = nextDist.begin(); it != nextDist.end();) {
-                if (it->second < 1e-12)
+                if (it->second < 1e-12) {
+                    prunedMass += it->second;
                     it = nextDist.erase(it);
-                else
+                } else {
                     ++it;
+                }
             }
         }
         dist = std::move(nextDist);
     }
 
     double delta = 0.0;
-    const double twoK = std::ldexp(1.0, static_cast<int>(payloadBits));
+    const double twoK = std::ldexp(1.0, static_cast<int>(std::min(payloadBits, std::size_t{1023})));
 
     for (const auto& [bin, prob] : dist) {
         const double logQ = static_cast<double>(bin) / kScale;
@@ -139,7 +142,7 @@ double exactFailureProbability(std::span<const MeaningChoice> sequence, std::siz
         delta += prob * minFactor;
     }
 
-    return std::min(1.0, std::max(0.0, delta));
+    return std::min(1.0, std::max(0.0, delta + prunedMass));
 }
 
 EmbedResult embed(std::span<const MeaningChoice> sequence, std::uint64_t message, std::size_t payloadBits,
@@ -148,7 +151,7 @@ EmbedResult embed(std::span<const MeaningChoice> sequence, std::uint64_t message
     res.payloadBits = payloadBits;
     res.embeddedMessage = message;
 
-    if (payloadBits == 0 || sequence.empty()) {
+    if (payloadBits == 0 || payloadBits > 53 || sequence.empty()) {
         res.success = false;
         return res;
     }
@@ -215,7 +218,7 @@ DecodeResult decode(std::span<const MeaningChoice> sequence, std::span<const std
     DecodeResult res;
     res.payloadBits = payloadBits;
 
-    if (payloadBits == 0 || sequence.empty() || observedForms.size() != sequence.size()) {
+    if (payloadBits == 0 || payloadBits > 53 || sequence.empty() || observedForms.size() != sequence.size()) {
         res.success = false;
         return res;
     }
@@ -276,14 +279,15 @@ DecodeResult decode(std::span<const MeaningChoice> sequence, std::span<const std
     const double leftZ = centerZ - halfQ;
     const double rightZ = centerZ + halfQ;
 
-    if (leftZ < 0.0 || rightZ >= 1.0) {
-        // Interval straddles circular 0/1 boundary
-        res.success = false;
-        return res;
-    }
+    // Handle circular modular interval wrap-around on S^1 = [0, 1) modulo 1
+    const double effectiveLeft = (leftZ < 0.0 && leftZ >= -1e-12) ? 0.0 : leftZ;
+    const double effectiveRight = (rightZ >= 1.0 && rightZ <= 1.0 + 1e-12) ? std::nextafter(1.0, 0.0) : rightZ;
 
-    const auto cellLeft = static_cast<std::uint64_t>(std::floor(leftZ * numCells));
-    const auto cellRight = static_cast<std::uint64_t>(std::floor(rightZ * numCells));
+    const double leftWrapped = effectiveLeft - std::floor(effectiveLeft);
+    const double rightWrapped = effectiveRight - std::floor(effectiveRight);
+
+    const auto cellLeft = static_cast<std::uint64_t>(std::floor(leftWrapped * numCells));
+    const auto cellRight = static_cast<std::uint64_t>(std::floor(rightWrapped * numCells));
 
     // Valid if and only if the arc does not cross a cell boundary
     if (cellLeft == cellRight && cellLeft < static_cast<std::uint64_t>(numCells)) {

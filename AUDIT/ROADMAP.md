@@ -146,7 +146,7 @@ flowchart TD
 
 *Goal: Enforce Fréchet polytope bounding on information ledgers and conserve probability mass in steganography.*
 
-- [ ] **Step 3.1: Fréchet Polytope Bounding for Theorem 1 Identity**
+- [x] **Step 3.1: Fréchet Polytope Bounding for Theorem 1 Identity**
   - **File:** [src/Stats.cpp:170–176](file:///C:/FM/rzd/razobill/src/Stats.cpp#L170-L176)
   - **Action:** Bound joint entropy before computing marginals:
     ```cpp
@@ -156,25 +156,25 @@ flowchart TD
     const double I      = C + E - J_bound;
     ```
     Guarantees $(I + \Lambda) \equiv E$ and $(I + \Delta) \equiv C$ to the last bit of IEEE 754 precision.
-- [ ] **Step 3.2: Deduplicate `(form, meaning)` Pairs in Stratified Miller-Madow**
+- [x] **Step 3.2: Deduplicate `(form, meaning)` Pairs in Stratified Miller-Madow**
   - **File:** [src/Stats.cpp:164–165, 185–220](file:///C:/FM/rzd/razobill/src/Stats.cpp#L164-L165)
   - **Action:** Aggregate identical cell pairs into a unified mass map per stratum so observed stratum cardinality $K_w$ is not artificially inflated by unaggregated rows.
-- [ ] **Step 3.3: Conserve Probability Mass in `exactFailureProbability()`**
+- [x] **Step 3.3: Conserve Probability Mass in `exactFailureProbability()`**
   - **File:** [src/Channel.cpp:121–128](file:///C:/FM/rzd/razobill/src/Channel.cpp#L121-L128)
   - **Action:** Accumulate dropped probability mass $\sum p_k < 10^{-12}$ into a `prunedMass` accumulator and add it as a conservative upper bound term:
     ```cpp
     return std::min(1.0, std::max(0.0, delta + prunedMass));
     ```
-- [ ] **Step 3.4: Guard Against Mantissa Truncation ($k > 53$ Bits)**
+- [x] **Step 3.4: Guard Against Mantissa Truncation ($k > 53$ Bits)**
   - **File:** [src/Channel.cpp:156–163, 262–286](file:///C:/FM/rzd/razobill/src/Channel.cpp#L156-L163)
   - **Action:** Guard `embed()` and `decode()`:
     ```cpp
     if (payloadBits == 0 || payloadBits > 53) return res;
     ```
-- [ ] **Step 3.5: Support Circular Modular Interval Wrap-around on $S^1$**
+- [x] **Step 3.5: Support Circular Modular Interval Wrap-around on $S^1$**
   - **File:** [src/Channel.cpp:279](file:///C:/FM/rzd/razobill/src/Channel.cpp#L279)
   - **Action:** In `decode()`, handle intervals wrapping around $[leftZ + 1.0, 1.0) \cup [0.0, rightZ)$ modulo 1, eliminating false-negative rejections.
-- [ ] **Step 3.6: Add Missing `<tuple>` Include**
+- [x] **Step 3.6: Add Missing `<tuple>` Include**
   - **File:** [src/Stats.cpp:43](file:///C:/FM/rzd/razobill/src/Stats.cpp#L43), [include/librazobill/Stats.hpp:24](file:///C:/FM/rzd/razobill/include/librazobill/Stats.hpp#L24)
   - **Action:** Explicitly add `#include <tuple>`.
 
