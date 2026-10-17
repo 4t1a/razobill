@@ -196,6 +196,14 @@ void RazobillEngine::detectLocked() {
         phys_ = view_ = t;
         ready_ = true;
     }
+    if (ready_) {
+        try {
+            if (db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0) > 0) {
+                hasCollision_ = true;
+            }
+        } catch (...) {
+        }
+    }
 }
 
 void RazobillEngine::requireReadyLocked() const {
@@ -225,13 +233,17 @@ std::size_t RazobillEngine::registerFormsLocked(const std::string& selectForms) 
              ", CAST((SELECT count(*) FROM rb_form) + row_number() OVER (ORDER BY form) - 1 AS " + d.tI32() +
              "), form, " + d.templateExpr("form") + " FROM (SELECT DISTINCT form FROM (" + selectForms +
              ") WHERE form IS NOT NULL AND form NOT IN (SELECT form FROM rb_form WHERE form IS NOT NULL))");
-    if (db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0) != 0)
-        throw std::runtime_error("form id collision: two different forms share one 64-bit hash");
+    const auto collisionCount =
+        db_.query("SELECT count(*) FROM (SELECT id FROM rb_form GROUP BY id HAVING count(*) > 1)").i64(0, 0);
+    if (collisionCount != 0) {
+        // Disambiguate 64-bit hash collision via dense 32-bit `no` foreign key (F-CONC-03)
+        hasCollision_ = true;
+    }
     return static_cast<std::size_t>(db_.query("SELECT count(*) FROM rb_form").i64(0, 0) - before);
 }
 
 std::string_view RazobillEngine::physKeyLocked() const {
-    return compact_ || dx_->denseFormKey() ? "form_no" : "form_id";
+    return compact_ || dx_->denseFormKey() || hasCollision_ ? "form_no" : "form_id";
 }
 
 std::size_t RazobillEngine::refresh() {
@@ -451,7 +463,7 @@ void RazobillEngine::compactDictionary() {
 
 void RazobillEngine::createViewsLocked() {
     const std::string join =
-        compact_ || dx_->denseFormKey()
+        compact_ || dx_->denseFormKey() || hasCollision_
             ? " LEFT JOIN rb_form f ON f.no = e.form_no LEFT JOIN rb_doubt d ON d.form_id = f.id"
             : " LEFT JOIN rb_form f ON f.id = e.form_id LEFT JOIN rb_doubt d ON d.form_id = e.form_id";
     db_.exec("CREATE OR REPLACE VIEW " + view_ +
@@ -533,7 +545,7 @@ std::vector<stats::XY> RazobillEngine::xyLocked(std::unordered_map<std::string, 
     const auto& d = *dx_;
     const std::string y = cfg_.purpose.empty() ? "'-'" : d.toText("e." + cfg_.purpose);
     std::string sql;
-    if (compact_ || d.denseFormKey())
+    if (compact_ || d.denseFormKey() || hasCollision_)
         sql = "SELECT f.id AS fid, " + y + " AS yv, count(*) AS n FROM " + phys_ +
               " e JOIN rb_form f ON f.no = e.form_no GROUP BY f.id, yv";
     else

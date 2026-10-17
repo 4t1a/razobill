@@ -44,28 +44,17 @@ namespace simd {
 enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx512 = 3 };
 
 // Branchless count-trailing-zeros for fast bitmask index location.
-// Uses hardware `tzcnt` / `bsf` on x86-64 or `rbit` + `clz` on ARM64.
-// Guarantees deterministic return of 64 on mask == 0 with zero undefined behavior.
+// Uses std::countr_zero from C++20 <bit> to guarantee branchless, UB-free
+// trailing zero extraction across x86-64 (tzcnt/bsf) and ARM64 (rbit+clz).
+// Returns 64 if mask == 0.
 [[nodiscard]] inline int countTrailingZeros64(std::uint64_t mask) noexcept {
-    if (mask == 0) [[unlikely]] {
-        return 64;
-    }
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_ctzll(mask);
-#elif defined(_MSC_VER)
-    unsigned long index;
-    if (_BitScanForward64(&index, mask)) {
-        return static_cast<int>(index);
-    }
-    return 64;
-#else
     return std::countr_zero(mask);
-#endif
 }
 
 /// Dynamically detects the available SIMD instruction set via runtime CPUID / feature checks.
 [[nodiscard]] inline SimdArchitecture detectSimdArchitecture() noexcept {
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(_M_X64))
+#if (defined(__x86_64__) || defined(_M_X64))
+#if defined(__GNUC__) || defined(__clang__)
     __builtin_cpu_init();
     if (__builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("avx512f")) {
         return SimdArchitecture::Avx512;
@@ -74,19 +63,36 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
         return SimdArchitecture::Avx2;
     }
     return SimdArchitecture::Scalar;
-#elif defined(_MSC_VER) && (defined(__x86_64__) || defined(_M_X64))
+#elif defined(_MSC_VER)
     int cpuInfo[4] = {0};
     __cpuid(cpuInfo, 0);
     const int nIds = cpuInfo[0];
+    if (nIds < 1) return SimdArchitecture::Scalar;
+
+    // Check OSXSAVE support (CPUID leaf 1, ECX bit 27)
+    __cpuid(cpuInfo, 1);
+    const bool osxsave = (cpuInfo[2] & (1 << 27)) != 0;
+    if (!osxsave) return SimdArchitecture::Scalar;
+
+    // Check if OS has enabled YMM state saving in XCR0 (bits 1 and 2: XMM and YMM)
+    const unsigned long long xcr0 = _xgetbv(0);
+    const bool ymmSupported = (xcr0 & 0x6) == 0x6;
+    if (!ymmSupported) return SimdArchitecture::Scalar;
+
     if (nIds >= 7) {
         __cpuidex(cpuInfo, 7, 0);
         const bool avx2 = (cpuInfo[1] & (1 << 5)) != 0;
         const bool avx512f = (cpuInfo[1] & (1 << 16)) != 0;
         const bool avx512bw = (cpuInfo[1] & (1 << 30)) != 0;
-        if (avx512f && avx512bw) return SimdArchitecture::Avx512;
+        // For AVX-512, check XCR0 bits 5, 6, 7 (opmask, ZMM_Hi256, Hi16_ZMM) -> mask 0xE6
+        const bool zmmSupported = (xcr0 & 0xE6) == 0xE6;
+        if (zmmSupported && avx512f && avx512bw) return SimdArchitecture::Avx512;
         if (avx2) return SimdArchitecture::Avx2;
     }
     return SimdArchitecture::Scalar;
+#else
+    return SimdArchitecture::Scalar;
+#endif
 #elif defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64)
     return SimdArchitecture::Neon;
 #elif defined(__AVX2__)
@@ -95,6 +101,11 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
     return SimdArchitecture::Scalar;
 #endif
 }
+
+namespace detail {
+/// Hoisted process-level SIMD architecture cache to eliminate magic static thread guard checks on hot path.
+inline const SimdArchitecture kSimdArch = detectSimdArchitecture();
+} // namespace detail
 
 // Forward declarations for multi-tier SIMD scanners
 [[nodiscard]] inline std::size_t findWhitespaceAvx2(const char* data, std::size_t length) noexcept;
@@ -236,8 +247,7 @@ inline std::size_t findWhitespaceAvx512(const char* data, std::size_t length) no
 /// Dynamic runtime function dispatcher: automatically selects the best SIMD implementation
 /// for the current host CPU at runtime without crashing.
 [[nodiscard]] inline std::size_t findWhitespaceDynamic(const char* data, std::size_t length) noexcept {
-    static const SimdArchitecture arch = detectSimdArchitecture();
-    switch (arch) {
+    switch (detail::kSimdArch) {
     case SimdArchitecture::Avx512:
         return findWhitespaceAvx512(data, length);
     case SimdArchitecture::Avx2:

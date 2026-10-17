@@ -31,15 +31,41 @@ inline razobill::AdbcOptions duckdbOptions() {
     o.flavor = razobill::Flavor::DuckDB;
 #if defined(_WIN32)
     const char* defLib = "duckdb.dll";
-    const char* forkeLib = "C:/Users/Forke/AppData/Roaming/Python/Python313/site-packages/_duckdb.cp313-win_amd64.pyd";
     const char* defExt = "build/librazobill.duckdb_extension";
-    const char* chosenLib = defLib;
-    if (std::getenv("RZB_DUCKDB_LIB")) {
-        chosenLib = std::getenv("RZB_DUCKDB_LIB");
-    } else {
-        std::error_code ec;
-        if (std::filesystem::exists(forkeLib, ec)) {
-            chosenLib = forkeLib;
+    std::string chosenLib = env("RZB_DUCKDB_LIB", defLib);
+    std::error_code ec;
+    if (!std::filesystem::exists(chosenLib, ec) && !std::getenv("RZB_DUCKDB_LIB")) {
+        const std::array<const char*, 4> candidateDirs = {"build", "build/Release", "build/Debug", "bin"};
+        for (const char* dir : candidateDirs) {
+            auto candidate = std::filesystem::path(dir) / defLib;
+            if (std::filesystem::exists(candidate, ec)) {
+                chosenLib = candidate.string();
+                break;
+            }
+        }
+        if (!std::filesystem::exists(chosenLib, ec)) {
+            const char* appData = std::getenv("APPDATA");
+            if (appData) {
+                const std::filesystem::path pyDir = std::filesystem::path(appData) / "Python";
+                if (std::filesystem::exists(pyDir, ec)) {
+                    for (const auto& pyVer : std::filesystem::directory_iterator(pyDir, ec)) {
+                        if (pyVer.is_directory(ec)) {
+                            const auto sitePkg = pyVer.path() / "site-packages";
+                            if (std::filesystem::exists(sitePkg, ec)) {
+                                for (const auto& entry : std::filesystem::directory_iterator(sitePkg, ec)) {
+                                    const auto name = entry.path().filename().string();
+                                    if (name.find("_duckdb") != std::string::npos &&
+                                        (name.ends_with(".pyd") || name.ends_with(".dll"))) {
+                                        chosenLib = entry.path().string();
+                                        break;
+                                    }
+                                }
+                                if (std::filesystem::exists(chosenLib, ec)) break;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 #elif defined(__APPLE__)

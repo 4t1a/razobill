@@ -50,7 +50,11 @@ public:
                             task = std::move(tasks_.front());
                             tasks_.pop();
                         }
-                        task();
+                        try {
+                            task();
+                        } catch (...) {
+                            // Ensure worker thread does not crash the host process via std::terminate()
+                        }
                     }
                 });
             }
@@ -115,14 +119,14 @@ public:
         if (total == 0) return;
         if (chunkSize == 0) {
             const std::size_t count = workers_.empty() ? 1 : workers_.size();
-            chunkSize = std::max<std::size_t>(1, (total + count - 1) / count);
+            chunkSize = std::max<std::size_t>(1, total / count + (total % count != 0 ? 1 : 0));
         }
         if (workers_.empty() || total <= chunkSize) {
             fn(0, total);
             return;
         }
 
-        std::size_t numChunks = (total + chunkSize - 1) / chunkSize;
+        const std::size_t numChunks = total / chunkSize + (total % chunkSize != 0 ? 1 : 0);
         std::vector<std::future<void>> futures;
         futures.reserve(numChunks);
 

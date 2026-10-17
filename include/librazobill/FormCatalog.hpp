@@ -110,8 +110,13 @@ public:
         entry.intSlots = numInts;
         entry.strSlots = numStrs;
 
-        hashToKeys_[explicitHash].push_back(keyStr);
+        // Strong exception safety: pre-reserve vector capacities before container mutation (F-CONC-03)
+        formsById_.reserve(formsById_.size() + 1);
+        auto& keyVec = hashToKeys_[explicitHash];
+        keyVec.reserve(keyVec.size() + 1);
+
         auto inserted = formsByKey_.emplace(keyStr, std::move(entry));
+        keyVec.push_back(keyStr);
         // ISO C++ [unord.req]: Rehashing an std::unordered_map never invalidates
         // pointers or references to elements, only iterators. Caching raw pointers
         // to mapped values in formsById_ is guaranteed stable for the lifetime of

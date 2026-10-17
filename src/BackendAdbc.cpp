@@ -101,10 +101,12 @@ bool isValid(const ArrowArray* a, std::int64_t i) {
 }
 
 template <class T> T at(const ArrowArray* a, std::int64_t i) {
+    if (!a || a->n_buffers < 2 || !a->buffers[1]) return T{};
     return static_cast<const T*>(a->buffers[1])[i + a->offset];
 }
 
 Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
+    if (!fmt) return std::monostate{};
     if (!std::strcmp(fmt, "n")) return std::monostate{};
     if (!isValid(a, i)) return std::monostate{};
     if (!std::strcmp(fmt, "l")) return at<std::int64_t>(a, i);
@@ -118,6 +120,7 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
     if (!std::strcmp(fmt, "g")) return at<double>(a, i);
     if (!std::strcmp(fmt, "f")) return static_cast<double>(at<float>(a, i));
     if (!std::strcmp(fmt, "b")) {
+        if (!a || a->n_buffers < 2 || !a->buffers[1]) return static_cast<std::int64_t>(0);
         const auto k = static_cast<std::uint64_t>(i + a->offset);
         return static_cast<std::int64_t>(
             ((static_cast<unsigned int>(static_cast<const std::uint8_t*>(a->buffers[1])[k >> 3U]) >> (k & 7U)) & 1U));
@@ -131,6 +134,7 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
             throw BackendError(std::string("malformed decimal format string: ") + fmt);
         }
         if (bits != 128) throw BackendError(std::string("unsupported decimal width: ") + fmt);
+        if (!a || a->n_buffers < 2 || !a->buffers[1]) return 0.0;
         const auto* w = static_cast<const std::uint64_t*>(a->buffers[1]) + (2 * (i + a->offset));
         const auto hi = static_cast<std::int64_t>(w[1]);
         double v = 0.0;
@@ -148,14 +152,20 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
         return v;
     }
     if (!std::strcmp(fmt, "u")) {
+        if (!a || a->n_buffers < 2 || !a->buffers[1]) return std::string{};
         const auto* off = static_cast<const std::int32_t*>(a->buffers[1]) + a->offset;
-        return std::string(static_cast<const char*>(a->buffers[2]) + off[i],
-                           static_cast<std::size_t>(off[i + 1] - off[i]));
+        if (off[i + 1] <= off[i]) return std::string{};
+        const auto len = static_cast<std::size_t>(off[i + 1] - off[i]);
+        if (a->n_buffers < 3 || !a->buffers[2]) return std::string{};
+        return std::string(static_cast<const char*>(a->buffers[2]) + off[i], len);
     }
     if (!std::strcmp(fmt, "U")) {
+        if (!a || a->n_buffers < 2 || !a->buffers[1]) return std::string{};
         const auto* off = static_cast<const std::int64_t*>(a->buffers[1]) + a->offset;
-        return std::string(static_cast<const char*>(a->buffers[2]) + off[i],
-                           static_cast<std::size_t>(off[i + 1] - off[i]));
+        if (off[i + 1] <= off[i]) return std::string{};
+        const auto len = static_cast<std::size_t>(off[i + 1] - off[i]);
+        if (a->n_buffers < 3 || !a->buffers[2]) return std::string{};
+        return std::string(static_cast<const char*>(a->buffers[2]) + off[i], len);
     }
     throw BackendError(std::string("unsupported Arrow type in result: ") + fmt + " (cast the column in the query)");
 }
@@ -304,6 +314,10 @@ private:
                 }
             } bg(&batch);
             if (!out) continue;
+            if (batch.n_children < schema.n_children) {
+                throw BackendError("Arrow batch n_children (" + std::to_string(batch.n_children) +
+                                   ") less than schema n_children (" + std::to_string(schema.n_children) + ")");
+            }
             for (std::int64_t r = 0; r < batch.length; ++r) {
                 std::vector<Value> row;
                 row.reserve(static_cast<std::size_t>(schema.n_children));

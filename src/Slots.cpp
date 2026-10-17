@@ -11,11 +11,28 @@ namespace razobill::core {
 namespace {
 
 constexpr std::size_t digits10(std::int64_t v) noexcept {
-    std::size_t n = (v < 0) ? 2 : 1;
-    uint64_t u = (v < 0) ? static_cast<uint64_t>(-(v + 1)) + 1 : static_cast<uint64_t>(v);
-    for (; u >= 10; u /= 10)
-        ++n;
-    return n;
+    const std::size_t sign = (v < 0) ? 1 : 0;
+    const uint64_t u = (v < 0) ? static_cast<uint64_t>(-(v + 1)) + 1 : static_cast<uint64_t>(v);
+    if (u < 10ULL) return 1 + sign;
+    if (u < 100ULL) return 2 + sign;
+    if (u < 1000ULL) return 3 + sign;
+    if (u < 10000ULL) return 4 + sign;
+    if (u < 100000ULL) return 5 + sign;
+    if (u < 1000000ULL) return 6 + sign;
+    if (u < 10000000ULL) return 7 + sign;
+    if (u < 100000000ULL) return 8 + sign;
+    if (u < 1000000000ULL) return 9 + sign;
+    if (u < 10000000000ULL) return 10 + sign;
+    if (u < 100000000000ULL) return 11 + sign;
+    if (u < 1000000000000ULL) return 12 + sign;
+    if (u < 10000000000000ULL) return 13 + sign;
+    if (u < 100000000000000ULL) return 14 + sign;
+    if (u < 1000000000000000ULL) return 15 + sign;
+    if (u < 10000000000000000ULL) return 16 + sign;
+    if (u < 100000000000000000ULL) return 17 + sign;
+    if (u < 1000000000000000000ULL) return 18 + sign;
+    if (u < 10000000000000000000ULL) return 19 + sign;
+    return 20 + sign;
 }
 
 bool isLegacyFormKey(std::string_view form) noexcept {
@@ -146,6 +163,7 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
             estSize += 1;
             p += 1;
         }
+        if (estSize > kMaxMessageBytes) return Status::TooLarge;
     }
 
     if (nInt == 0 && nStr == 0 && (!ints.empty() || !strs.empty())) {
@@ -163,34 +181,46 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
     out.reserve(estSize);
 
     p = tmpl.data();
+    const char* literalStart = p;
     nInt = 0;
     nStr = 0;
     std::array<char, 32> numBuf{};
     while (p < end) {
         if (*p == '{') {
             if (p + 1 < end && *(p + 1) == '{') {
+                if (p > literalStart) out.append(literalStart, static_cast<std::size_t>(p - literalStart));
                 out.push_back('{');
                 p += 2;
+                literalStart = p;
             } else if (p + 2 < end && *(p + 1) == 'i' && *(p + 2) == '}') {
+                if (p > literalStart) out.append(literalStart, static_cast<std::size_t>(p - literalStart));
                 const auto r = std::to_chars(numBuf.data(), numBuf.data() + numBuf.size(), ints[nInt++]);
                 out.append(numBuf.data(), r.ptr);
                 p += 3;
+                literalStart = p;
             } else if (p + 2 < end && *(p + 1) == 's' && *(p + 2) == '}') {
+                if (p > literalStart) out.append(literalStart, static_cast<std::size_t>(p - literalStart));
                 out.append(strs[nStr++]);
                 p += 3;
+                literalStart = p;
             } else {
-                out.push_back(*p++);
+                ++p;
             }
         } else if (*p == '}') {
             if (p + 1 < end && *(p + 1) == '}') {
+                if (p > literalStart) out.append(literalStart, static_cast<std::size_t>(p - literalStart));
                 out.push_back('}');
                 p += 2;
+                literalStart = p;
             } else {
-                out.push_back(*p++);
+                ++p;
             }
         } else {
-            out.push_back(*p++);
+            ++p;
         }
+    }
+    if (p > literalStart) {
+        out.append(literalStart, static_cast<std::size_t>(p - literalStart));
     }
     return Status::Ok;
 }

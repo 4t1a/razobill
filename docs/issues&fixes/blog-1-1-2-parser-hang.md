@@ -90,7 +90,7 @@ if mode == "semantic" and msg[p] in ('"', "'"):
             continue
 ```
 
-The C++ core scanner in `src/Core.cpp` applies the identical invariant, asserting non-zero forward progress before advancing to delimiter SIMD chunks.
+The C++ core scanner in `include/librazobill/Scanner.hpp` applies the identical invariant, asserting non-zero forward progress before advancing to delimiter SIMD chunks.
 
 ---
 

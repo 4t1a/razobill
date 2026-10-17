@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Surface Budget Enforcer: Razobill C Universal ABI Header (RazobillC.h)
-Enforces hard caps: <= 6 functions, <= 3 types in include/librazobill/RazobillC.h.
+Enforces hard caps: <= 7 functions, <= 3 types in include/librazobill/RazobillC.h.
 Unified CamelCase with Rz prefix. Zero legacy aliases. Zero banned words.
 """
 
@@ -51,12 +51,15 @@ def main():
     types = type_pattern.findall(content)
 
     print(f"C Public Surface Audit ({HEADER_PATH.name}):")
-    print(f"  Functions ({len(functions)}/6): {', '.join(functions)}")
+    print(f"  Functions ({len(functions)}/7): {', '.join(functions)}")
     print(f"  Types     ({len(types)}/3): {', '.join(types)}")
 
     failed = False
-    if len(functions) > 6:
-        print(f"FAILED: Function count {len(functions)} exceeds maximum allowance of 6!")
+    if len(functions) > 7:
+        print(f"FAILED: Function count {len(functions)} exceeds maximum allowance of 7!")
+        failed = True
+    if "RzAbiVersion" not in functions:
+        print("FAILED: Mandatory governance function RzAbiVersion is missing from RazobillC.h!")
         failed = True
     if len(types) > 3:
         print(f"FAILED: Type count {len(types)} exceeds maximum allowance of 3!")

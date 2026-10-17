@@ -135,6 +135,7 @@ private:
     std::string phys_;
     std::string view_;
     bool compact_ = false;
+    bool hasCollision_ = false;
     bool ready_ = false;
 };
 

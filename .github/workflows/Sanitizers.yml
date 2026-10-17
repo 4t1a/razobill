@@ -110,4 +110,4 @@ jobs:
 
       - name: Run Clang-Tidy on Core Sources
         run: |
-          clang-tidy-18 -p build src/*.cpp --warnings-as-errors=''
+          clang-tidy-18 -p build src/*.cpp --warnings-as-errors='*'

@@ -311,7 +311,8 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
     const size_t total = py::len(inputs);
 
     struct InputItem {
-        std::string bytes;
+        std::string_view view;
+        std::string owned;
         bool isBytes;
     };
 
@@ -324,15 +325,22 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             char* buf = nullptr;
             Py_ssize_t len = 0;
             PYBIND11_BYTES_AS_STRING_AND_SIZE(item.ptr(), &buf, &len);
-            rawInputs.push_back(InputItem{.bytes = std::string(buf, static_cast<size_t>(len)), .isBytes = true});
+            rawInputs.push_back(InputItem{
+                .view = std::string_view(buf, static_cast<size_t>(len)),
+                .owned = {},
+                .isBytes = true,
+            });
         } else if (py::isinstance<py::str>(item)) {
             PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
             if (!enc) throw py::error_already_set();
+            std::string s(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc)));
+            Py_DECREF(enc);
             rawInputs.push_back(InputItem{
-                .bytes = std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))),
+                .view = {},
+                .owned = std::move(s),
                 .isBytes = false,
             });
-            Py_DECREF(enc);
+            rawInputs.back().view = rawInputs.back().owned;
         } else {
             std::string tn = py::str(item.get_type());
             throw py::type_error("[razobill] What happened: Unsupported item type in split_many at index " +
@@ -352,15 +360,15 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             auto& pool = getThreadPool();
             pool.parallelFor(total, 256, [&](size_t start, size_t end) {
                 for (size_t idx = start; idx < end; ++idx) {
-                    if (!rawInputs[idx].bytes.empty()) {
-                        statuses[idx] = core::parse(rawInputs[idx].bytes, records[idx], mode);
+                    if (!rawInputs[idx].view.empty()) {
+                        statuses[idx] = core::parse(rawInputs[idx].view, records[idx], mode);
                     }
                 }
             });
         } else {
             for (size_t idx = 0; idx < total; ++idx) {
-                if (!rawInputs[idx].bytes.empty()) {
-                    statuses[idx] = core::parse(rawInputs[idx].bytes, records[idx], mode);
+                if (!rawInputs[idx].view.empty()) {
+                    statuses[idx] = core::parse(rawInputs[idx].view, records[idx], mode);
                 }
             }
         }

@@ -4,7 +4,9 @@ use razobill_vector::parse_razobill;
 fn test_parse_razobill() {
     let msg = "Accepted publickey for ubuntu from 192.168.1.100 port 54322 ssh2";
     let res = parse_razobill(msg).expect("Failed to parse log record");
+    assert!(res.contains_key("template"));
     assert!(res.contains_key("form"));
+    assert_eq!(res.get("template"), res.get("form"));
     assert!(res.contains_key("ints"));
     assert!(res.contains_key("strs"));
 
