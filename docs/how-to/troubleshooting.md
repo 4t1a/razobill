@@ -11,7 +11,7 @@ This guide provides solutions for common error messages and unexpected behaviors
 
 ## Errors indexed by message
 
-### Invalid Input Error: [razobill] What happened: RzJoin failed. Why: Count mismatch
+### `Invalid Input Error: [razobill] What happened: RzJoin failed. Why: Count mismatch`
 
 **What happened**:
 `RzJoin` failed because the number of `{i}` and `{s}` placeholders in the template did not match the lengths of the integer and string arrays.
@@ -29,7 +29,7 @@ SELECT RzJoin('Failed password for {s} from {s} port {i}', [22]::BIGINT[], ['roo
 
 ---
 
-### IO Error: Extension could not be loaded because its signature is either missing or invalid
+### `IO Error: Extension could not be loaded because its signature is either missing or invalid`
 
 **What happened**:
 DuckDB refused to load a locally built `razobill.duckdb_extension` binary:
@@ -78,7 +78,7 @@ SELECT RzJoin('port {i}', [22]::BIGINT[], []::VARCHAR[]);
 
 ---
 
-### RzError: [razobill] What happened: Invalid scan mode
+### `RzError: [razobill] What happened: Invalid scan mode`
 
 **What happened**:
 Python raised `RzError: [razobill] What happened: Invalid scan mode. Why: Expected 'semantic' or 'exact', got '...'`.
@@ -99,7 +99,7 @@ rec2 = rz.split(line, mode="exact")
 
 ---
 
-### RzError: [razobill] What happened: Unsupported input type
+### `RzError: [razobill] What happened: Unsupported input type`
 
 **What happened**:
 Python raised `RzError: [razobill] What happened: Unsupported input type. Why: Expected str or bytes, got int`.

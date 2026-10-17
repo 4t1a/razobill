@@ -66,10 +66,10 @@ A single parameter hole inside a template (`{i}` or `{s}`) that receives an inte
 
 | Deprecated term | Canonical replacement | Context |
 | :--- | :--- | :--- |
-| `rbDecompose` | `RzSplit` / `split` | Legacy decomposition function |
-| `rbReconstruct` / `rbRebuild` | `RzJoin` / `join` | Legacy reconstruction function |
-| `rbForm` | `RzTemplate` / `template` | Legacy template extractor |
-| `rbInts` | `record.ints` | Legacy integer array accessor |
-| `rbStrs` | `record.strs` | Legacy string array accessor |
+| `rb-Decompose` | `RzSplit` / `split` | Legacy decomposition function |
+| `rb-Reconstruct` / `rb-Rebuild` | `RzJoin` / `join` | Legacy reconstruction function |
+| `rb-Form` | `RzTemplate` / `template` | Legacy template extractor |
+| `rb-Ints` | `record.ints` | Legacy integer array accessor |
+| `rb-Strs` | `record.strs` | Legacy string array accessor |
 | `Form key` | `Template` | Format string with `{i}` and `{s}` placeholders |
 | `Delimiter token` | `Placeholder` | `{i}` or `{s}` marker inside a template |
