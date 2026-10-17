@@ -70,18 +70,19 @@ struct PairHash64 {
     std::size_t operator()(const std::pair<std::uint64_t, std::uint32_t>& p) const noexcept {
         // Murmur-style mixer
         std::uint64_t h = p.first ^ (static_cast<std::uint64_t>(p.second) * 0x9E3779B97F4A7C15ULL);
-        h ^= h >> 33;
+        h ^= h >> 33U;
         h *= 0xFF51AFD7ED558CCDULL;
-        h ^= h >> 33;
+        h ^= h >> 33U;
         return static_cast<std::size_t>(h);
     }
 };
 
 struct PairHash32 {
     std::size_t operator()(const std::pair<std::uint32_t, std::uint32_t>& p) const noexcept {
-        const std::uint64_t combined = (static_cast<std::uint64_t>(p.first) << 32) | p.second;
+        const std::uint64_t combined =
+            (static_cast<std::uint64_t>(p.first) << 32U) | static_cast<std::uint64_t>(p.second);
         std::uint64_t h = combined * 0x9E3779B97F4A7C15ULL;
-        h ^= h >> 32;
+        h ^= h >> 32U;
         return static_cast<std::size_t>(h);
     }
 };
@@ -89,8 +90,8 @@ struct PairHash32 {
 struct TripleHash {
     std::size_t operator()(const std::tuple<std::uint64_t, std::uint32_t, std::uint32_t>& t) const noexcept {
         std::uint64_t h = std::get<0>(t);
-        h ^= (static_cast<std::uint64_t>(std::get<1>(t)) * 0x9E3779B97F4A7C15ULL) + (h << 6) + (h >> 2);
-        h ^= (static_cast<std::uint64_t>(std::get<2>(t)) * 0xC6A4A7935BD1E995ULL) + (h << 6) + (h >> 2);
+        h ^= (static_cast<std::uint64_t>(std::get<1>(t)) * 0x9E3779B97F4A7C15ULL) + (h << 6U) + (h >> 2U);
+        h ^= (static_cast<std::uint64_t>(std::get<2>(t)) * 0xC6A4A7935BD1E995ULL) + (h << 6U) + (h >> 2U);
         return static_cast<std::size_t>(h);
     }
 };
@@ -98,9 +99,9 @@ struct TripleHash {
 struct PairHashU64 {
     std::size_t operator()(const std::pair<std::uint64_t, std::uint64_t>& p) const noexcept {
         std::uint64_t h = p.first ^ (p.second * 0x9E3779B97F4A7C15ULL);
-        h ^= h >> 33;
+        h ^= h >> 33U;
         h *= 0xFF51AFD7ED558CCDULL;
-        h ^= h >> 33;
+        h ^= h >> 33U;
         return static_cast<std::size_t>(h);
     }
 };
@@ -108,8 +109,8 @@ struct PairHashU64 {
 struct TripleHashU64 {
     std::size_t operator()(const std::tuple<std::uint64_t, std::uint32_t, std::uint64_t>& t) const noexcept {
         std::uint64_t h = std::get<0>(t);
-        h ^= (static_cast<std::uint64_t>(std::get<1>(t)) * 0x9E3779B97F4A7C15ULL) + (h << 6) + (h >> 2);
-        h ^= (std::get<2>(t) * 0xC6A4A7935BD1E995ULL) + (h << 6) + (h >> 2);
+        h ^= (static_cast<std::uint64_t>(std::get<1>(t)) * 0x9E3779B97F4A7C15ULL) + (h << 6U) + (h >> 2U);
+        h ^= (std::get<2>(t) * 0xC6A4A7935BD1E995ULL) + (h << 6U) + (h >> 2U);
         return static_cast<std::size_t>(h);
     }
 };
@@ -187,7 +188,7 @@ Ledger ledger(std::span<const Cell> cells, double totalEvents, double confidence
     //   3) I      = C + E - J_bound >= 0 (mutual information non-negativity)
     //   4) Exact algebraic ledger identities: (I + Lambda) == E, (I + Delta) == C,
     //      and (E - C) == (Lambda - Delta), with zero independent clamping drift.
-    const double J_bound = std::max(std::max(C, E), std::min(J, C + E));
+    const double J_bound = std::max({C, E, std::min(J, C + E)});
     const double Lambda = J_bound - C;
     const double Delta = J_bound - E;
     const double I = C + E - J_bound;

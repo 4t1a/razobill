@@ -93,7 +93,12 @@ def main():
             lower_line = line.lower()
             if term in lower_line:
                 # ignore internal includes and internal C++ Status::SlotUnderflow/SlotOverflow enum / core types
-                if "#include" in line or "slotunderflow" in lower_line or "slotoverflow" in lower_line or "core::slotrecord" in lower_line:
+                if (
+                    "#include" in line
+                    or "slotunderflow" in lower_line
+                    or "slotoverflow" in lower_line
+                    or "core::slotrecord" in lower_line
+                ):
                     continue
                 errors.append(f"Banned term '{term}' on line {lineno}: {line.strip()}")
 

@@ -126,7 +126,7 @@ private:
     void createViewsLocked();
     std::vector<stats::XY> xyLocked(std::unordered_map<std::string, std::uint32_t>& yids);
     double totalEventsLocked();
-    std::string physKeyLocked() const;
+    std::string_view physKeyLocked() const;
 
     Backend& db_;
     Config cfg_;

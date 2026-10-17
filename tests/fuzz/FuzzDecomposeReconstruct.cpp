@@ -149,7 +149,8 @@ int main(int argc, char** argv) {
         std::string overLimit(razobill::core::kMaxMessageBytes + 1, 'x');
         assert(razobill::core::parse(overLimit, rec) == razobill::Status::TooLarge);
     }
-    std::cout << "[FuzzDecomposeReconstruct] All " << testCases.size() << " sample test cases and 16MB boundary test passed perfectly!\n";
+    std::cout << "[FuzzDecomposeReconstruct] All " << testCases.size()
+              << " sample test cases and 16MB boundary test passed perfectly!\n";
 
     size_t targetIterations = 1'000'000;
     if (argc > 1 && argv[1] != nullptr) {
@@ -158,8 +159,8 @@ int main(int argc, char** argv) {
     }
 
     const unsigned int numThreads = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
-    std::cout << "[FuzzDecomposeReconstruct] Spawning " << numThreads
-              << " worker threads for " << targetIterations << " randomized stress iterations...\n";
+    std::cout << "[FuzzDecomposeReconstruct] Spawning " << numThreads << " worker threads for " << targetIterations
+              << " randomized stress iterations...\n";
 
     const auto t0 = std::chrono::steady_clock::now();
     std::atomic<size_t> totalDone{0};
@@ -169,11 +170,12 @@ int main(int argc, char** argv) {
     for (unsigned int tid = 0; tid < numThreads; ++tid) {
         workers.emplace_back([&, tid, numThreads]() {
             std::mt19937_64 rng(1337 + tid * 10007);
-            const size_t itersForThread = (targetIterations / numThreads) +
-                                          (tid == 0 ? (targetIterations % numThreads) : 0);
+            const size_t itersForThread =
+                (targetIterations / numThreads) + (tid == 0 ? (targetIterations % numThreads) : 0);
 
             // Mutation primitives
-            const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_.,:;()[]{}\"'<>|/\\{}!@#$%^&*+=~`\x11\x12\x13";
+            const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
+                                   "-_.,:;()[]{}\"'<>|/\\{}!@#$%^&*+=~`\x11\x12\x13";
             const size_t charsetSize = sizeof(charset) - 1;
 
             std::string buffer;
@@ -229,9 +231,8 @@ int main(int argc, char** argv) {
     const double rate = (sec > 0.0) ? (static_cast<double>(totalDone.load()) / sec / 1'000'000.0) : 0.0;
 
     std::cout << "[FuzzDecomposeReconstruct] Completed " << totalDone.load()
-              << " multi-threaded randomized fuzz iterations in " << sec << "s ("
-              << rate << " M iters/sec) across " << numThreads
-              << " threads with ZERO invariant violations, ZERO memory leaks, and ZERO crashes!\n";
+              << " multi-threaded randomized fuzz iterations in " << sec << "s (" << rate << " M iters/sec) across "
+              << numThreads << " threads with ZERO invariant violations, ZERO memory leaks, and ZERO crashes!\n";
     return 0;
 }
 #endif

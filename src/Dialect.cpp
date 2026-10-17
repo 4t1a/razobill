@@ -42,7 +42,10 @@ public:
     std::string tF64() const override { return "DOUBLE"; }
     std::string tStr() const override { return "VARCHAR"; }
     std::string tNullableStr() const override { return "VARCHAR"; }
-    std::string tableTail(std::string_view) const override { return ""; }
+    std::string tableTail(std::string_view orderBy) const override {
+        (void)orderBy;
+        return "";
+    }
     std::string toText(std::string_view e) const override { return "CAST(" + std::string(e) + " AS VARCHAR)"; }
     std::string matches(std::string_view h, std::string_view p) const override {
         return "regexp_matches(" + std::string(h) + ", " + std::string(p) + ")";
@@ -89,13 +92,15 @@ public:
         return "match(" + std::string(h) + ", " + std::string(p) + ")";
     }
     std::string formExpr(std::string_view col, core::ScanMode /*mode*/ = core::ScanMode::Semantic) const override {
-        const std::string c(col), tok = quote(kTokenRegex), ints = quote(kIntRegex);
+        const std::string c(col);
+        const std::string tok = quote(kTokenRegex);
+        const std::string ints = quote(kIntRegex);
         const std::string ch17 = "char(" + std::to_string(static_cast<int>(kControlReserved17)) + ")";
         const std::string ch18 = "char(" + std::to_string(static_cast<int>(core::kPlaceholder)) + ")";
         const std::string ch19 = "char(" + std::to_string(static_cast<int>(core::kTypeSeparator)) + ")";
         return "if(position(" + c + ", " + ch17 + ") > 0 OR position(" + c + ", " + ch18 + ") > 0 OR position(" + c +
-               ", " + ch19 + ") > 0, concat(" + ch18 + ", " + ch19 + ", 'S'), concat(replaceRegexpAll(" + c + ", " + tok +
-               ", " + ch18 + "), " + ch19 + ", arrayStringConcat(arrayMap(t -> if(match(t, " + ints +
+               ", " + ch19 + ") > 0, concat(" + ch18 + ", " + ch19 + ", 'S'), concat(replaceRegexpAll(" + c + ", " +
+               tok + ", " + ch18 + "), " + ch19 + ", arrayStringConcat(arrayMap(t -> if(match(t, " + ints +
                "), 'I', 'S'), extractAll(" + c + ", " + tok + ")))))";
     }
     std::string hashExpr(std::string_view t) const override { return "xxHash64(" + std::string(t) + ")"; }
@@ -103,8 +108,8 @@ public:
         const std::string s(f);
         const std::string ch18 = "char(" + std::to_string(static_cast<int>(core::kPlaceholder)) + ")";
         const std::string ch19 = "char(" + std::to_string(static_cast<int>(core::kTypeSeparator)) + ")";
-        return "if(position(" + s + ", " + ch19 + ") > 0, replaceAll(substring(" + s + ", 1, position(" + s +
-               ", " + ch19 + ") - 1), " + ch18 + ", '<*>'), replaceAll(" + s + ", " + ch18 + ", '<*>'))";
+        return "if(position(" + s + ", " + ch19 + ") > 0, replaceAll(substring(" + s + ", 1, position(" + s + ", " +
+               ch19 + ") - 1), " + ch18 + ", '<*>'), replaceAll(" + s + ", " + ch18 + ", '<*>'))";
     }
     std::string truncate(std::string_view t) const override { return "TRUNCATE TABLE " + std::string(t); }
 };

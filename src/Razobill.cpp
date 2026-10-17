@@ -47,8 +47,7 @@ namespace {
 
 class TransactionGuard {
 public:
-    explicit TransactionGuard(Backend& db, Flavor flavor)
-        : db_(db), active_(flavor == Flavor::DuckDB) {
+    explicit TransactionGuard(Backend& db, Flavor flavor) : db_(db), active_(flavor == Flavor::DuckDB) {
         if (active_) {
             try {
                 db_.exec("BEGIN TRANSACTION");
@@ -71,13 +70,15 @@ public:
             try {
                 db_.exec("ROLLBACK");
             } catch (...) {
-                // Suppress rollback errors during exception unwinding
+                (void)0; // Explicitly suppress rollback errors during exception unwinding
             }
         }
     }
 
     TransactionGuard(const TransactionGuard&) = delete;
     TransactionGuard& operator=(const TransactionGuard&) = delete;
+    TransactionGuard(TransactionGuard&&) = delete;
+    TransactionGuard& operator=(TransactionGuard&&) = delete;
 
 private:
     Backend& db_;
@@ -91,7 +92,7 @@ private:
 // applies ANSI SQL standard double-quote escaping.
 void requireIdentifier(const std::string& s, const char* what) {
     const bool ok = !s.empty() && s.size() <= 64 && (std::isalpha(static_cast<unsigned char>(s[0])) || s[0] == '_') &&
-                    std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isalnum(c) || c == '_'; });
+                    std::ranges::all_of(s, [](unsigned char c) { return std::isalnum(c) || c == '_'; });
     if (!ok) throw std::invalid_argument(std::string(what) + " must match [A-Za-z_][A-Za-z0-9_]{0,63}: '" + s + "'");
 }
 
@@ -108,9 +109,8 @@ std::string quoteIdentifier(std::string_view name) {
 }
 
 void requireName(const std::string& s) {
-    if (s.empty() || s.size() > 128 || !std::all_of(s.begin(), s.end(), [](unsigned char c) {
-            return std::isalnum(c) || c == '_' || c == '.' || c == '-';
-        }))
+    if (s.empty() || s.size() > 128 ||
+        !std::ranges::all_of(s, [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '.' || c == '-'; }))
         throw std::invalid_argument("meaning must match [A-Za-z0-9_.-]{1,128}: '" + s + "'");
 }
 
@@ -166,8 +166,8 @@ RazobillEngine::RazobillEngine(Backend& backend, Config config) : db_(backend), 
     requireIdentifier(cfg_.table, "table");
     requireIdentifier(cfg_.messageColumn, "messageColumn");
     if (!cfg_.purpose.empty()) requireIdentifier(cfg_.purpose, "purpose");
-    if (!(cfg_.tau > 0.5 && cfg_.tau <= 1.0)) throw std::invalid_argument("tau must be in (0.5, 1]");
-    if (!(cfg_.eps >= 0)) throw std::invalid_argument("eps must be >= 0");
+    if (cfg_.tau <= 0.5 || cfg_.tau > 1.0) throw std::invalid_argument("tau must be in (0.5, 1]");
+    if (cfg_.eps < 0) throw std::invalid_argument("eps must be >= 0");
     dx_ = makeDialect(db_.flavor());
     phys_ = view_ = cfg_.table;
     std::scoped_lock lock(mu_);
@@ -230,16 +230,17 @@ std::size_t RazobillEngine::registerFormsLocked(const std::string& selectForms) 
     return static_cast<std::size_t>(db_.query("SELECT count(*) FROM rb_form").i64(0, 0) - before);
 }
 
-std::string RazobillEngine::physKeyLocked() const {
+std::string_view RazobillEngine::physKeyLocked() const {
     return compact_ || dx_->denseFormKey() ? "form_no" : "form_id";
 }
 
 std::size_t RazobillEngine::refresh() {
     std::scoped_lock lock(mu_);
     const auto& d = *dx_;
-    const std::string t = cfg_.table, m = cfg_.messageColumn;
+    const std::string t = cfg_.table;
+    const std::string m = cfg_.messageColumn;
     const auto sMode = cfg_.scanMode;
-    std::size_t added;
+    std::size_t added = 0;
     if (d.denseFormKey()) {
         db_.exec("ALTER TABLE " + t + " ADD COLUMN IF NOT EXISTS form_no " + d.tI32());
         added = registerFormsLocked("SELECT " + d.formExpr(m, sMode) + " AS form FROM " + t + " WHERE form_no IS NULL");
@@ -270,7 +271,9 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
     const auto& d = *dx_;
     if (!d.supportsCompact()) throw std::logic_error("compact storage is not supported on this engine");
     requireIdentifier(src, "source table");
-    const std::string m = cfg_.messageColumn, dst = cfg_.table + "_c", name = cfg_.table;
+    const std::string m = cfg_.messageColumn;
+    const std::string dst = cfg_.table + "_c";
+    const std::string name = cfg_.table;
 
     TransactionGuard tx(db_, d.flavor());
 
@@ -310,7 +313,8 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
     db_.exec("INSERT INTO rb_str SELECT CAST(coalesce((SELECT max(id) + 1 FROM rb_str), 0) + row_number() OVER () - 1 "
              "AS INTEGER), s "
              "FROM (SELECT DISTINCT unnest(rbs[1:" +
-             std::to_string(ks) + "]) AS s FROM rb_s) WHERE s IS NOT NULL AND s NOT IN (SELECT s FROM rb_str WHERE s IS NOT NULL)");
+             std::to_string(ks) +
+             "]) AS s FROM rb_s) WHERE s IS NOT NULL AND s NOT IN (SELECT s FROM rb_str WHERE s IS NOT NULL)");
 
     std::string sel = "SELECT " + list("s.") + "f.no AS form_no, ";
     for (long long j = 0; j < ki; ++j)
@@ -327,7 +331,9 @@ std::uint64_t RazobillEngine::compact(const std::string& src) {
         db_.exec("CREATE TABLE " + dst + " AS " + sel + " LIMIT 0");
     db_.exec("INSERT INTO " + dst + " BY NAME " + sel);
 
-    std::string ivs, svs, joins;
+    std::string ivs;
+    std::string svs;
+    std::string joins;
     for (long long j = 0; j < ki; ++j)
         ivs += "c.i" + std::to_string(j) + ", ";
     for (long long j = 0; j < ks; ++j) {
@@ -356,7 +362,8 @@ std::uint64_t RazobillEngine::verify(const std::string& src) {
     std::string sel;
     for (std::size_t r = 0; r < cols.rows.size(); ++r)
         sel += (r ? ", " : "") + quoteIdentifier(cols.str(r, 0));
-    const std::string a = "SELECT " + sel + " FROM " + src, b = "SELECT " + sel + " FROM " + view_;
+    const std::string a = "SELECT " + sel + " FROM " + src;
+    const std::string b = "SELECT " + sel + " FROM " + view_;
     return static_cast<std::uint64_t>(db_.query("SELECT (SELECT count(*) FROM (" + a + " EXCEPT ALL " + b +
                                                 ")) + (SELECT count(*) FROM (" + b + " EXCEPT ALL " + a + "))")
                                           .i64(0, 0));
@@ -392,7 +399,8 @@ DictionaryStats RazobillEngine::gcDictionary() {
     const std::size_t purged = before > active ? before - active : 0;
 
     if (purged > 0) {
-        db_.exec("DELETE FROM rb_str WHERE id IS NOT NULL AND id NOT IN (SELECT id FROM rb_active_str_ids WHERE id IS NOT NULL)");
+        db_.exec("DELETE FROM rb_str WHERE id IS NOT NULL AND id NOT IN (SELECT id FROM rb_active_str_ids WHERE id IS "
+                 "NOT NULL)");
     }
     db_.exec("DROP TABLE IF EXISTS rb_active_str_ids");
 
@@ -423,8 +431,18 @@ void RazobillEngine::compactDictionary() {
              "1 AS INTEGER) AS new_id, s FROM rb_str");
     for (long long j = 0; j < ks; ++j) {
         const std::string dj = "d" + std::to_string(j);
-        db_.exec("UPDATE " + phys_ + " SET " + dj + " = remap.new_id FROM rb_str_remap remap WHERE " + phys_ + "." +
-                 dj + " = remap.old_id");
+        std::string updateSql;
+        updateSql.reserve((phys_.size() * 2) + (dj.size() * 2) + 64);
+        updateSql.append("UPDATE ")
+            .append(phys_)
+            .append(" SET ")
+            .append(dj)
+            .append(" = remap.new_id FROM rb_str_remap remap WHERE ")
+            .append(phys_)
+            .append(".")
+            .append(dj)
+            .append(" = remap.old_id");
+        db_.exec(updateSql);
     }
     db_.exec("CREATE OR REPLACE TABLE rb_str AS SELECT new_id AS id, s FROM rb_str_remap ORDER BY id");
     db_.exec("DROP TABLE IF EXISTS rb_str_remap");
@@ -449,7 +467,7 @@ std::vector<RazobillEngine::Rule> RazobillEngine::activeRulesLocked(int version)
         const auto& kind = ev.str(r, 0);
         const auto& meaning = ev.str(r, 1);
         if (kind == "define")
-            rules.push_back({meaning, ev.str(r, 2), ev.f64(r, 3)});
+            rules.push_back({.meaning = meaning, .pattern = ev.str(r, 2), .weight = ev.f64(r, 3)});
         else
             std::erase_if(rules, [&](const Rule& x) { return x.meaning == meaning; });
     }
@@ -475,7 +493,7 @@ std::vector<RazobillEngine::FormP> RazobillEngine::resolveLocked(const std::vect
     std::vector<FormP> out;
     out.reserve(w.size());
     for (const auto& [key, weight] : w)
-        out.push_back({key.first, key.second, weight / total[key.first]});
+        out.push_back({.form = key.first, .meaning = key.second, .p = weight / total[key.first]});
     return out;
 }
 
@@ -528,8 +546,11 @@ std::vector<stats::XY> RazobillEngine::xyLocked(std::unordered_map<std::string, 
     std::vector<stats::XY> out;
     out.reserve(t.rows.size());
     for (std::size_t r = 0; r < t.rows.size(); ++r)
-        out.push_back(
-            {t.u64(r, 0), t.isNull(r, 1) ? in("\x01null") : in(t.str(r, 1)), static_cast<double>(t.i64(r, 2))});
+        out.push_back({
+            .form = t.u64(r, 0),
+            .y = t.isNull(r, 1) ? in("\x01null") : in(t.str(r, 1)),
+            .n = static_cast<double>(t.i64(r, 2)),
+        });
     yids = in.map();
     return out;
 }
@@ -548,7 +569,7 @@ Defined RazobillEngine::define(const std::string& meaning, const std::string& pa
 
     std::vector<Rule> probe = activeRulesLocked(cur);
     std::erase_if(probe, [&](const Rule& r) { return r.meaning != meaning; });
-    probe.push_back({meaning, pattern, weight});
+    probe.push_back({.meaning = meaning, .pattern = pattern, .weight = weight});
     std::unordered_map<std::uint64_t, bool> merged;
     for (const auto& f : resolveLocked(probe))
         merged[f.form] = true;
@@ -591,7 +612,7 @@ int RazobillEngine::retire(const std::string& meaning) {
     const int cur = static_cast<int>(db_.query("SELECT v FROM rb_meta").i64(0, 0));
     const auto rules = activeRulesLocked(cur);
     auto matchesMeaning = [&](const Rule& r) { return r.meaning == meaning; };
-    if (std::none_of(rules.begin(), rules.end(), matchesMeaning)) {
+    if (std::ranges::none_of(rules, matchesMeaning)) {
         throw std::invalid_argument("no active meaning named " + meaning);
     }
     TransactionGuard tx(db_, dx_->flavor());
@@ -633,7 +654,7 @@ stats::Ledger RazobillEngine::ledger() {
     std::vector<stats::Cell> cells;
     cells.reserve(map.size());
     for (const auto& m : map)
-        if (n.contains(m.form)) cells.push_back({m.form, mi(m.meaning), n[m.form] * m.p});
+        if (n.contains(m.form)) cells.push_back({.form = m.form, .meaning = mi(m.meaning), .mass = n[m.form] * m.p});
     const auto l = stats::ledger(cells, totalEventsLocked());
     if (std::abs(l.expression - l.conveyance - l.latitude) > 1e-9 ||
         std::abs(l.content - l.conveyance - l.doubt) > 1e-9)
@@ -651,7 +672,7 @@ double RazobillEngine::leakage() {
     std::vector<stats::FormMeaning> fm;
     fm.reserve(map.size());
     for (const auto& m : map)
-        fm.push_back({m.form, mi(m.meaning), m.p});
+        fm.push_back({.form = m.form, .meaning = mi(m.meaning), .p = m.p});
     return stats::leakage(xy, fm);
 }
 
@@ -662,7 +683,7 @@ std::optional<MeaningOf> RazobillEngine::meaningOf(const std::string& text) {
     const auto id = core::xxh64(slots.templateStr);
     std::scoped_lock lock(mu_);
     if (db_.query("SELECT count(*) FROM rb_form WHERE id = " + std::to_string(id)).i64(0, 0) == 0) return std::nullopt;
-    MeaningOf out{id, std::nullopt, std::nullopt, id};
+    MeaningOf out{.formId = id, .meaning = std::nullopt, .doubt = std::nullopt, .form_id = id};
     const auto t = db_.query("SELECT meaning, doubt FROM rb_doubt WHERE form_id = " + std::to_string(id));
     if (!t.empty()) {
         if (!t.isNull(0, 0)) out.meaning = t.str(0, 0);
@@ -683,8 +704,9 @@ std::vector<std::pair<std::string, std::int64_t>> RazobillEngine::todo(std::size
     for (const auto& m : map)
         count.erase(m.form);
     std::vector<std::pair<std::uint64_t, std::int64_t>> top(count.begin(), count.end());
-    std::sort(top.begin(), top.end(),
-              [](auto& a, auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; });
+    std::ranges::sort(top, [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
     if (top.size() > n) top.resize(n);
     if (top.empty()) return {};
 

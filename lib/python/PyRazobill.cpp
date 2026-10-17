@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
-#if !defined(_WIN32)
+#ifndef _WIN32
 #include <pthread.h>
 #endif
 #include <span>
@@ -26,18 +26,16 @@ using namespace razobill;
 
 namespace {
 
-static std::unique_ptr<core::ThreadPool>& getThreadPoolHolder() {
+std::unique_ptr<core::ThreadPool>& getThreadPoolHolder() {
     static std::unique_ptr<core::ThreadPool> pool = std::make_unique<core::ThreadPool>();
     return pool;
 }
 
-static core::ThreadPool& getThreadPool() {
+core::ThreadPool& getThreadPool() {
     static std::once_flag initFork;
-    std::call_once(initFork, []() {
-#if !defined(_WIN32)
-        pthread_atfork(nullptr, nullptr, []() {
-            getThreadPoolHolder() = std::make_unique<core::ThreadPool>();
-        });
+    std::call_once(initFork, [] {
+#ifndef _WIN32
+        pthread_atfork(nullptr, nullptr, [] { getThreadPoolHolder() = std::make_unique<core::ThreadPool>(); });
 #endif
     });
     auto& p = getThreadPoolHolder();
@@ -92,7 +90,7 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
     const core::ScanMode mode = parseMode(modeStr);
 
     if (py::isinstance<py::bytes>(input)) {
-        py::bytes b = input.cast<py::bytes>();
+        auto b = input.cast<py::bytes>();
         char* buf = nullptr;
         Py_ssize_t len = 0;
         PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
@@ -147,7 +145,7 @@ py::tuple splitOne(const py::object& input, const std::string& modeStr) {
             Py_DECREF(encoded);
             throw py::error_already_set();
         }
-        py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
+        auto tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
 
         py::list intList;
         for (int64_t v : slots.ints)
@@ -179,7 +177,7 @@ py::object templateOne(const py::object& input, const std::string& modeStr) {
     const core::ScanMode mode = parseMode(modeStr);
 
     if (py::isinstance<py::bytes>(input)) {
-        py::bytes b = input.cast<py::bytes>();
+        auto b = input.cast<py::bytes>();
         char* buf = nullptr;
         Py_ssize_t len = 0;
         PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
@@ -245,7 +243,6 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
                              "What to do: Pass a str or bytes template.");
     }
 
-    std::string tmplStorage;
     std::string_view tmplView;
 
     py::object encodedTmpl;
@@ -281,9 +278,8 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
         } else if (py::isinstance<py::str>(item)) {
             PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
             if (!enc) throw py::error_already_set();
-            py::object encObj = py::reinterpret_steal<py::object>(enc);
-            strViews.emplace_back(PyBytes_AS_STRING(encObj.ptr()),
-                                  static_cast<size_t>(PyBytes_GET_SIZE(encObj.ptr())));
+            auto encObj = py::reinterpret_steal<py::object>(enc);
+            strViews.emplace_back(PyBytes_AS_STRING(encObj.ptr()), static_cast<size_t>(PyBytes_GET_SIZE(encObj.ptr())));
             encodedStrs.push_back(std::move(encObj));
         } else {
             std::string tn = py::str(item.get_type());
@@ -304,12 +300,10 @@ py::object joinOne(const py::object& tmplObj, const py::sequence& intsSeq, const
 
     if (isBytes) {
         return py::bytes(result.data(), result.size());
-    } else {
-        PyObject* pyRes =
-            PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
-        if (!pyRes) throw py::error_already_set();
-        return py::reinterpret_steal<py::object>(pyRes);
     }
+    PyObject* pyRes = PyUnicode_DecodeUTF8(result.data(), static_cast<Py_ssize_t>(result.size()), "surrogateescape");
+    if (!pyRes) throw py::error_already_set();
+    return py::reinterpret_steal<py::object>(pyRes);
 }
 
 py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
@@ -330,12 +324,14 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             char* buf = nullptr;
             Py_ssize_t len = 0;
             PYBIND11_BYTES_AS_STRING_AND_SIZE(item.ptr(), &buf, &len);
-            rawInputs.push_back(InputItem{std::string(buf, static_cast<size_t>(len)), true});
+            rawInputs.push_back(InputItem{.bytes = std::string(buf, static_cast<size_t>(len)), .isBytes = true});
         } else if (py::isinstance<py::str>(item)) {
             PyObject* enc = PyUnicode_AsEncodedString(item.ptr(), "utf-8", "surrogateescape");
             if (!enc) throw py::error_already_set();
-            rawInputs.push_back(
-                InputItem{std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))), false});
+            rawInputs.push_back(InputItem{
+                .bytes = std::string(PyBytes_AS_STRING(enc), static_cast<size_t>(PyBytes_GET_SIZE(enc))),
+                .isBytes = false,
+            });
             Py_DECREF(enc);
         } else {
             std::string tn = py::str(item.get_type());
@@ -373,9 +369,8 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
     // Check statuses before constructing Python objects
     for (size_t idx = 0; idx < total; ++idx) {
         if (statuses[idx] != Status::Ok) {
-            throw py::value_error("[razobill] What happened: Parsing failed at index " +
-                                  std::to_string(idx) + ". Why: " +
-                                  std::string(razobill::describe(statuses[idx])) +
+            throw py::value_error("[razobill] What happened: Parsing failed at index " + std::to_string(idx) +
+                                  ". Why: " + std::string(razobill::describe(statuses[idx])) +
                                   ". What to do: Check input data integrity.");
         }
     }
@@ -401,7 +396,7 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
             PyObject* pyTmpl = PyUnicode_DecodeUTF8(rec.templateStr.data(),
                                                     static_cast<Py_ssize_t>(rec.templateStr.size()), "surrogateescape");
             if (!pyTmpl) throw py::error_already_set();
-            py::object tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
+            auto tmplObj = py::reinterpret_steal<py::object>(pyTmpl);
 
             py::list strList;
             for (const auto& s : rec.strs) {
@@ -418,7 +413,7 @@ py::list splitMany(const py::sequence& inputs, const std::string& modeStr) {
 
 uint64_t hashOne(const py::object& input) {
     if (py::isinstance<py::bytes>(input)) {
-        py::bytes b = input.cast<py::bytes>();
+        auto b = input.cast<py::bytes>();
         char* buf = nullptr;
         Py_ssize_t len = 0;
         PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buf, &len);
@@ -427,7 +422,7 @@ uint64_t hashOne(const py::object& input) {
     if (py::isinstance<py::str>(input)) {
         PyObject* encoded = PyUnicode_AsEncodedString(input.ptr(), "utf-8", "surrogateescape");
         if (!encoded) throw py::error_already_set();
-        py::object encObj = py::reinterpret_steal<py::object>(encoded);
+        auto encObj = py::reinterpret_steal<py::object>(encoded);
         char* buf = PyBytes_AS_STRING(encObj.ptr());
         Py_ssize_t len = PyBytes_GET_SIZE(encObj.ptr());
         return core::xxh64(std::string_view(buf, static_cast<size_t>(len)));
@@ -454,5 +449,5 @@ PYBIND11_MODULE(Core, m) {
     m.def("split_many", &splitMany, py::arg("inputs"), py::arg("mode") = "semantic",
           "Splits an iterable of log lines with GIL release across worker threads");
     m.def("hash", &hashOne, py::arg("input"), "Computes 64-bit xxHash64 (seed 0) of a string or bytes input");
-    m.def("version", []() { return std::string(LIBRAZOBILL_VERSION_STRING); }, "Returns semantic library version");
+    m.def("version", [] { return std::string(LIBRAZOBILL_VERSION_STRING); }, "Returns semantic library version");
 }

@@ -9,7 +9,6 @@ with resilient pure-Python fallback when compilers/SDKs are absent.
 import sys
 import os
 import glob
-import shutil
 from pathlib import Path
 from setuptools import setup
 

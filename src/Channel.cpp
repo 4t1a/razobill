@@ -54,10 +54,10 @@ ChannelCapacity analyzeCapacity(std::span<const MeaningChoice> sequence) noexcep
     }
 
     const double sigma = std::sqrt(sigma2);
-    const double rawK = std::floor(mu - 3.0 * sigma - 7.0);
+    const double rawK = std::floor(mu - (3.0 * sigma) - 7.0);
     const std::size_t k = rawK > 0.0 ? static_cast<std::size_t>(rawK) : 0;
 
-    return {mu, sigma2, k};
+    return {.meanCapacityBits = mu, .variance = sigma2, .safePayloadBits = k};
 }
 
 std::size_t requiredKeyBits(std::span<const MeaningChoice> sequence, std::size_t s) noexcept {
@@ -73,7 +73,7 @@ std::size_t requiredKeyBits(std::span<const MeaningChoice> sequence, std::size_t
         for (const auto& opt : step.options) {
             if (opt.probability > 0.0) {
                 const double p = opt.probability / sumP;
-                if (p < minP) minP = p;
+                minP = std::min(minP, p);
             }
         }
         if (minP > 0.0) {
@@ -103,55 +103,59 @@ double failureProbabilityBound(const ChannelCapacity& capacity, std::size_t payl
 double exactFailureProbability(std::span<const MeaningChoice> sequence, std::size_t payloadBits) noexcept {
     if (sequence.empty()) return 0.0;
 
-    constexpr double kScale = 1000.0;
-    std::unordered_map<std::int64_t, double> dist{{0, 1.0}};
-    double prunedMass = 0.0;
+    try {
+        constexpr double kScale = 1000.0;
+        std::unordered_map<std::int64_t, double> dist{{0, 1.0}};
+        double prunedMass = 0.0;
 
-    for (const auto& step : sequence) {
-        if (step.options.empty()) continue;
-        double sumP = 0.0;
-        for (const auto& opt : step.options)
-            sumP += opt.probability;
-        if (sumP <= 0.0) continue;
+        for (const auto& step : sequence) {
+            if (step.options.empty()) continue;
+            double sumP = 0.0;
+            for (const auto& opt : step.options)
+                sumP += opt.probability;
+            if (sumP <= 0.0) continue;
 
-        std::unordered_map<std::int64_t, double> nextDist;
-        nextDist.reserve(dist.size() * step.options.size());
+            std::unordered_map<std::int64_t, double> nextDist;
+            nextDist.reserve(dist.size() * step.options.size());
 
-        for (const auto& opt : step.options) {
-            if (opt.probability <= 0.0) continue;
-            const double p = opt.probability / sumP;
-            const double logP = -std::log2(p);
-            const auto shift = static_cast<std::int64_t>(std::round(logP * kScale));
+            for (const auto& opt : step.options) {
+                if (opt.probability <= 0.0) continue;
+                const double p = opt.probability / sumP;
+                const double logP = -std::log2(p);
+                const auto shift = static_cast<std::int64_t>(std::round(logP * kScale));
 
-            for (const auto& [bin, prob] : dist) {
-                nextDist[bin + shift] += prob * p;
-            }
-        }
-        constexpr std::size_t kMaxDistStates = 4096;
-        if (nextDist.size() > kMaxDistStates) {
-            for (auto it = nextDist.begin(); it != nextDist.end();) {
-                if (it->second < 1e-12) {
-                    prunedMass += it->second;
-                    it = nextDist.erase(it);
-                } else {
-                    ++it;
+                for (const auto& [bin, prob] : dist) {
+                    nextDist[bin + shift] += prob * p;
                 }
             }
+            constexpr std::size_t kMaxDistStates = 4096;
+            if (nextDist.size() > kMaxDistStates) {
+                for (auto it = nextDist.begin(); it != nextDist.end();) {
+                    if (it->second < 1e-12) {
+                        prunedMass += it->second;
+                        it = nextDist.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+            dist = std::move(nextDist);
         }
-        dist = std::move(nextDist);
+
+        double delta = 0.0;
+        const double twoK = std::ldexp(1.0, static_cast<int>(std::min(payloadBits, std::size_t{1023})));
+
+        for (const auto& [bin, prob] : dist) {
+            const double logQ = static_cast<double>(bin) / kScale;
+            const double q = std::pow(2.0, -logQ);
+            const double minFactor = std::min(1.0, twoK * q);
+            delta += prob * minFactor;
+        }
+
+        return std::min(1.0, std::max(0.0, delta + prunedMass));
+    } catch (...) {
+        return 1.0;
     }
-
-    double delta = 0.0;
-    const double twoK = std::ldexp(1.0, static_cast<int>(std::min(payloadBits, std::size_t{1023})));
-
-    for (const auto& [bin, prob] : dist) {
-        const double logQ = static_cast<double>(bin) / kScale;
-        const double q = std::pow(2.0, -logQ);
-        const double minFactor = std::min(1.0, twoK * q);
-        delta += prob * minFactor;
-    }
-
-    return std::min(1.0, std::max(0.0, delta + prunedMass));
 }
 
 EmbedResult embed(std::span<const MeaningChoice> sequence, std::uint64_t message, std::size_t payloadBits,
@@ -204,7 +208,7 @@ EmbedResult embed(std::span<const MeaningChoice> sequence, std::uint64_t message
 
         for (const auto& opt : step.options) {
             const double p = opt.probability / sumP;
-            const double subR = subL + curWidth * p;
+            const double subR = subL + (curWidth * p);
 
             if (u >= subL && (u < subR || &opt == &step.options.back())) {
                 res.chosenForms.push_back(opt.formIndex);
@@ -261,7 +265,7 @@ DecodeResult decode(std::span<const MeaningChoice> sequence, std::span<const std
 
         for (const auto& opt : step.options) {
             const double p = opt.probability / sumP;
-            const double subR = subL + curWidth * p;
+            const double subR = subL + (curWidth * p);
 
             if (opt.formIndex == observedForm) {
                 curL = subL;

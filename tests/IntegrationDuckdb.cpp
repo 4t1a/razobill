@@ -523,12 +523,9 @@ TEST_CASE("control plane: config synchronization, transactional atomicity and ba
             "(4, 'User root login successful', 'INFO')");
 
     // Test config precedence and snake_case synchronization
-    RazobillEngine rz(*b, {
-        .table = "ctrl_logs",
-        .purpose = "level",
-        .message_column = "log_msg",
-        .scan_mode = core::ScanMode::Semantic
-    });
+    RazobillEngine rz(
+        *b,
+        {.table = "ctrl_logs", .purpose = "level", .message_column = "log_msg", .scan_mode = core::ScanMode::Semantic});
 
     const auto rows = rz.compact("ctrl_test");
     CHECK(rows == 4);
@@ -561,4 +558,3 @@ TEST_CASE("control plane: config synchronization, transactional atomicity and ba
     CHECK(v3 == 3);
     CHECK(rz.version() == 3);
 }
-

@@ -54,18 +54,20 @@ pub fn parse_razobill(raw_msg: &str) -> Result<BTreeMap<String, serde_json::Valu
     };
 
     if !matches!(status, RzStatus::Ok) {
-        return Err(format!("Razobill decomposition failed with status {:?}", status));
+        return Err(format!(
+            "Razobill decomposition failed with status {status:?}"
+        ));
     }
 
-    struct RecordGuard<'a>(&'a mut RzRecord);
-    impl<'a> Drop for RecordGuard<'a> {
+    struct RecordGuard(*mut RzRecord);
+    impl Drop for RecordGuard {
         fn drop(&mut self) {
             unsafe {
                 RzFree(self.0);
             }
         }
     }
-    let _guard = RecordGuard(&mut record);
+    let _guard = RecordGuard(&mut record as *mut RzRecord);
 
     // DESIGN DECISION (F-EXT-06):
     // Vector VRL represents internal event values as UTF-8 JSON objects (`serde_json::Value`).

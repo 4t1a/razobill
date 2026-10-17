@@ -225,4 +225,3 @@ TEST_CASE("Channel degenerate inputs and precision underflow rejection") {
     auto resLongDecode = decode(longSeq, longForms, 8, sharedKey);
     CHECK(!resLongDecode.success);
 }
-

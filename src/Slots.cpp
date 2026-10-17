@@ -63,8 +63,10 @@ Status splitKey(std::string_view form, std::string_view& skeleton, std::string_v
 
 Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> ints,
                          std::span<const std::string_view> strs, std::string& out) {
-    std::string_view skeleton, types;
-    std::size_t nInt = 0, nStr = 0;
+    std::string_view skeleton;
+    std::string_view types;
+    std::size_t nInt = 0;
+    std::size_t nStr = 0;
     if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) {
         return s;
     }
@@ -86,7 +88,9 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
 
     out.clear();
     out.reserve(size);
-    std::size_t ti = 0, ii = 0, si = 0;
+    std::size_t ti = 0;
+    std::size_t ii = 0;
+    std::size_t si = 0;
     std::array<char, 32> num{};
     for (char c : skeleton) {
         if (static_cast<unsigned char>(c) != kPlaceholder) {
@@ -110,7 +114,8 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
     // This eliminates intermediate reallocations and guarantees O(N) allocation determinism.
     const char* p = tmpl.data();
     const char* const end = p + tmpl.size();
-    std::size_t nInt = 0, nStr = 0;
+    std::size_t nInt = 0;
+    std::size_t nStr = 0;
     std::size_t estSize = 0;
 
     while (p < end) {
@@ -257,8 +262,10 @@ Status reconstruct(std::string_view tmpl, std::span<const std::int64_t> ints, st
 
 Status templateOf(std::string_view form, std::string& out) {
     if (isLegacyFormKey(form)) {
-        std::string_view skeleton, types;
-        std::size_t nInt = 0, nStr = 0;
+        std::string_view skeleton;
+        std::string_view types;
+        std::size_t nInt = 0;
+        std::size_t nStr = 0;
         if (const auto s = splitKey(form, skeleton, types, nInt, nStr); s != Status::Ok) {
             return s;
         }

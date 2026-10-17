@@ -22,6 +22,7 @@
 #include "duckdb_extension.h"
 #include "librazobill/Slots.hpp"
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 DUCKDB_EXTENSION_EXTERN
 
 namespace {
@@ -29,7 +30,7 @@ namespace {
 using razobill::Status;
 namespace core = razobill::core;
 
-constexpr std::size_t kScratchKeepBytes = std::size_t{1} << 20;
+constexpr std::size_t kScratchKeepBytes = std::size_t{1} << 20U;
 
 enum class Kind : unsigned char { I64, I32, I16, I8, U64, U32, U16, U8, Str, IntList, StrList, Unsupported };
 
@@ -64,7 +65,7 @@ inline Kind classify(duckdb_logical_type t) {
     case DUCKDB_TYPE_BLOB:
         return Kind::Str;
     case DUCKDB_TYPE_LIST: {
-        auto elem = duckdb_list_type_child_type(t);
+        auto* elem = duckdb_list_type_child_type(t);
         auto elemId = duckdb_get_type_id(elem);
         duckdb_destroy_logical_type(&elem);
         if (elemId == DUCKDB_TYPE_BIGINT || elemId == DUCKDB_TYPE_INTEGER || elemId == DUCKDB_TYPE_UBIGINT) {
@@ -91,8 +92,10 @@ struct Scratch {
         if (text.capacity() > kScratchKeepBytes) std::string().swap(text);
         if (record.skeleton.capacity() > kScratchKeepBytes) std::string().swap(record.skeleton);
         if (record.templateStr.capacity() > kScratchKeepBytes) std::string().swap(record.templateStr);
-        if (record.ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes) std::vector<std::int64_t>().swap(record.ints);
-        if (record.strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes) std::vector<std::string_view>().swap(record.strs);
+        if (record.ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes)
+            std::vector<std::int64_t>().swap(record.ints);
+        if (record.strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes)
+            std::vector<std::string_view>().swap(record.strs);
         if (ints.capacity() * sizeof(std::int64_t) > kScratchKeepBytes) std::vector<std::int64_t>().swap(ints);
         if (strs.capacity() * sizeof(std::string_view) > kScratchKeepBytes) std::vector<std::string_view>().swap(strs);
     }
@@ -150,7 +153,7 @@ inline void fail(duckdb_function_info info, const char* fn, Status s, std::strin
 void RzTemplateImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
+    auto* vec = duckdb_data_chunk_get_vector(in, 0);
     auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
     auto* vv = duckdb_vector_get_validity(vec);
     for (idx_t r = 0; r < n; ++r) {
@@ -176,18 +179,18 @@ void RzTemplateImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vect
 void RzSplitImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector out) {
     auto& sc = scratch();
     const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
+    auto* vec = duckdb_data_chunk_get_vector(in, 0);
     auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
     auto* vv = duckdb_vector_get_validity(vec);
 
-    auto tmplChild = duckdb_struct_vector_get_child(out, 0);
-    auto intsChild = duckdb_struct_vector_get_child(out, 1);
-    auto strsChild = duckdb_struct_vector_get_child(out, 2);
+    auto* tmplChild = duckdb_struct_vector_get_child(out, 0);
+    auto* intsChild = duckdb_struct_vector_get_child(out, 1);
+    auto* strsChild = duckdb_struct_vector_get_child(out, 2);
 
-    auto intsGrandchild = duckdb_list_vector_get_child(intsChild);
+    auto* intsGrandchild = duckdb_list_vector_get_child(intsChild);
     auto* intsEntries = static_cast<duckdb_list_entry*>(duckdb_vector_get_data(intsChild));
 
-    auto strsGrandchild = duckdb_list_vector_get_child(strsChild);
+    auto* strsGrandchild = duckdb_list_vector_get_child(strsChild);
     auto* strsEntries = static_cast<duckdb_list_entry*>(duckdb_vector_get_data(strsChild));
 
     idx_t totalInts = 0;
@@ -198,16 +201,16 @@ void RzSplitImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector 
             setNull(tmplChild, r);
             setNull(intsChild, r);
             setNull(strsChild, r);
-            intsEntries[r] = {totalInts, 0};
-            strsEntries[r] = {totalStrs, 0};
+            intsEntries[r] = {.offset = totalInts, .length = 0};
+            strsEntries[r] = {.offset = totalStrs, .length = 0};
             setNull(out, r);
             continue;
         }
         auto sv = viewOf(data[r]);
         if (sv.empty()) {
             put(tmplChild, r, "");
-            intsEntries[r] = {totalInts, 0};
-            strsEntries[r] = {totalStrs, 0};
+            intsEntries[r] = {.offset = totalInts, .length = 0};
+            strsEntries[r] = {.offset = totalStrs, .length = 0};
             continue;
         }
         if (auto s = core::parse(sv, sc.record, core::ScanMode::Semantic); s != Status::Ok) {
@@ -218,7 +221,7 @@ void RzSplitImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector 
 
         const idx_t numInts = sc.record.ints.size();
         duckdb_list_vector_reserve(intsChild, totalInts + numInts);
-        intsEntries[r] = {totalInts, numInts};
+        intsEntries[r] = {.offset = totalInts, .length = numInts};
         auto* dstInts = static_cast<std::int64_t*>(duckdb_vector_get_data(intsGrandchild));
         for (idx_t i = 0; i < numInts; ++i) {
             dstInts[totalInts + i] = sc.record.ints[i];
@@ -227,7 +230,7 @@ void RzSplitImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector 
 
         const idx_t numStrs = sc.record.strs.size();
         duckdb_list_vector_reserve(strsChild, totalStrs + numStrs);
-        strsEntries[r] = {totalStrs, numStrs};
+        strsEntries[r] = {.offset = totalStrs, .length = numStrs};
         for (idx_t i = 0; i < numStrs; ++i) {
             put(strsGrandchild, totalStrs + i, sc.record.strs[i]);
         }
@@ -245,21 +248,21 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
     const idx_t numCols = duckdb_data_chunk_get_column_count(in);
     if (numCols < 1) return;
 
-    auto tmplVec = duckdb_data_chunk_get_vector(in, 0);
+    auto* tmplVec = duckdb_data_chunk_get_vector(in, 0);
     auto* tmplData = static_cast<duckdb_string_t*>(duckdb_vector_get_data(tmplVec));
     auto* tmplVv = duckdb_vector_get_validity(tmplVec);
 
     sc.args.resize(numCols - 1);
     for (idx_t c = 1; c < numCols; ++c) {
-        auto vec = duckdb_data_chunk_get_vector(in, c);
-        auto ltype = duckdb_vector_get_column_type(vec);
+        auto* vec = duckdb_data_chunk_get_vector(in, c);
+        auto* ltype = duckdb_vector_get_column_type(vec);
         auto& a = sc.args[c - 1];
         a.kind = classify(ltype);
         duckdb_destroy_logical_type(&ltype);
         a.data = duckdb_vector_get_data(vec);
         a.validity = duckdb_vector_get_validity(vec);
         if (a.kind == Kind::IntList || a.kind == Kind::StrList) {
-            auto ch = duckdb_list_vector_get_child(vec);
+            auto* ch = duckdb_list_vector_get_child(vec);
             a.childData = duckdb_vector_get_data(ch);
             a.childValidity = duckdb_vector_get_validity(ch);
         }
@@ -273,11 +276,9 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
             setNull(out, r);
             continue;
         }
-        if (isStandardThreeArg) {
-            if (!isValid(sc.args[0].validity, r) || !isValid(sc.args[1].validity, r)) {
-                setNull(out, r);
-                continue;
-            }
+        if (isStandardThreeArg && (!isValid(sc.args[0].validity, r) || !isValid(sc.args[1].validity, r))) {
+            setNull(out, r);
+            continue;
         }
 
         sc.ints.clear();
@@ -366,7 +367,7 @@ void RzJoinImpl(duckdb_function_info info, duckdb_data_chunk in, duckdb_vector o
 // ---- RzHash ----
 void RzHashImpl(duckdb_function_info /*info*/, duckdb_data_chunk in, duckdb_vector out) {
     const idx_t n = duckdb_data_chunk_get_size(in);
-    auto vec = duckdb_data_chunk_get_vector(in, 0);
+    auto* vec = duckdb_data_chunk_get_vector(in, 0);
     auto* data = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vec));
     auto* vv = duckdb_vector_get_validity(vec);
     auto* dst = static_cast<std::uint64_t*>(duckdb_vector_get_data(out));
@@ -419,12 +420,14 @@ public:
     }
     FunctionSet(const FunctionSet&) = delete;
     FunctionSet& operator=(const FunctionSet&) = delete;
+    FunctionSet(FunctionSet&&) = delete;
+    FunctionSet& operator=(FunctionSet&&) = delete;
 
     void add(std::initializer_list<duckdb_logical_type> params, duckdb_logical_type ret,
              void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
-        auto f = duckdb_create_scalar_function();
+        auto* f = duckdb_create_scalar_function();
         duckdb_scalar_function_set_name(f, name_);
-        for (auto p : params)
+        for (auto* p : params)
             duckdb_scalar_function_add_parameter(f, p);
         duckdb_scalar_function_set_return_type(f, ret);
         duckdb_scalar_function_set_function(f, fn);
@@ -434,7 +437,7 @@ public:
 
     void addVarargs(duckdb_logical_type firstParam, duckdb_logical_type varargsType, duckdb_logical_type ret,
                     void (*fn)(duckdb_function_info, duckdb_data_chunk, duckdb_vector)) {
-        auto f = duckdb_create_scalar_function();
+        auto* f = duckdb_create_scalar_function();
         duckdb_scalar_function_set_name(f, name_);
         if (firstParam) duckdb_scalar_function_add_parameter(f, firstParam);
         duckdb_scalar_function_set_varargs(f, varargsType);
@@ -456,11 +459,17 @@ private:
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast,cppcoreguidelines-avoid-non-const-global-variables,readability-named-parameter)
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info, struct duckdb_extension_access*) {
     try {
-        Type varchar(DUCKDB_TYPE_VARCHAR), blob(DUCKDB_TYPE_BLOB), bigint(DUCKDB_TYPE_BIGINT), ubigint(DUCKDB_TYPE_UBIGINT);
+        Type varchar(DUCKDB_TYPE_VARCHAR);
+        Type blob(DUCKDB_TYPE_BLOB);
+        Type bigint(DUCKDB_TYPE_BIGINT);
+        Type ubigint(DUCKDB_TYPE_UBIGINT);
         Type any(DUCKDB_TYPE_ANY);
-        Type bigintList = Type::listOf(bigint), varcharList = Type::listOf(varchar), blobList = Type::listOf(blob);
+        Type bigintList = Type::listOf(bigint);
+        Type varcharList = Type::listOf(varchar);
+        Type blobList = Type::listOf(blob);
 
         std::vector<const char*> structNames = {"template", "ints", "strs"};
         std::vector<duckdb_logical_type> structTypesVarchar = {varchar.t, bigintList.t, varcharList.t};

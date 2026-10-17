@@ -1,4 +1,4 @@
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
@@ -8,6 +8,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,7 @@ namespace razobill {
 namespace {
 
 void* sysLoadLibrary(const char* path, bool deepbind, bool global) {
-#if defined(_WIN32)
+#ifdef _WIN32
     (void)deepbind;
     (void)global;
     return reinterpret_cast<void*>(LoadLibraryA(path));
@@ -46,7 +47,7 @@ void* sysLoadLibrary(const char* path, bool deepbind, bool global) {
 
 void sysUnloadLibrary(void* handle) {
     if (!handle) return;
-#if defined(_WIN32)
+#ifdef _WIN32
     FreeLibrary(reinterpret_cast<HMODULE>(handle));
 #else
     dlclose(handle);
@@ -54,7 +55,7 @@ void sysUnloadLibrary(void* handle) {
 }
 
 void* sysLoadSymbol(void* handle, const char* symbol) {
-#if defined(_WIN32)
+#ifdef _WIN32
     return reinterpret_cast<void*>(GetProcAddress(reinterpret_cast<HMODULE>(handle), symbol));
 #else
     return dlsym(handle, symbol);
@@ -62,7 +63,7 @@ void* sysLoadSymbol(void* handle, const char* symbol) {
 }
 
 std::string sysLastError() {
-#if defined(_WIN32)
+#ifdef _WIN32
     DWORD err = GetLastError();
     if (err == 0) return "no error";
     LPSTR buf = nullptr;
@@ -95,8 +96,8 @@ const std::uint8_t* validity(const ArrowArray* a) {
 }
 bool isValid(const ArrowArray* a, std::int64_t i) {
     const auto* v = validity(a);
-    const auto k = i + a->offset;
-    return v == nullptr || (v[k >> 3] >> (k & 7)) & 1;
+    const auto k = static_cast<std::uint64_t>(i + a->offset);
+    return v == nullptr || (((static_cast<unsigned int>(v[k >> 3U]) >> (k & 7U)) & 1U) != 0U);
 }
 
 template <class T> T at(const ArrowArray* a, std::int64_t i) {
@@ -117,26 +118,30 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
     if (!std::strcmp(fmt, "g")) return at<double>(a, i);
     if (!std::strcmp(fmt, "f")) return static_cast<double>(at<float>(a, i));
     if (!std::strcmp(fmt, "b")) {
-        const auto k = i + a->offset;
-        return static_cast<std::int64_t>((static_cast<const std::uint8_t*>(a->buffers[1])[k >> 3] >> (k & 7)) & 1);
+        const auto k = static_cast<std::uint64_t>(i + a->offset);
+        return static_cast<std::int64_t>(
+            ((static_cast<unsigned int>(static_cast<const std::uint8_t*>(a->buffers[1])[k >> 3U]) >> (k & 7U)) & 1U));
     }
     if (!std::strncmp(fmt, "d:", 2)) {
-        int precision = 0, scale = 0, bits = 128;
+        int precision = 0;
+        int scale = 0;
+        int bits = 128;
+        // NOLINTNEXTLINE(cert-err34-c,cppcoreguidelines-pro-type-vararg,bugprone-unchecked-string-to-number-conversion)
         if (std::sscanf(fmt + 2, "%d,%d,%d", &precision, &scale, &bits) < 2) {
             throw BackendError(std::string("malformed decimal format string: ") + fmt);
         }
         if (bits != 128) throw BackendError(std::string("unsupported decimal width: ") + fmt);
-        const auto* w = static_cast<const std::uint64_t*>(a->buffers[1]) + 2 * (i + a->offset);
+        const auto* w = static_cast<const std::uint64_t*>(a->buffers[1]) + (2 * (i + a->offset));
         const auto hi = static_cast<std::int64_t>(w[1]);
         double v = 0.0;
         if (hi < 0) {
-            const std::uint64_t uhi = static_cast<std::uint64_t>(hi);
+            const auto uhi = static_cast<std::uint64_t>(hi);
             const std::uint64_t magLo = (w[0] == 0) ? 0ULL : (~w[0] + 1ULL);
             const std::uint64_t magHi = (w[0] == 0) ? (0ULL - uhi) : ~uhi;
-            const double mag = static_cast<double>(magHi) * 18446744073709551616.0 + static_cast<double>(magLo);
+            const double mag = (static_cast<double>(magHi) * 18446744073709551616.0) + static_cast<double>(magLo);
             v = -mag;
         } else {
-            v = static_cast<double>(hi) * 18446744073709551616.0 + static_cast<double>(w[0]);
+            v = (static_cast<double>(hi) * 18446744073709551616.0) + static_cast<double>(w[0]);
         }
         for (int k = 0; k < scale; ++k)
             v /= 10.0;
@@ -157,6 +162,11 @@ Value decode(const char* fmt, const ArrowArray* a, std::int64_t i) {
 
 class AdbcBackend final : public Backend {
 public:
+    AdbcBackend(const AdbcBackend&) = delete;
+    AdbcBackend& operator=(const AdbcBackend&) = delete;
+    AdbcBackend(AdbcBackend&&) = delete;
+    AdbcBackend& operator=(AdbcBackend&&) = delete;
+
     explicit AdbcBackend(const AdbcOptions& o) : flavor_(o.flavor) {
         const auto& preloads = !o.preloadGlobal.empty() ? o.preloadGlobal : o.preload_global;
         for (const auto& lib : preloads) {
@@ -193,18 +203,24 @@ public:
         AdbcError err{};
         if (have_conn_) {
             driver_.ConnectionRelease(&conn_, &err);
-            if (err.release) { err.release(&err); err = AdbcError{}; }
+            if (err.release) {
+                err.release(&err);
+                err = AdbcError{};
+            }
         }
         if (have_db_) {
             driver_.DatabaseRelease(&db_, &err);
-            if (err.release) { err.release(&err); err = AdbcError{}; }
+            if (err.release) {
+                err.release(&err);
+                err = AdbcError{};
+            }
         }
         if (lib_) {
             sysUnloadLibrary(lib_);
             lib_ = nullptr;
         }
-        for (auto it = preloadHandles_.rbegin(); it != preloadHandles_.rend(); ++it) {
-            sysUnloadLibrary(*it);
+        for (void* handle : std::views::reverse(preloadHandles_)) {
+            sysUnloadLibrary(handle);
         }
         preloadHandles_.clear();
     }
@@ -225,13 +241,18 @@ private:
         AdbcStatement st{};
         if (driver_.StatementNew(&conn_, &st, &err) != ADBC_STATUS_OK) fail("StatementNew", err);
         struct Guard {
-            AdbcDriver& d;
-            AdbcStatement& s;
+            AdbcDriver* d{nullptr};
+            AdbcStatement* s{nullptr};
+            explicit Guard(AdbcDriver* d_in, AdbcStatement* s_in) noexcept : d(d_in), s(s_in) {}
+            Guard(const Guard&) = delete;
+            Guard& operator=(const Guard&) = delete;
+            Guard(Guard&&) = delete;
+            Guard& operator=(Guard&&) = delete;
             ~Guard() {
                 AdbcError e{};
-                d.StatementRelease(&s, &e);
+                if (d && s) d->StatementRelease(s, &e);
             }
-        } guard{driver_, st};
+        } guard(&driver_, &st);
         const std::string q(sql);
         if (driver_.StatementSetSqlQuery(&st, q.c_str(), &err) != ADBC_STATUS_OK) fail("SetSqlQuery", err);
         ArrowArrayStream stream{};
@@ -239,20 +260,30 @@ private:
         if (driver_.StatementExecuteQuery(&st, &stream, &rows, &err) != ADBC_STATUS_OK)
             fail("ExecuteQuery [" + q.substr(0, 160) + "]", err);
         struct StreamGuard {
-            ArrowArrayStream& s;
+            ArrowArrayStream* s{nullptr};
+            explicit StreamGuard(ArrowArrayStream* s_in) noexcept : s(s_in) {}
+            StreamGuard(const StreamGuard&) = delete;
+            StreamGuard& operator=(const StreamGuard&) = delete;
+            StreamGuard(StreamGuard&&) = delete;
+            StreamGuard& operator=(StreamGuard&&) = delete;
             ~StreamGuard() {
-                if (s.release) s.release(&s);
+                if (s && s->release) s->release(s);
             }
-        } sg{stream};
+        } sg(&stream);
         if (!stream.release) return;
         ArrowSchema schema{};
         if (stream.get_schema(&stream, &schema) != 0) throw BackendError("cannot read result schema");
         struct SchemaGuard {
-            ArrowSchema& s;
+            ArrowSchema* s{nullptr};
+            explicit SchemaGuard(ArrowSchema* s_in) noexcept : s(s_in) {}
+            SchemaGuard(const SchemaGuard&) = delete;
+            SchemaGuard& operator=(const SchemaGuard&) = delete;
+            SchemaGuard(SchemaGuard&&) = delete;
+            SchemaGuard& operator=(SchemaGuard&&) = delete;
             ~SchemaGuard() {
-                if (s.release) s.release(&s);
+                if (s && s->release) s->release(s);
             }
-        } schg{schema};
+        } schg(&schema);
         if (out) {
             for (std::int64_t c = 0; c < schema.n_children; ++c)
                 out->names.emplace_back(schema.children[c]->name ? schema.children[c]->name : "");
@@ -262,11 +293,16 @@ private:
             if (stream.get_next(&stream, &batch) != 0) throw BackendError("cannot read result batch");
             if (!batch.release) break;
             struct BatchGuard {
-                ArrowArray& a;
+                ArrowArray* a{nullptr};
+                explicit BatchGuard(ArrowArray* a_in) noexcept : a(a_in) {}
+                BatchGuard(const BatchGuard&) = delete;
+                BatchGuard& operator=(const BatchGuard&) = delete;
+                BatchGuard(BatchGuard&&) = delete;
+                BatchGuard& operator=(BatchGuard&&) = delete;
                 ~BatchGuard() {
-                    if (a.release) a.release(&a);
+                    if (a && a->release) a->release(a);
                 }
-            } bg{batch};
+            } bg(&batch);
             if (!out) continue;
             for (std::int64_t r = 0; r < batch.length; ++r) {
                 std::vector<Value> row;

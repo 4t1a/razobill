@@ -122,8 +122,9 @@ public:
     }
 
     template <typename T, typename... Args> [[nodiscard]] T* create(Args&&... args) {
-        static_assert(std::is_trivially_destructible_v<T>,
-                      "MemoryArena::create only supports trivially destructible types (destructors are not called on reset)");
+        static_assert(
+            std::is_trivially_destructible_v<T>,
+            "MemoryArena::create only supports trivially destructible types (destructors are not called on reset)");
         void* mem = allocate(sizeof(T), alignof(T));
         return ::new (mem) T(std::forward<Args>(args)...);
     }

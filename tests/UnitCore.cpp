@@ -337,21 +337,19 @@ TEST_CASE("ThreadPool: parallelFor exception safety and worker settlement") {
     razobill::core::ThreadPool pool(4);
     std::atomic<int> completedTasks{0};
 
-    CHECK_THROWS_AS(
-        pool.parallelFor(100, 10, [&](std::size_t start, std::size_t end) {
-            if (start == 20) {
-                throw std::runtime_error("Simulated task failure");
-            }
-            completedTasks.fetch_add(static_cast<int>(end - start));
-        }),
-        std::runtime_error
-    );
+    CHECK_THROWS_AS(pool.parallelFor(100, 10,
+                                     [&](std::size_t start, std::size_t end) {
+                                         if (start == 20) {
+                                             throw std::runtime_error("Simulated task failure");
+                                         }
+                                         completedTasks.fetch_add(static_cast<int>(end - start));
+                                     }),
+                    std::runtime_error);
 
     // After exception is caught, all worker tasks have settled cleanly and pool remains usable
     std::atomic<int> nextTasks{0};
-    pool.parallelFor(50, 10, [&](std::size_t start, std::size_t end) {
-        nextTasks.fetch_add(static_cast<int>(end - start));
-    });
+    pool.parallelFor(50, 10,
+                     [&](std::size_t start, std::size_t end) { nextTasks.fetch_add(static_cast<int>(end - start)); });
     CHECK(nextTasks.load() == 50);
 }
 

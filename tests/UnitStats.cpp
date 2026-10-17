@@ -220,10 +220,7 @@ TEST_CASE("Proposition 6: Multi-level depth ledger splits entropy and relevance 
 
 TEST_CASE("Theorem 1 Fréchet polytope bounding and Cell deduplication") {
     // 1. Exact independent variable test: X independent of W
-    std::vector<Cell> indepCells{
-        {0, 0, 25.0}, {0, 1, 25.0},
-        {1, 0, 25.0}, {1, 1, 25.0}
-    };
+    std::vector<Cell> indepCells{{0, 0, 25.0}, {0, 1, 25.0}, {1, 0, 25.0}, {1, 1, 25.0}};
     const auto lIndep = ledger(indepCells, 100.0);
     CHECK(lIndep.conveyance == doctest::Approx(0.0).epsilon(1e-12));
     CHECK(std::abs(lIndep.expression - (lIndep.conveyance + lIndep.latitude)) < 1e-15);
@@ -231,9 +228,7 @@ TEST_CASE("Theorem 1 Fréchet polytope bounding and Cell deduplication") {
     CHECK(std::abs((lIndep.expression - lIndep.content) - (lIndep.latitude - lIndep.doubt)) < 1e-15);
 
     // 2. Exact deterministic functional test: X == W
-    std::vector<Cell> detCells{
-        {0, 0, 40.0}, {1, 1, 60.0}
-    };
+    std::vector<Cell> detCells{{0, 0, 40.0}, {1, 1, 60.0}};
     const auto lDet = ledger(detCells, 100.0);
     CHECK(lDet.latitude == doctest::Approx(0.0).epsilon(1e-12));
     CHECK(lDet.doubt == doctest::Approx(0.0).epsilon(1e-12));
@@ -248,11 +243,7 @@ TEST_CASE("Theorem 1 Fréchet polytope bounding and Cell deduplication") {
         {1, 0, 15.0}, {1, 0, 15.0}, // combined: {1, 0, 30.0}
         {2, 1, 25.0}, {2, 1, 25.0}  // combined: {2, 1, 50.0}
     };
-    std::vector<Cell> aggCells{
-        {0, 0, 20.0},
-        {1, 0, 30.0},
-        {2, 1, 50.0}
-    };
+    std::vector<Cell> aggCells{{0, 0, 20.0}, {1, 0, 30.0}, {2, 1, 50.0}};
     const auto lUnagg = ledger(unaggCells, 100.0);
     const auto lAgg = ledger(aggCells, 100.0);
 

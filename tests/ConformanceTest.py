@@ -21,12 +21,16 @@ sys.path.insert(0, str(root_dir / "lib" / "python"))
 
 import pyrazobill as rz
 
+
 # Load C ABI
 def find_c_lib():
     names = [
-        "razobill.dll", "librazobill.dll",
-        "librazobill.so", "razobill.so",
-        "librazobill.dylib", "razobill.dylib",
+        "razobill.dll",
+        "librazobill.dll",
+        "librazobill.so",
+        "razobill.so",
+        "librazobill.dylib",
+        "razobill.dylib",
     ]
     subdirs = ["build", "build/Release", "build/Debug", "bin", "."]
     for sub in subdirs:
@@ -35,6 +39,7 @@ def find_c_lib():
             if p.exists():
                 return p
     raise RuntimeError(f"Cannot find compiled C ABI shared library in {root_dir / 'build'}")
+
 
 dll_path = find_c_lib()
 c_lib = ctypes.CDLL(str(dll_path))
@@ -76,6 +81,7 @@ import duckdb
 
 con = duckdb.connect(config={"allow_unsigned_extensions": "true"})
 
+
 def find_duckdb_ext():
     names = ["razobill.duckdb_extension", "librazobill.duckdb_extension"]
     subdirs = ["build", "build/Release", "build/Debug", "bin", "."]
@@ -85,6 +91,7 @@ def find_duckdb_ext():
             if p.exists():
                 return p
     return None
+
 
 ext_path = find_duckdb_ext()
 has_duckdb_ext = False
@@ -167,17 +174,19 @@ def main():
         assert py_rec.template == c_tmpl, (
             f"Template mismatch on line {idx}:\n  Python: {py_rec.template}\n  C ABI:  {c_tmpl}"
         )
-        assert py_rec.ints == c_ints, (
-            f"Ints mismatch on line {idx}:\n  Python: {py_rec.ints}\n  C ABI:  {c_ints}"
-        )
-        assert py_rec.strs == c_strs, (
-            f"Strs mismatch on line {idx}:\n  Python: {py_rec.strs}\n  C ABI:  {c_strs}"
-        )
+        assert py_rec.ints == c_ints, f"Ints mismatch on line {idx}:\n  Python: {py_rec.ints}\n  C ABI:  {c_ints}"
+        assert py_rec.strs == c_strs, f"Strs mismatch on line {idx}:\n  Python: {py_rec.strs}\n  C ABI:  {c_strs}"
 
         if has_duckdb_ext:
-            assert c_tmpl == db_tmpl, f"Template mismatch with DuckDB on line {idx}:\n  C ABI:  {c_tmpl}\n  DuckDB: {db_tmpl}"
-            assert c_ints == db_ints, f"Ints mismatch with DuckDB on line {idx}:\n  C ABI:  {c_ints}\n  DuckDB: {db_ints}"
-            assert c_strs == db_strs, f"Strs mismatch with DuckDB on line {idx}:\n  C ABI:  {c_strs}\n  DuckDB: {db_strs}"
+            assert c_tmpl == db_tmpl, (
+                f"Template mismatch with DuckDB on line {idx}:\n  C ABI:  {c_tmpl}\n  DuckDB: {db_tmpl}"
+            )
+            assert c_ints == db_ints, (
+                f"Ints mismatch with DuckDB on line {idx}:\n  C ABI:  {c_ints}\n  DuckDB: {db_ints}"
+            )
+            assert c_strs == db_strs, (
+                f"Strs mismatch with DuckDB on line {idx}:\n  C ABI:  {c_strs}\n  DuckDB: {db_strs}"
+            )
 
     status_suffix = "across Python, C ABI, and DuckDB SQL!" if has_duckdb_ext else "across Python and C ABI!"
     print(f"SUCCESS: All {len(lines)} lines produced 100% byte-identical results {status_suffix}")

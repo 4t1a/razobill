@@ -1,0 +1,3 @@
+# Ignore thirdparty dependencies and build directory
+thirdparty/**
+build/**
