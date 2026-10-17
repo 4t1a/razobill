@@ -113,30 +113,30 @@ flowchart TD
 
 *Goal: Ensure 100% bit-exact lossless roundtripping, safe template formatting, and SIMD instruction safety.*
 
-- [ ] **Step 2.1: Re-engineer `templateOf()` Transformer**
+- [x] **Step 2.1: Re-engineer `templateOf()` Transformer**
   - **File:** [src/Slots.cpp:221–243](file:///C:/FM/rzd/razobill/src/Slots.cpp#L221-L243)
   - **Action:**
     - Transform `{i}` and `{s}` placeholders into `<*>`.
     - Unescape `{{` to `{` and `}}` to `}`.
     - Remove the hardcoded literal hack `form == "junk"`.
-- [ ] **Step 2.2: Fix Loop 2 Bounds & Infinite Loop in `reconstructNew()`**
+- [x] **Step 2.2: Fix Loop 2 Bounds & Infinite Loop in `reconstructNew()`**
   - **File:** [src/Slots.cpp:142–161](file:///C:/FM/rzd/razobill/src/Slots.cpp#L142-L161)
   - **Action:**
     - Verify `p + 1 < end && *(p + 1) == '}'` before executing `p += 2`.
     - Fall back to advancing `p++` if an unexpected `{` is encountered.
-- [ ] **Step 2.3: Unify Slot Count Validation Contracts**
+- [x] **Step 2.3: Unify Slot Count Validation Contracts**
   - **File:** [src/Slots.cpp:60, 130–132](file:///C:/FM/rzd/razobill/src/Slots.cpp#L60), [include/librazobill/Status.hpp](file:///C:/FM/rzd/razobill/include/librazobill/Status.hpp)
   - **Action:**
     - Add `Status::SlotOverflow = 4` to `Status.hpp`.
     - Return `SlotOverflow` when `ints.size() > nInt || strs.size() > nStr`.
     - Harmonize validation logic between `reconstructLegacy()` and `reconstructNew()`.
-- [ ] **Step 2.4: Handle Internal Control Framing Bytes in `parse()`**
+- [x] **Step 2.4: Handle Internal Control Framing Bytes in `parse()`**
   - **File:** [src/Slots.cpp:170–210](file:///C:/FM/rzd/razobill/src/Slots.cpp#L170-L210)
   - **Action:** Check `res.reserved` from `scan()`. If true, escape internal control characters (`0x11..0x13`) to prevent skeleton corruption.
-- [ ] **Step 2.5: Fix Big-Endian xxHash64 Divergence**
+- [x] **Step 2.5: Fix Big-Endian xxHash64 Divergence**
   - **File:** [include/librazobill/Hash.hpp:38–47](file:///C:/FM/rzd/razobill/include/librazobill/Hash.hpp#L38-L47)
   - **Action:** Ensure 64-bit and 32-bit word loads use little-endian byte ordering via `std::byteswap` (C++23) or compiler intrinsics (`__builtin_bswap64`, `_byteswap_uint64`).
-- [ ] **Step 2.6: Fix SIMD Trailing Zero UB**
+- [x] **Step 2.6: Fix SIMD Trailing Zero UB**
   - **File:** [include/librazobill/SimdScanner.hpp:26–36](file:///C:/FM/rzd/razobill/include/librazobill/SimdScanner.hpp#L26-L36)
   - **Action:** Explicitly guard `countTrailingZeros64(mask)`: if `mask == 0`, return 64 immediately without calling `__builtin_ctzll(0)`.
 

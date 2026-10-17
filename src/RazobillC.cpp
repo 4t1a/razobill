@@ -101,7 +101,7 @@ RZ_API RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCap
         std::string result;
         const razobill::Status status = razobill::core::reconstruct(tmplView, intSpan, strViews, result);
         if (status != razobill::Status::Ok) {
-            if (status == razobill::Status::SlotUnderflow) return RZ_ERR_COUNT_MISMATCH;
+            if (status == razobill::Status::SlotUnderflow || status == razobill::Status::SlotOverflow) return RZ_ERR_COUNT_MISMATCH;
             if (status == razobill::Status::Malformed) return RZ_ERR_MALFORMED_TEMPLATE;
             if (status == razobill::Status::TooLarge) return RZ_ERR_MESSAGE_TOO_LARGE;
             return RZ_ERR_INVALID_ARGUMENT;

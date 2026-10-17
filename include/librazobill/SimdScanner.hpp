@@ -19,6 +19,7 @@
 //    hardware.
 #pragma once
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -44,20 +45,21 @@ enum class SimdArchitecture : std::uint8_t { Scalar = 0, Neon = 1, Avx2 = 2, Avx
 
 // Branchless count-trailing-zeros for fast bitmask index location.
 // Uses hardware `tzcnt` / `bsf` on x86-64 or `rbit` + `clz` on ARM64.
+// Guarantees deterministic return of 64 on mask == 0 with zero undefined behavior.
 [[nodiscard]] inline int countTrailingZeros64(std::uint64_t mask) noexcept {
+    if (mask == 0) [[unlikely]] {
+        return 64;
+    }
 #if defined(__GNUC__) || defined(__clang__)
     return __builtin_ctzll(mask);
 #elif defined(_MSC_VER)
     unsigned long index;
-    _BitScanForward64(&index, mask);
-    return static_cast<int>(index);
-#else
-    int count = 0;
-    while ((mask & 1) == 0) {
-        mask >>= 1;
-        ++count;
+    if (_BitScanForward64(&index, mask)) {
+        return static_cast<int>(index);
     }
-    return count;
+    return 64;
+#else
+    return std::countr_zero(mask);
 #endif
 }
 

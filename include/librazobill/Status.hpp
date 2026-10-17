@@ -20,6 +20,7 @@ enum class Status : unsigned char {
     TooLarge,       // message or rebuilt message exceeds kMaxMessageBytes (16 MB)
     Malformed,      // form key is not "<skeleton>\x13<types>" or counts disagree
     SlotUnderflow,  // fewer integer or string slots supplied than the form requires
+    SlotOverflow,   // more integer or string slots supplied than the form requires
     BufferTooSmall, // destination buffer capacity is insufficient
     InvalidParam    // null pointer or out-of-range argument
 };
@@ -34,6 +35,8 @@ enum class Status : unsigned char {
         return "malformed form key";
     case Status::SlotUnderflow:
         return "fewer slot values than the form requires";
+    case Status::SlotOverflow:
+        return "more slot values than the form requires";
     case Status::BufferTooSmall:
         return "destination buffer capacity is insufficient";
     case Status::InvalidParam:

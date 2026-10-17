@@ -60,6 +60,9 @@ Status reconstructLegacy(std::string_view form, std::span<const std::int64_t> in
     if (ints.size() < nInt || strs.size() < nStr) {
         return Status::SlotUnderflow;
     }
+    if (ints.size() > nInt || strs.size() > nStr) {
+        return Status::SlotOverflow;
+    }
 
     std::size_t size = skeleton.size() - types.size();
     for (std::size_t i = 0; i < nInt; ++i) {
@@ -127,8 +130,11 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
     if (nInt == 0 && nStr == 0 && (!ints.empty() || !strs.empty())) {
         return Status::Malformed;
     }
-    if (ints.size() != nInt || strs.size() != nStr) {
+    if (ints.size() < nInt || strs.size() < nStr) {
         return Status::SlotUnderflow;
+    }
+    if (ints.size() > nInt || strs.size() > nStr) {
+        return Status::SlotOverflow;
     }
     if (estSize > kMaxMessageBytes) return Status::TooLarge;
 
@@ -151,10 +157,16 @@ Status reconstructNew(std::string_view tmpl, std::span<const std::int64_t> ints,
             } else if (p + 2 < end && *(p + 1) == 's' && *(p + 2) == '}') {
                 out.append(strs[nStr++]);
                 p += 3;
+            } else {
+                out.push_back(*p++);
             }
         } else if (*p == '}') {
-            out.push_back('}');
-            p += 2;
+            if (p + 1 < end && *(p + 1) == '}') {
+                out.push_back('}');
+                p += 2;
+            } else {
+                out.push_back(*p++);
+            }
         } else {
             out.push_back(*p++);
         }
@@ -207,6 +219,15 @@ Status parse(std::string_view msg, SlotRecord& out, ScanMode mode) {
         else
             out.templateStr.push_back(c);
     }
+
+    if (result.reserved) {
+        // When message contains internal framing control characters (0x11..0x13),
+        // legacy skeleton encoding is ambiguous under the legacy wire format.
+        // Invalidate legacy skeleton/types to mandate modern templateStr format.
+        out.skeleton.clear();
+        out.types.clear();
+    }
+
     return Status::Ok;
 }
 
@@ -226,6 +247,7 @@ Status templateOf(std::string_view form, std::string& out) {
             return s;
         }
         out.clear();
+        out.reserve(skeleton.size());
         for (char c : skeleton) {
             if (static_cast<unsigned char>(c) == kPlaceholder)
                 out.append("<*>");
@@ -234,11 +256,42 @@ Status templateOf(std::string_view form, std::string& out) {
         }
         return Status::Ok;
     }
+
     if (form.find(static_cast<char>(kTypeSeparator)) != std::string_view::npos ||
-        form.find(static_cast<char>(kPlaceholder)) != std::string_view::npos || form == "junk") {
+        form.find(static_cast<char>(kPlaceholder)) != std::string_view::npos) {
         return Status::Malformed;
     }
-    out.assign(form);
+
+    out.clear();
+    out.reserve(form.size());
+
+    const char* p = form.data();
+    const char* const end = p + form.size();
+
+    while (p < end) {
+        if (*p == '{') {
+            if (p + 1 < end && *(p + 1) == '{') {
+                out.push_back('{');
+                p += 2;
+            } else if (p + 2 < end && (*(p + 1) == 'i' || *(p + 1) == 's') && *(p + 2) == '}') {
+                out.append("<*>");
+                p += 3;
+            } else {
+                out.clear();
+                return Status::Malformed;
+            }
+        } else if (*p == '}') {
+            if (p + 1 < end && *(p + 1) == '}') {
+                out.push_back('}');
+                p += 2;
+            } else {
+                out.clear();
+                return Status::Malformed;
+            }
+        } else {
+            out.push_back(*p++);
+        }
+    }
     return Status::Ok;
 }
 

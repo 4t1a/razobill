@@ -15,6 +15,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
 
@@ -35,15 +36,31 @@ namespace razobill::core {
     // In C++, dereferencing `reinterpret_cast<uint64_t*>(p)` on unaligned memory is technically
     // Undefined Behavior (UB) and crashes on ARM. Modern GCC/Clang optimize std::memcpy(&v, p, 8)
     // into a single machine `mov` instruction. Clean, safe, zero-cost!
-    auto rd64 = [](const char* p) {
+    auto rd64 = [](const char* p) noexcept -> std::uint64_t {
         std::uint64_t v;
         std::memcpy(&v, p, 8);
-        return v;
+        if constexpr (std::endian::native == std::endian::big) {
+#if defined(_MSC_VER)
+            return _byteswap_uint64(v);
+#else
+            return __builtin_bswap64(v);
+#endif
+        } else {
+            return v;
+        }
     };
-    auto rd32 = [](const char* p) {
+    auto rd32 = [](const char* p) noexcept -> std::uint32_t {
         std::uint32_t v;
         std::memcpy(&v, p, 4);
-        return v;
+        if constexpr (std::endian::native == std::endian::big) {
+#if defined(_MSC_VER)
+            return _byteswap_ulong(v);
+#else
+            return __builtin_bswap32(v);
+#endif
+        } else {
+            return v;
+        }
     };
     auto round = [&](std::uint64_t acc, std::uint64_t in) { return std::rotl(acc + in * P2, 31) * P1; };
     auto merge = [&](std::uint64_t h, std::uint64_t v) { return (h ^ round(0, v)) * P1 + P4; };

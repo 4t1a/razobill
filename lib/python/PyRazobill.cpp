@@ -41,6 +41,7 @@ std::string formatJoinError(Status st, std::string_view tmpl) {
     std::string why;
     switch (st) {
     case Status::SlotUnderflow:
+    case Status::SlotOverflow:
         why = "Count mismatch (template has more or fewer placeholders than provided values)";
         break;
     case Status::Malformed:

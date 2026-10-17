@@ -136,6 +136,7 @@ TEST_CASE("reconstruct rejects corrupt input without touching memory it should n
     std::string out;
     std::vector<std::int64_t> ints{1};
     std::vector<std::string_view> strs{"a"};
+    std::vector<std::string_view> noStrs{};
     CHECK(reconstruct("no separator", ints, strs, out) == Status::Malformed);
     CHECK(reconstruct(std::string("\x12\x13X"), ints, strs, out) == Status::Malformed);
     CHECK(reconstruct(std::string("\x12\x12\x13I"), ints, strs, out) == Status::Malformed);
@@ -143,19 +144,42 @@ TEST_CASE("reconstruct rejects corrupt input without touching memory it should n
     CHECK(reconstruct(std::string("\x12\x12\x13II"), ints, strs, out) == Status::SlotUnderflow);
     CHECK(reconstruct(std::string("\x12\x12\x13SS"), ints, strs, out) == Status::SlotUnderflow);
     std::vector<std::int64_t> neg{-1};
-    CHECK(reconstruct(std::string("\x12\x13I"), neg, strs, out) == Status::Malformed);
-    CHECK(reconstruct(std::string("\x12\x13I"), ints, strs, out) == Status::Ok);
+    CHECK(reconstruct(std::string("\x12\x13I"), neg, noStrs, out) == Status::Malformed);
+    CHECK(reconstruct(std::string("\x12\x13I"), ints, noStrs, out) == Status::Ok);
     CHECK(out == "1");
+    // Excess string or integer parameters produce SlotOverflow under unified contract
+    CHECK(reconstruct(std::string("\x12\x13I"), ints, strs, out) == Status::SlotOverflow);
     std::vector<std::int64_t> padded{5, 99, 99};
-    CHECK(reconstruct(std::string("a \x12\x13I"), padded, strs, out) == Status::Ok);
-    CHECK(out == "a 5");
+    CHECK(reconstruct(std::string("a \x12\x13I"), padded, noStrs, out) == Status::SlotOverflow);
+    CHECK(reconstruct("a {i}", padded, noStrs, out) == Status::SlotOverflow);
 }
 
 TEST_CASE("templateOf") {
     std::string t;
+    // Legacy format
     CHECK(templateOf(std::string("Failed password for \x12 from \x12 port \x12\x13SSI"), t) == Status::Ok);
     CHECK(t == "Failed password for <*> from <*> port <*>");
-    CHECK(templateOf("junk", t) == Status::Malformed);
+    // New format with {i} and {s} placeholders
+    CHECK(templateOf("Failed password for {s} from {s} port {i}", t) == Status::Ok);
+    CHECK(t == "Failed password for <*> from <*> port <*>");
+    // Escaped braces unescaping
+    CHECK(templateOf("Object {{key}} has value {i}", t) == Status::Ok);
+    CHECK(t == "Object {key} has value <*>");
+    // Plain string without placeholders
+    CHECK(templateOf("system initialized successfully", t) == Status::Ok);
+    CHECK(t == "system initialized successfully");
+    // Malformed syntax: unclosed brace, invalid placeholder, stray brace, reserved control characters
+    CHECK(templateOf("junk {", t) == Status::Malformed);
+    CHECK(templateOf("junk {x}", t) == Status::Malformed);
+    CHECK(templateOf("junk }", t) == Status::Malformed);
+    CHECK(templateOf(std::string("bad \x12 char"), t) == Status::Malformed);
+    CHECK(templateOf(std::string("bad \x13 char"), t) == Status::Malformed);
+}
+
+TEST_CASE("SimdScanner: countTrailingZeros64 zero-mask safety") {
+    CHECK(razobill::core::simd::countTrailingZeros64(0) == 64);
+    CHECK(razobill::core::simd::countTrailingZeros64(1) == 0);
+    CHECK(razobill::core::simd::countTrailingZeros64(0x8000000000000000ULL) == 63);
 }
 
 TEST_CASE("property: parse then reconstruct is the identity (random structured messages)") {

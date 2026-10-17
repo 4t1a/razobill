@@ -122,6 +122,7 @@ inline void fail(duckdb_function_info info, const char* fn, Status s, std::strin
     std::string why;
     switch (s) {
     case Status::SlotUnderflow:
+    case Status::SlotOverflow:
         why = "Count mismatch (template placeholders do not match the number of provided integers or strings)";
         break;
     case Status::Malformed:
