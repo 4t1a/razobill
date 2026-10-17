@@ -1,140 +1,280 @@
 # Python API reference
 
-Technical reference for pyrazobill module exports, classes, and function signatures.
-Read this reference if you need exact parameter types, default values, and exceptions for Python.
-Skip this reference if you need an introductory guide.
+[Docs](../README.md) / [Reference](python-api.md) / Python API
+
+This document specifies the functions, classes, and constants exported by the `pyrazobill` package.
+
+- **Who this is for**: Python developers integrating Razobill into ingestion pipelines, CLI utilities, or analytical jobs.
+- **What you will have at the end**: The exact parameter contracts, types, exceptions, and execution guarantees for every Python export.
 
 ---
 
-## Overview
+## Module summary
 
-The `pyrazobill` module exports five primary functions, two container classes, and one version constant.
-
-| Symbol | Type | Description |
-| :--- | :--- | :--- |
-| `RzSplit` | Function | Decomposes a log line into an `RzRecord`. |
-| `RzJoin` | Function | Reconstructs the exact original line from decomposed components. |
-| `RzTemplate` | Function | Extracts the template string or bytes without allocating value lists. |
-| `RzHash` | Function | Computes a fast 64-bit template hash (xxHash64) for indexing. |
-| `RzSplitMany` | Function | Parses an iterable of messages in parallel releasing the GIL. |
-| `RzRecord` | Named Tuple | Structured return container with `(template, ints, strs)`. |
-| `RzError` | Exception | Base exception class (subclass of `ValueError`) raised on failures. |
-| `__version__` | String | Package semantic version string (`"1.1.2"`). |
-
-Ergonomic aliases are also exported: `split`, `join`, `template`, `hash`, `split_many`, `Record`, `Error`.
+| Symbol | Type | Description | Stability |
+| :--- | :--- | :--- | :---: |
+| `split` (`RzSplit`) | Function | Decomposes a single log line into an `RzRecord`. | Stable |
+| `join` (`RzJoin`) | Function | Reconstructs the exact raw line from decomposed components. | Stable |
+| `template` (`RzTemplate`) | Function | Extracts the template string or bytes without allocating values. | Stable |
+| `hash` (`RzHash`) | Function | Computes a 64-bit unsigned template hash (xxHash64). | Stable |
+| `split_many` (`RzSplitMany`) | Function | Parses an iterable of messages in parallel, releasing the GIL. | Stable |
+| `isNative` | Function | Returns `True` if compiled C++ SIMD extension is loaded. | Stable |
+| `RzRecord` | NamedTuple | Decomposed record containing `(template, ints, strs)`. | Stable |
+| `RzError` | Class | Exception raised on argument validation or parsing errors. | Stable |
+| `__version__` | Constant | Package version string (`"1.1.2"`). | Stable |
 
 ---
 
-## Function reference
-
-### `RzSplit(line: Union[str, bytes], mode: str = "semantic") -> RzRecord`
+## split
 
 Decomposes a single log line into a structured record.
 
-- **Parameters**:
-  - `line` (*str* or *bytes*): The message to split. Empty string or bytes are valid.
-  - `mode` (*{"semantic", "exact"}*, default: `"semantic"`):
-    - `"semantic"`: Groups volatile tokens (IPs, paths, hashes) into `{s}` placeholders.
-    - `"exact"`: Preserves non-numeric tokens literally in the template.
-- **Returns**:
-  - `RzRecord`: Named tuple `(template, ints, strs)`.
-- **Raises**:
-  - `RzError`: If `mode` is invalid or `line` is not `str` or `bytes`.
-- **Example**:
+### Signature
 
-  ```python
-  import pyrazobill as rz
-  rec = rz.RzSplit("port 22 open")
-  # rec.template == 'port {i} open'
-  # rec.ints == [22]
-  # rec.strs == []
-  ```
+```python
+split(line: str | bytes, mode: str = "semantic") -> RzRecord
+```
 
----
+Alias: `RzSplit`.
 
-### `RzJoin(*args) -> Union[str, bytes]`
+### Parameters
 
-Reconstructs the original raw message.
+- `line` (*str* or *bytes*): The message to split. Both `str` and `bytes` are valid inputs.
+- `mode` (*{"semantic", "exact"}*, default: `"semantic"`):
+  - `"semantic"`: Groups volatile tokens (IPs, paths, hosts) into `{s}` placeholders.
+  - `"exact"`: Preserves non-numeric tokens verbatim, isolating purely numeric digit sequences into `{i}`.
 
-- **Signatures**:
-  - `RzJoin(record: RzRecord) -> Union[str, bytes]`
-  - `RzJoin(template: Union[str, bytes], ints: Sequence[int], strs: Sequence[Union[str, bytes]]) -> Union[str, bytes]`
-- **Parameters**:
-  - `template`: Template containing `{i}` and `{s}` markers.
-  - `ints`: Sequence of integers matching `{i}` count.
-  - `strs`: Sequence of strings or bytes matching `{s}` count.
-- **Returns**:
-  - The reconstructed string or bytes matching input byte-for-byte.
-- **Raises**:
-  - `RzError`: If counts do not match or template syntax is malformed.
+### Returns
 
----
+`RzRecord`: NamedTuple of `(template, ints, strs)` matching the input type (`str` returns strings, `bytes` returns bytes).
 
-### `RzTemplate(line: Union[str, bytes], mode: str = "semantic") -> Union[str, bytes]`
+### Edge behavior
 
-Extracts only the structural template without allocating numeric or string value arrays.
+- **Empty input (`""` or `b""`)**: Returns `RzRecord(template="", ints=[], strs=[])`.
+- **Literal curly braces**: Escaped as `{{` and `}}` in `template`.
+- **Oversized input (> 16 MiB)**: Raises `RzError`.
 
-- **Parameters**:
-  - `line` (*str* or *bytes*): Input message.
-  - `mode` (*str*): Token scanning mode.
-- **Returns**:
-  - The template string or bytes.
-- **Example**:
+### Errors
 
-  ```python
-  import pyrazobill as rz
-  tmpl = rz.RzTemplate("port 22 open")
-  # tmpl == 'port {i} open'
-  ```
+Raises `RzError` (subclass of `ValueError`) if `line` is not `str` or `bytes`, or if `mode` is invalid.
+
+### Example
+
+```python
+import pyrazobill as rz
+
+rec = rz.split("Failed password for root from 192.168.1.100 port 22")
+print(rec.template)
+print(rec.ints)
+print(rec.strs)
+```
+
+Output:
+
+```text
+Failed password for {s} from {s} port {i}
+[22]
+['root', '192.168.1.100']
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `RzHash(line: Union[str, bytes]) -> int`
+## join
 
-Computes a deterministic 64-bit hash (xxHash64, seed 0) of the input template or message.
+Reconstructs the original raw message byte for byte from decomposed components.
 
-- **Parameters**:
-  - `line` (*str* or *bytes*): Input template or message.
-- **Returns**:
-  - `int`: 64-bit unsigned integer matching DuckDB `RzHash()` and ClickHouse `xxHash64()` bit-for-bit.
-- **Raises**:
-  - `RzError`: If `line` is not `str` or `bytes`.
-- **Example**:
+### Signature
 
-  ```python
-  import pyrazobill as rz
-  rec = rz.RzSplit("Failed password for root from 192.168.1.100 port 22")
-  h = rz.RzHash(rec.template)
-  # h == 54855824174769941
-  ```
+```python
+join(template: str | bytes, ints: Sequence[int], strs: Sequence[str | bytes]) -> str | bytes
+join(*record: RzRecord) -> str | bytes
+```
+
+Alias: `RzJoin`.
+
+### Parameters
+
+- `template`: Template string containing `{i}` and `{s}` placeholders.
+- `ints`: Sequence of 64-bit non-negative integers matching `{i}` count.
+- `strs`: Sequence of strings or bytes matching `{s}` count.
+
+### Returns
+
+The reconstructed `str` or `bytes`, matching the original input bit for bit.
+
+### Errors
+
+Raises `RzError` if the placeholder count disagrees with the number of provided integers or strings.
+
+### Example
+
+```python
+import pyrazobill as rz
+
+line = "Failed password for root from 192.168.1.100 port 22"
+rec = rz.split(line)
+restored = rz.join(rec.template, rec.ints, rec.strs)
+assert restored == line
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `RzSplitMany(lines: Iterable[Union[str, bytes]], mode: str = "semantic") -> List[RzRecord]`
+## template
 
-Parses an iterable of lines using multi-threaded C++ workers.
+Extracts only the structural template without allocating integer or string lists.
 
-- **Parameters**:
-  - `lines` (*Iterable*): Sequence or generator of string or byte lines.
-  - `mode` (*str*): Token scanning mode.
-- **Returns**:
-  - List of `RzRecord` instances corresponding to input lines.
+### Signature
+
+```python
+template(line: str | bytes, mode: str = "semantic") -> str | bytes
+```
+
+Alias: `RzTemplate`.
+
+### Parameters
+
+- `line` (*str* or *bytes*): Input message.
+- `mode` (*{"semantic", "exact"}*, default: `"semantic"`): Token scanning mode.
+
+### Returns
+
+The format string or bytes with `{i}` and `{s}` placeholders.
+
+### Example
+
+```python
+import pyrazobill as rz
+
+tmpl = rz.template("Failed password for root from 192.168.1.100 port 22")
+print(tmpl)
+```
+
+Output:
+
+```text
+Failed password for {s} from {s} port {i}
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
+
+---
+
+## hash
+
+Computes an unsigned 64-bit hash (xxHash64) of the template string or raw line.
+
+### Signature
+
+```python
+hash(line: str | bytes, mode: str = "semantic") -> int
+```
+
+Alias: `RzHash`.
+
+### Parameters
+
+- `line` (*str* or *bytes*): Input template or message.
+- `mode` (*{"semantic", "exact"}*, default: `"semantic"`): Token scanning mode.
+
+### Returns
+
+`int`: 64-bit unsigned integer matching DuckDB `RzHash` and ClickHouse `xxHash64` bit-for-bit.
+
+### Example
+
+```python
+import pyrazobill as rz
+
+rec = rz.split("Failed password for root from 192.168.1.100 port 22")
+h = rz.hash(rec.template)
+print(h)
+```
+
+Output:
+
+```text
+54855824174769941
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
+
+---
+
+## split_many
+
+Decomposes an iterable of log messages across worker threads while releasing the Python GIL.
+
+### Signature
+
+```python
+split_many(lines: Iterable[str | bytes], mode: str = "semantic") -> list[RzRecord]
+```
+
+Alias: `RzSplitMany`.
+
+### Parameters
+
+- `lines` (*Iterable[str | bytes]*): An iterable of string or byte lines.
+- `mode` (*{"semantic", "exact"}*, default: `"semantic"`): Token scanning mode.
+
+### Returns
+
+`list[RzRecord]`: An ordered list of decomposed records corresponding to the input lines.
+
+### GIL behavior
+
+When `len(lines) > 128`, the C++ extension releases the Python Global Interpreter Lock (GIL) and dispatches parsing across worker threads.
+
+### Example
+
+```python
+import pyrazobill as rz
+
+lines = [
+    "Failed password for root from 192.168.1.100 port 22",
+    "Failed password for admin from 10.0.0.1 port 2222",
+]
+records = rz.split_many(lines)
+print(len(records))
+```
+
+Output:
+
+```text
+2
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
 ## Classes
 
-### `class RzRecord`
+### RzRecord
 
-Named tuple representing a decomposed message:
+A `NamedTuple` subclass containing decomposed log elements:
 
-- `template` (*Union[str, bytes]*): Extracted template.
-- `ints` (*List[int]*): Extracted 64-bit signed integers.
-- `strs` (*List[Union[str, bytes]]*): Extracted variable string slices.
+- `template` (*str | bytes*): Format string with placeholders.
+- `ints` (*list[int]*): Extracted 64-bit integers.
+- `strs` (*list[str | bytes]*): Extracted variable string tokens.
 
-### `class RzError(ValueError)`
+### RzError
 
-Exception raised on parsing or argument validation failures.
-Attributes:
+Subclass of `ValueError` raised on argument validation or parsing failures. Contains structured diagnostic text detailing what happened, why, and what to do.
 
-- Includes structured diagnostic messages with what happened, why, and what to do.
+---
+
+## Related
+
+- [Parsing logs in Python](../how-to/python.md): batch processing and multithreading guide.
+- [DuckDB SQL reference](sql-functions.md): SQL scalar function signatures.
+- [Controlled glossary](glossary.md): definitions for canonical project terms.

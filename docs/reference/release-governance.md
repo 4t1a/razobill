@@ -1,32 +1,46 @@
 # Release governance and provenance
 
-Standard operating procedures for validating, signing, and distributing release artifacts.
-Read this document if you are preparing or verifying an official release of Razobill.
-Skip this document if you are an application user.
+[Docs](../README.md) / [Reference](release-governance.md) / Release governance
+
+This document specifies the verification gates, signing protocols, and distribution checklists required for official releases of Razobill.
+
+- **Who this is for**: Release engineers, maintainers, and downstream packagers verifying build artifacts.
+- **What you will have at the end**: An exact checklist of test gates, provenance requirements, and distribution channels.
 
 ---
 
 ## Release checklist
 
-Every release candidate must complete this automated verification checklist:
+Every release candidate must complete this automated verification checklist before publication:
 
-1. **Unit and regression tests**:
-   - All 41 C++ unit test cases must pass with 0 failures (`UnitTests.exe`).
-   - Over 1,080,000 assertions must pass cleanly.
-   - All 18 Python tests must pass under multiple Python versions (`3.9` through `3.13`).
-2. **Database extension tests**:
-   - DuckDB extension integration tests must pass (`IntegrationDuckdb.exe`).
-3. **Documentation quality gate**:
-   - `python tools/LintDocs.py` must report zero errors across all documentation files.
-4. **Binary compatibility check**:
-   - Verify that `LIBRAZOBILL_ABI_VERSION` matches the intended contract.
+1. **Unit and regression test gates**:
+   - All 50 C++ unit test cases must pass with zero failures (`build/UnitTests.exe`), verifying over 1.98 million assertions.
+   - All 15 Python unit tests and 5 Hypothesis property tests must pass cleanly under target runtimes (`3.9` through `3.13`).
+   - All 14 DuckDB extension integration tests must pass (`build/IntegrationDuckdb.exe`).
+   - Cargo integration tests in `ext/vector` and Go tests in `ext/otel` must pass.
+2. **Quality and linting gates**:
+   - `python tools/LintDocs.py README.md CONTRIBUTING.md docs/` must pass with zero errors.
+   - `npx markdownlint-cli2 "**/*.md"` must report zero lint violations.
+   - `python tools/VerifyMarkdownLinks.py` must verify that 100% of internal links resolve.
+   - Python, C, and DuckDB surface checks must verify that public surfaces are within budget.
+3. **Binary compatibility verification**:
+   - Verify that `LIBRAZOBILL_ABI_VERSION` in `include/librazobill/Version.hpp` and `RZ_ABI_VERSION` in `include/librazobill/RazobillC.h` match the intended release contract.
+   - Run `twine check lib/python/dist/*` to verify package metadata.
 
 ---
 
-## Artifact distribution and signing
+## Artifact distribution and provenance
 
-Official release artifacts include:
+Official release artifacts are distributed through three automated channels:
 
-- Multi-platform precompiled Python wheels on PyPI (`pyrazobill`).
-- DuckDB loadable extensions published to the official DuckDB Community repository.
-- GitHub release archives accompanied by SHA-256 checksums and GPG cryptographic signatures.
+- **PyPI**: Pre-compiled binary wheels (`.whl`) and source distributions (`.tar.gz`) for `pyrazobill`.
+- **DuckDB Community Extensions**: Signed loadable binary extensions (`razobill.duckdb_extension`) built via `extension-ci-tools`.
+- **GitHub Releases**: Tagged release archives accompanied by SHA-256 checksums and SLSA build attestations (`.github/workflows/Release.yml`).
+
+---
+
+## Related
+
+- [Deprecation policy](deprecation-policy.md): ABI stability and breaking change rules.
+- [Compatibility matrix](compatibility.md): supported operating systems and Python versions.
+- [Packages reference](packages.md): distributions and installation methods.

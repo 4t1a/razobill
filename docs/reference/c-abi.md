@@ -1,32 +1,33 @@
 # Universal C ABI reference
 
-Header declarations, memory ownership rules, and status codes for RazobillC.h.
-Read this reference if you are calling librazobill through foreign function interfaces (FFI).
-Skip this reference if you are using high-level Python or SQL bindings.
+[Docs](../README.md) / [Reference](c-abi.md) / C ABI
+
+This document specifies the C99-compatible foreign function interface exported by `include/librazobill/RazobillC.h`.
+
+- **Who this is for**: Systems programmers building FFI bindings in Rust, Go, Zig, C#, Java, or C.
+- **What you will have at the end**: The exact function declarations, memory lifetime contracts, status codes, and container structures.
 
 ---
 
-## Overview
+## Function summary
 
-The C ABI is declared in `include/librazobill/RazobillC.h`.
-It provides zero-allocation log decomposition with stable binary layout.
-
-| Symbol | Type | Description |
-| :--- | :--- | :--- |
-| `RzSplit` | Function | Decomposes a message into an `RzRecord`. |
-| `RzJoin` | Function | Reconstructs the exact message into caller-provided buffer. |
-| `RzTemplate` | Function | Writes the structural template into caller buffer. |
-| `RzFree` | Function | Releases heap memory allocated by `RzSplit`. |
-| `RzStatusMessage` | Function | Returns human-readable description for any `RzStatus`. |
-| `RzVersion` | Function | Returns the semantic version string (`"1.1.2"`). |
-| `RzRecord` | Struct | Container for decomposed message data. |
-| `RzStatus` | Enum | Numeric status code indicating success or error reason. |
+| Function | Signature | Return type | Stability |
+| :--- | :--- | :--- | :---: |
+| `RzSplit` | `RzSplit(message, messageLength, outRecord)` | `RzStatus` | Stable |
+| `RzJoin` | `RzJoin(record, outBuffer, bufferCapacity, outLength)` | `RzStatus` | Stable |
+| `RzTemplate` | `RzTemplate(message, messageLength, outBuffer, bufferCapacity, outLength)` | `RzStatus` | Stable |
+| `RzFree` | `RzFree(record)` | `void` | Stable |
+| `RzStatusMessage` | `RzStatusMessage(status)` | `const char*` | Stable |
+| `RzVersion` | `RzVersion()` | `const char*` | Stable |
+| `RzAbiVersion` | `RzAbiVersion()` | `int` | Stable |
 
 ---
 
-## Types
+## Data structures
 
-### `typedef struct RzRecord`
+### RzRecord
+
+The core container for decomposed log events:
 
 ```c
 typedef struct RzRecord {
@@ -41,13 +42,15 @@ typedef struct RzRecord {
 } RzRecord;
 ```
 
-**Lifetimes**:
+#### Memory ownership contract
 
-1. Pointers in `strValues` point directly into the caller's message buffer (zero-copy string views).
-   The message buffer must outlive `outRecord`.
-2. Memory allocated for `templateStr`, `intValues`, and pointer arrays must be released with `RzFree(outRecord)`.
+1. **Zero-copy string views**: Pointers in `strValues` borrow directly from the caller's input `message` buffer. The source buffer must remain valid and unmodified while `strValues` is accessed.
+2. **Deallocation**: Caller must pass `outRecord` to `RzFree` when finished to release arrays allocated for `templateStr` and `intValues`.
+3. **Manual initialization**: Foreign callers may manually construct an `RzRecord` with `internalHandle = NULL` to call `RzJoin`.
 
-### `typedef enum RzStatus`
+### RzStatus
+
+Enumeration of status codes returned by C ABI functions:
 
 ```c
 typedef enum RzStatus {
@@ -64,45 +67,160 @@ typedef enum RzStatus {
 
 ---
 
-## Functions
+## RzSplit
 
-### `RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* outRecord)`
+Decomposes a message into a template, extracted 64-bit integers, and zero-copy string views.
 
-Splits a message into a template string, 64-bit integers, and string slices.
+### Signature
 
-- **Parameters**:
-  - `message`: Pointer to input bytes (does not require NUL termination).
-  - `messageLength`: Byte length of message.
-  - `outRecord`: Pointer to caller-allocated `RzRecord` struct.
-- **Returns**: `RZ_OK` on success, or an error status code.
+```c
+RZ_API RzStatus RzSplit(const char* message, size_t messageLength, RzRecord* outRecord);
+```
+
+### Parameters
+
+- `message`: Pointer to input message bytes. Does not require a trailing NUL byte.
+- `messageLength`: Length of the message in bytes.
+- `outRecord`: Pointer to caller-allocated `RzRecord` struct populated on success.
+
+### Returns
+
+`RZ_OK` (0) on success, or an error status code.
+
+### Edge behavior
+
+- **NULL message or outRecord**: Returns `RZ_ERR_INVALID_ARGUMENT`.
+- **Empty input (`messageLength == 0`)**: Returns an empty template with zero integers and zero strings.
+- **Message > 16 MiB**: Returns `RZ_ERR_MESSAGE_TOO_LARGE`.
+
+### Example
+
+```c
+#include "librazobill/RazobillC.h"
+#include <stdio.h>
+#include <string.h>
+
+const char* msg = "Failed password for root from 192.168.1.100 port 22";
+RzRecord record;
+if (RzSplit(msg, strlen(msg), &record) == RZ_OK) {
+    printf("Template: %.*s\n", (int)record.templateLength, record.templateStr);
+    RzFree(&record);
+}
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength)`
+## RzJoin
 
-Reconstructs the original message from a decomposed record.
+Reconstructs the original message from an `RzRecord` into a caller-supplied buffer.
 
-- **Parameters**:
-  - `record`: Pointer to the record to join.
-  - `outBuffer`: Target buffer (may be `NULL` if probing capacity).
-  - `bufferCapacity`: Byte capacity of `outBuffer`.
-  - `outLength`: Pointer receiving bytes written or required.
-- **Returns**: `RZ_OK` on success, or `RZ_ERR_BUFFER_TOO_SMALL`.
+### Signature
+
+```c
+RZ_API RzStatus RzJoin(const RzRecord* record, char* outBuffer, size_t bufferCapacity, size_t* outLength);
+```
+
+### Parameters
+
+- `record`: Pointer to the record to join.
+- `outBuffer`: Destination buffer to receive reconstructed bytes. May be `NULL` when probing required capacity.
+- `bufferCapacity`: Byte capacity of `outBuffer`.
+- `outLength`: Pointer receiving the count of bytes written (or required capacity if `outBuffer` is too small).
+
+### Returns
+
+- `RZ_OK` on successful reconstruction.
+- `RZ_ERR_BUFFER_TOO_SMALL` if `bufferCapacity` is insufficient. `*outLength` receives the required byte capacity.
+
+### Example
+
+```c
+size_t needed = 0;
+RzJoin(&record, NULL, 0, &needed);
+
+char* buf = (char*)malloc(needed);
+size_t written = 0;
+if (RzJoin(&record, buf, needed, &written) == RZ_OK) {
+    printf("Reconstructed: %.*s\n", (int)written, buf);
+}
+free(buf);
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `RzStatus RzTemplate(const char* message, size_t messageLength, char* outBuffer, size_t bufferCapacity, size_t* outLength)`
+## RzTemplate
 
-Extracts the template representation without allocating parsed value arrays.
+Extracts the template representation directly without allocating parsed parameter arrays.
+
+### Signature
+
+```c
+RZ_API RzStatus RzTemplate(const char* message, size_t messageLength, char* outBuffer, size_t bufferCapacity, size_t* outLength);
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `void RzFree(RzRecord* record)`
+## RzFree
 
-Releases heap memory associated with a record. Safe to call on zeroed records or `NULL`.
+Releases heap memory associated with an `RzRecord` populated by `RzSplit`.
+
+### Signature
+
+```c
+RZ_API void RzFree(RzRecord* record);
+```
+
+Safe to call on zero-initialized records or with `NULL`.
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
 
 ---
 
-### `const char* RzStatusMessage(RzStatus status)`
+## RzStatusMessage
 
 Returns a static string description for any status code.
+
+### Signature
+
+```c
+RZ_API const char* RzStatusMessage(RzStatus status);
+```
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
+
+---
+
+## RzVersion and RzAbiVersion
+
+Returns library semantic version string and ABI version integer.
+
+### Signature
+
+```c
+RZ_API const char* RzVersion(void);
+RZ_API int RzAbiVersion(void);
+```
+
+`RzVersion()` returns `"1.1.2"`. `RzAbiVersion()` returns `1`.
+
+- **Stability**: Stable.
+- **Since version**: 1.0.0.
+
+---
+
+## Related
+
+- [C++ developer guide](../how-to/cpp-developer.md): embedding `librazobill` via CMake.
+- [Packages reference](packages.md): library distributions and linking commands.
+- [Lossless invertibility](../explanation/lossless-invertibility.md): two-pass reconstruction mechanics.

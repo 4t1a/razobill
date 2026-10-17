@@ -1,27 +1,33 @@
-# Getting started in 5 minutes
+# Getting started with Razobill
 
-Learn how to split log lines into structured templates and reconstruct the exact original strings.
-Read this guide if you are using Razobill for the first time.
-Skip this guide if you already have Razobill installed and running in your pipeline.
+[Docs](../README.md) / [Tutorials](getting-started.md) / Getting started
 
----
+This tutorial guides you through installing Razobill, splitting a raw log line into typed relational components, and reconstructing the exact original bytes in both Python and DuckDB SQL.
 
-## What you will build
-
-You will parse unstructured log lines into structured templates, numbers, and words.
-Then, you will verify bit-exact reconstruction of the original text.
+- **Who this is for**: Developers and operators evaluating Razobill for log parsing and compaction.
+- **What you will have at the end**: A working environment running Python and DuckDB that decomposes log lines and reconstructs them without data loss.
+- **Measured completion time**: 3 minutes.
 
 ---
 
-## Step 1: Install the library
+## Prerequisites
 
-Install the Python client package using `pip`:
+Before starting, confirm you have:
+
+- Python 3.9 or newer installed (`python --version`).
+- DuckDB 1.2.0 or newer installed (`duckdb --version`), or use Python's embedded DuckDB package.
+
+---
+
+## Step 1: Install pyrazobill
+
+Install the Python client package from PyPI:
 
 ```bash
 pip install pyrazobill
 ```
 
-Verify that the package is installed and check its version:
+Verify that Python can load the package and print the installed version:
 
 ```bash
 python -c "import pyrazobill as rz; print(rz.__version__)"
@@ -35,85 +41,119 @@ Expected output:
 
 ---
 
-## Step 2: Split your first log line
+## Step 2: Split your first log line in Python
 
-Open a Python interactive shell and run this code:
+Create a script named `try_razobill.py` with the following code:
 
 ```python
 import pyrazobill as rz
 
-# Sample authentication failure event
 line = "Failed password for root from 192.168.1.100 port 22"
-record = rz.RzSplit(line)
+record = rz.split(line)
 
 print("Template:", record.template)
-print("Numbers: ", record.ints)
-print("Words:   ", record.strs)
+print("Integers:", record.ints)
+print("Strings: ", record.strs)
+```
+
+Run the script:
+
+```bash
+python try_razobill.py
 ```
 
 Expected output:
 
 ```text
 Template: Failed password for {s} from {s} port {i}
-Numbers:  [22]
-Words:    ['root', '192.168.1.100']
+Integers: [22]
+Strings:  ['root', '192.168.1.100']
 ```
 
-The split operation extracted the constant string skeleton into a template.
-Variable components were typed into numbers (`{i}`) and words (`{s}`).
+The split operation extracted constant text into a template with `{s}` and `{i}` placeholders, isolating variable strings and numeric tokens.
 
 ---
 
-## Step 3: Reconstruct the original bytes
+## Step 3: Reconstruct the original text
 
-Pass the decomposed record back into `RzJoin`:
+Append reconstruction logic to `try_razobill.py` to verify the round trip:
 
 ```python
-reconstructed = rz.RzJoin(*record)
-print("Reconstructed:", reconstructed)
-print("Matches input:", reconstructed == line)
+restored = rz.join(record.template, record.ints, record.strs)
+print("Restored:     ", restored)
+print("Exact match:  ", restored == line)
+```
+
+Run the script again:
+
+```bash
+python try_razobill.py
 ```
 
 Expected output:
 
 ```text
-Reconstructed: Failed password for root from 192.168.1.100 port 22
-Matches input: True
+Template: Failed password for {s} from {s} port {i}
+Integers: [22]
+Strings:  ['root', '192.168.1.100']
+Restored:      Failed password for root from 192.168.1.100 port 22
+Exact match:   True
 ```
 
-> [!NOTE]
-> **TL;DR**: `RzJoin(*RzSplit(x)) == x` is guaranteed for all valid inputs. No whitespace, delimiter, or casing is modified.
+The invariant `join(split(x)) == x` restored every character, space, and digit of the original message.
 
 ---
 
 ## Step 4: Parse with DuckDB SQL
 
-If you work with DuckDB, you can run the same logic in SQL:
+Open the DuckDB shell and run:
 
 ```sql
--- Load the extension
 INSTALL razobill FROM community;
 LOAD razobill;
 
--- Decompose into structured columns
 SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS parsed;
 ```
 
 Expected output:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                         parsed                                         │
-│                 struct(template varchar, ints bigint[], strs varchar[])                │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ {'template': 'Failed password for {s} from {s} port {i}', 'ints': [22], 'strs': [root… │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                     rzsplit('Failed password for root from 192.168.1.100 port 22')                     │
+│                       struct("template" varchar, ints bigint[], strs varchar[])                        │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {'template': 'Failed password for {s} from {s} port {i}', 'ints': [22], 'strs': [root, 192.168.1.100]} │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Now verify SQL reconstruction:
+
+```sql
+SELECT RzJoin(parsed.template, parsed.ints, parsed.strs) AS reconstructed
+FROM (SELECT RzSplit('Failed password for root from 192.168.1.100 port 22') AS parsed);
+```
+
+Expected output:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│                    reconstructed                    │
+│                       varchar                       │
+├─────────────────────────────────────────────────────┤
+│ Failed password for root from 192.168.1.100 port 22 │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## What you just did
+
+You installed Razobill, parsed an unstructured log event into typed relational columns (template, integers, and strings), and reconstructed the exact original text using both Python and DuckDB SQL.
 
 ---
 
 ## Next steps
 
-- Explore batch processing in the [Python developer guide](../how-to/python.md).
-- Learn analytical SQL queries in the [DuckDB extension guide](../how-to/duckdb.md).
-- Read the mathematical guarantee in [Lossless invertibility](../explanation/lossless-invertibility.md).
+- [Building an ingestion pipeline](first-pipeline.md): stream raw log files into compact Parquet tables.
+- [DuckDB extension guide](../how-to/duckdb.md): query and aggregate millions of log rows with SQL.
+- [Python developer guide](../how-to/python.md): multithreaded batch processing releasing the GIL.

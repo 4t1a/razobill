@@ -1,35 +1,41 @@
 # Compacting and querying logs in DuckDB
 
-Parse unstructured log columns into typed structs and reconstruct original lines on demand.
-Read this guide if you are analyzing log data inside DuckDB.
-Skip this guide if you are writing application code in Python or C++.
+[Docs](../README.md) / [How-to guides](duckdb.md) / DuckDB
+
+This guide shows you how to install the Razobill DuckDB extension, parse unstructured log columns into typed relational structs, run analytical aggregations, and reconstruct original messages using SQL.
+
+- **Who this is for**: Data engineers and analysts managing telemetry streams or Parquet logs in DuckDB.
+- **What you will have at the end**: A reproducible SQL workflow that parses log columns into relational structs and reconstructs them without data loss.
 
 ---
 
-## Problem
+## The problem
 
-Storing telemetry logs as raw string columns in DuckDB leads to performance issues:
+Storing raw log lines as unstructured text in DuckDB causes three operational bottlenecks:
 
-1. Regex queries (`regexp_extract`) scan entire strings repeatedly, consuming CPU cycles.
-2. High-cardinality numbers and identifiers prevent columnar compression algorithms (Snappy, ZSTD) from achieving optimal compression ratios.
-3. Discarding raw strings during parsing loses forensic detail needed for security audits.
+1. Pattern extraction relies on regular expressions (`regexp_extract`) that parse entire strings on every query.
+2. High-cardinality timestamps, IP addresses, and identifiers prevent columnar compression algorithms (ZSTD, Bitpacking) from reaching optimal ratios.
+3. Discarding raw lines during ingestion eliminates forensic detail required during security audits.
 
 ---
 
-## Solution
+## Prerequisites
 
-The Razobill DuckDB extension exposes four scalar functions operating directly on database string pointers without intermediate heap copies.
+- DuckDB CLI version 1.2.0 or newer.
+- An existing table with log strings or permissions to install community extensions.
 
-### Step 1: Load the extension
+---
 
-In production, load the signed extension from the official DuckDB Community Repository:
+## Step 1: Load the extension
+
+In production, install and load the signed binary from the DuckDB Community Repository:
 
 ```sql
 INSTALL razobill FROM community;
 LOAD razobill;
 ```
 
-For local development builds, specify the binary path:
+For offline installations or local source builds, specify the compiled extension file path:
 
 ```sql
 LOAD 'build/razobill.duckdb_extension';
@@ -37,122 +43,114 @@ LOAD 'build/razobill.duckdb_extension';
 
 ---
 
-### Step 2: Decompose logs into structured columns
+## Step 2: Split log columns into relational structs
 
-Use `RzSplit(line)` to parse raw log strings into a composite struct containing `template`, `ints`, and `strs`:
+Use `RzSplit(line)` to decompose string columns into a struct containing `template`, `ints`, and `strs`.
+
+Create a table with synthetic authentication events:
 
 ```sql
--- Create an example table with raw log records
-CREATE TABLE raw_logs (msg VARCHAR);
-INSERT INTO raw_logs VALUES
-    ('Connection lost to 10.0.0.1 after 3 retries'),
-    ('Connection lost to 10.0.0.2 after 5 retries'),
-    ('User admin authenticated from 192.168.1.50'),
-    ('Connection lost to 10.0.0.1 after 1 retries');
-
--- Decompose every row in a single pass
-SELECT
-    RzSplit(msg) AS parsed
-FROM raw_logs;
+CREATE TABLE auth_logs (msg VARCHAR);
+INSERT INTO auth_logs VALUES
+    ('Failed password for root from 192.168.1.100 port 22'),
+    ('Failed password for admin from 10.0.0.1 port 2222'),
+    ('Accepted publickey for ubuntu from 192.168.1.50 port 54322');
 ```
 
-Output:
+Decompose the messages:
+
+```sql
+SELECT RzSplit(msg) AS parsed FROM auth_logs;
+```
+
+Expected output:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                                 parsed                                 │
-│        struct(template varchar, ints bigint[], strs varchar[])         │
-├────────────────────────────────────────────────────────────────────────┤
-│ {'template': 'Connection lost to {s} after {i} retries', 'ints': [3]… │
-│ {'template': 'Connection lost to {s} after {i} retries', 'ints': [5]… │
-│ {'template': 'User {s} authenticated from {s}', 'ints': [], 'strs':…   │
-│ {'template': 'Connection lost to {s} after {i} retries', 'ints': [1]… │
-└────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                    parsed                                                     │
+│                           struct("template" varchar, ints bigint[], strs varchar[])                           │
+├───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {'template': 'Failed password for {s} from {s} port {i}', 'ints': [22], 'strs': [root, 192.168.1.100]}        │
+│ {'template': 'Failed password for {s} from {s} port {i}', 'ints': [2222], 'strs': [admin, 10.0.0.1]}          │
+│ {'template': 'Accepted publickey for {s} from {s} port {i}', 'ints': [54322], 'strs': [ubuntu, 192.168.1.50]} │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+The output struct isolates constant template text from variable parameters.
 
 ---
 
-### Step 3: Aggregate by template pattern
+## Step 3: Aggregate log patterns
 
-Use `RzTemplate(line)` to extract the template directly when parameter arrays are not needed:
+Use `RzTemplate(line)` to group events when integer and string parameter arrays are not needed:
 
 ```sql
 SELECT
     RzTemplate(msg) AS pattern,
-    COUNT(*) AS event_count
-FROM raw_logs
+    COUNT(*) AS count
+FROM auth_logs
 GROUP BY 1
-ORDER BY event_count DESC;
+ORDER BY count DESC;
 ```
 
-Output:
+Expected output:
 
 ```text
-┌──────────────────────────────────────────────┬─────────────┐
-│                   pattern                    │ event_count │
-│                   varchar                    │    int64    │
-├──────────────────────────────────────────────┼─────────────┤
-│ Connection lost to {s} after {i} retries     │           3 │
-│ User {s} authenticated from {s}              │           1 │
-└──────────────────────────────────────────────┴─────────────┘
+┌──────────────────────────────────────────────┬───────┐
+│                   pattern                    │ count │
+│                   varchar                    │ int64 │
+├──────────────────────────────────────────────┼───────┤
+│ Failed password for {s} from {s} port {i}    │     2 │
+│ Accepted publickey for {s} from {s} port {i} │     1 │
+└──────────────────────────────────────────────┴───────┘
 ```
 
 ---
 
-### Step 4: Aggregate numerical parameter arrays
+## Step 4: Query numeric parameters
 
-Query extracted integers directly with array index operations:
+Extracted integers are stored in a `BIGINT[]` array and can be accessed with standard 1-indexed SQL array syntax:
 
 ```sql
 SELECT
     parsed.template,
-    COUNT(*) AS total_failures,
-    AVG(parsed.ints[1]) AS avg_retries
-FROM (SELECT RzSplit(msg) AS parsed FROM raw_logs)
-WHERE parsed.template LIKE '%Connection lost%'
+    COUNT(*) AS total_events,
+    AVG(parsed.ints[1]) AS avg_port
+FROM (SELECT RzSplit(msg) AS parsed FROM auth_logs)
 GROUP BY parsed.template;
-```
-
-Output:
-
-```text
-┌──────────────────────────────────────────┬────────────────┬─────────────┐
-│                 template                 │ total_failures │ avg_retries │
-│                 varchar                  │     int64      │   double    │
-├──────────────────────────────────────────┼────────────────┼─────────────┤
-│ Connection lost to {s} after {i} retries │              3 │         3.0 │
-└──────────────────────────────────────────┴────────────────┴─────────────┘
 ```
 
 ---
 
-### Step 5: Fast identity hashing with `RzHash`
+## Step 5: Fast template hashing with RzHash
 
-Compute deterministic 64-bit template hashes for join indexing:
+Compute a 64-bit unsigned hash of the template for join indexing:
 
 ```sql
 SELECT
     RzHash(msg) AS template_hash,
     RzTemplate(msg) AS template
-FROM raw_logs
-LIMIT 2;
+FROM auth_logs
+LIMIT 1;
 ```
+
+`RzHash` produces an unsigned 64-bit integer identical to ClickHouse `xxHash64`.
 
 ---
 
-## Verification
+## How to verify
 
-Confirm bit-exact reconstruction of the original text using `RzJoin`:
+Verify that decomposed logs reconstruct to the exact original bytes using `RzJoin`:
 
 ```sql
 SELECT
     msg == RzJoin(parsed.template, parsed.ints, parsed.strs) AS is_exact
 FROM (
-    SELECT msg, RzSplit(msg) AS parsed FROM raw_logs
+    SELECT msg, RzSplit(msg) AS parsed FROM auth_logs
 );
 ```
 
-Output:
+Expected output:
 
 ```text
 ┌──────────┐
@@ -162,9 +160,51 @@ Output:
 │ true     │
 │ true     │
 │ true     │
-│ true     │
 └──────────┘
 ```
 
-Every row evaluates to `true`.
-No whitespace, delimiter, or casing was altered during parsing.
+Every row returns `true`. Whitespace, delimiters, and case remain unchanged.
+
+---
+
+## Troubleshooting
+
+### Manually constructed integer array produces unexpected numbers in RzJoin
+
+In DuckDB SQL, literal lists of integers default to 32-bit `INTEGER[]` instead of 64-bit `BIGINT[]`.
+When uncast 32-bit arrays are read as 64-bit integers by `RzJoin`, memory aliasing produces corrupted values:
+
+```sql
+-- Problem: [22] defaults to INTEGER[]
+SELECT RzJoin('port {i}', [22], []::VARCHAR[]);
+-- Output: port 2774548873238
+```
+
+To resolve this, cast integer arrays explicitly to `BIGINT[]`:
+
+```sql
+SELECT RzJoin('port {i}', [22]::BIGINT[], []::VARCHAR[]);
+-- Output: port 22
+```
+
+### Extension failed to load because unsigned extensions are disabled
+
+When loading local builds, DuckDB blocks unsigned binaries:
+
+```text
+IO Error: Extension could not be loaded because its signature is either missing or invalid
+```
+
+Start the DuckDB shell with the `-unsigned` flag:
+
+```bash
+duckdb -unsigned
+```
+
+---
+
+## Related
+
+- [DuckDB SQL reference](../reference/sql-functions.md): complete function signatures and return types.
+- [Lossless invertibility](../explanation/lossless-invertibility.md): invariant proof and memory safety.
+- [Parquet on S3](s3-compaction.md): storing compact log stripes in cloud object storage.
